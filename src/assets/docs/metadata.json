@@ -1,0 +1,5 @@
+{
+  "name": "Interactive Study Bookshelf",
+  "description": "An interactive e-reader application for students to read textbooks, practice questions, and highlight important notes.",
+  "requestFramePermissions": []
+}
