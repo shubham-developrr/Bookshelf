@@ -18,7 +18,7 @@ function App() {
         setHighlights(prev => {
             const newHighlight: Highlight = {
                 ...highlight,
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                id: crypto.randomUUID(),
                 timestamp: new Date()
             };
             console.log('New highlight list:', [...prev, newHighlight]);
