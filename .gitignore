@@ -22,3 +22,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Miscellaneous files (can be deleted)
+misc/
+*.tmp
+*.temp
+
+# Playwright and testing
+.playwright-mcp/
+test-results/
+
+# MCP config (not needed for main app)
+mcp.config.json
+
+#Screenshots (optional - uncomment if you don't want to track)
+screenshots/

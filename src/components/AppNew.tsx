@@ -122,12 +122,17 @@ const AIGuruModal = ({ isOpen, onClose, initialPrompt }: { isOpen: boolean, onCl
 };
 
 export default function App() {
+
     const [highlights, setHighlights] = useState<Highlight[]>([]);
     const [isAIGuruModalOpen, setAIGuruModalOpen] = useState(false);
     const [aiInitialPrompt, setAiInitialPrompt] = useState('');
 
     const addHighlight = (highlight: Omit<Highlight, 'id'>) => {
         setHighlights(prev => [...prev, { ...highlight, id: Date.now().toString() }]);
+    };
+
+    const removeHighlight = (id: string) => {
+        setHighlights(prev => prev.filter(h => h.id !== id));
     };
 
     const openAIGuru = (prompt?: string) => {
@@ -149,6 +154,7 @@ export default function App() {
                                 openAIGuru={openAIGuru}
                                 highlights={highlights}
                                 addHighlight={addHighlight}
+                                removeHighlight={removeHighlight}
                             />
                         } 
                     />

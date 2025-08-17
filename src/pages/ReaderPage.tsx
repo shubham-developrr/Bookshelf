@@ -1,37 +1,26 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BackIcon, AlertIcon, SparklesIcon, PlayCircleIcon } from '../components/icons';
+import { BackIcon, AlertIcon, SparklesIcon } from '../components/icons';
 import { Highlight } from '../types/types';
-import { READER_TEXT, chapterSubtopics } from '../constants/constants';
+import { chapterSubtopics } from '../constants/constants';
 import { AIGuruIcon } from '../components/icons';
 import { useTheme } from '../contexts/ThemeContext';
+import KindleStyleTextViewer from '../components/KindleStyleTextViewerFixed';
 
 interface ReaderPageProps {
     openAIGuru: (prompt?: string) => void;
     highlights: Highlight[];
-    addHighlight: (highlight: Omit<Highlight, 'id'>) => void;
+    addHighlight: (highlight: Omit<Highlight, 'id' | 'timestamp'>) => void;
+    removeHighlight: (id: string) => void;
 }
 
-// --- Helper to escape regex special characters ---
-function escapeRegExp(string: string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-const ReaderPage: React.FC<ReaderPageProps> = ({ openAIGuru, highlights, addHighlight }) => {
+const ReaderPage: React.FC<ReaderPageProps> = ({ openAIGuru, highlights, addHighlight, removeHighlight }) => {
     const { subjectName, chapterName } = useParams<{ subjectName: string; chapterName: string }>();
     const navigate = useNavigate();
     const { theme } = useTheme();
     
-    const [highlightMenu, setHighlightMenu] = useState<{ top: number; left: number; show: boolean }>({ 
-        top: 0, left: 0, show: false 
-    });
-    const [showColorPicker, setShowColorPicker] = useState(false);
-    const [showNoteInput, setShowNoteInput] = useState(false);
-    const [noteText, setNoteText] = useState('');
     const [expandedSubtopics, setExpandedSubtopics] = useState<Set<string>>(new Set());
-    const [renderedHtml, setRenderedHtml] = useState(READER_TEXT);
     const contentRef = useRef<HTMLDivElement>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
 
     const currentBook = subjectName ? decodeURIComponent(subjectName) : '';
     const currentChapter = chapterName ? decodeURIComponent(chapterName) : '';
@@ -125,346 +114,27 @@ The emerging concept of "elephant-friendly" development promises to transform ho
         });
     };
 
-    // Simple text selection handler
-    useEffect(() => {
-        const handleSelection = () => {
-            setTimeout(() => {
-                const selection = window.getSelection();
-                if (selection && !selection.isCollapsed) {
-                    const range = selection.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    
-                    // Check if selection is within content area
-                    const target = range.commonAncestorContainer;
-                    const contentArea = target.nodeType === Node.TEXT_NODE 
-                        ? target.parentElement?.closest('.selectable-content')
-                        : (target as Element)?.closest('.selectable-content');
-                    
-                    if (contentArea) {
-                        setShowColorPicker(false);
-                        setShowNoteInput(false);
-                        
-                        // Position menu above selection
-                        let top = window.scrollY + rect.top - 70;
-                        let left = window.scrollX + rect.left + (rect.width / 2) - 125;
-                        
-                        // Keep menu within viewport
-                        const viewportWidth = window.innerWidth;
-                        if (left < 10) left = 10;
-                        if (left + 250 > viewportWidth) left = viewportWidth - 260;
-                        if (top < 70) top = window.scrollY + rect.bottom + 10;
-                        
-                        setHighlightMenu({
-                            top: top,
-                            left: left,
-                            show: true
-                        });
-                    }
-                }
-            }, 100);
-        };
-
-        // Listen for text selection
-        document.addEventListener('mouseup', handleSelection);
-        document.addEventListener('touchend', handleSelection);
-
-        return () => {
-            document.removeEventListener('mouseup', handleSelection);
-            document.removeEventListener('touchend', handleSelection);
-        };
-    }, []);
-
-    const hideMenu = useCallback(() => {
-        setHighlightMenu(prev => ({ ...prev, show: false }));
-    }, []);
-
-    const renderSubtopicContent = (subtopic: string) => {
-        let content = subtopicContent[subtopic] || 'Content for this subtopic will be added soon. Click the Explain button above for an AI explanation.';
-        
-        // Wrap in paragraph with proper styling
-        const styledContent = `<p class="theme-text-secondary leading-relaxed text-justify" style="line-height: 1.8; font-size: 15px; font-family: Georgia, serif;">${content}</p>`;
-        
-        // Apply highlights to this content
-        const chapterHighlights = highlights.filter(h => h.chapterId === currentBook);
-        let html = styledContent;
-        
-        chapterHighlights.forEach(highlight => {
-            let highlightStyle = '';
-            switch(highlight.color) {
-                case 'yellow':
-                    highlightStyle = 'background-color: rgba(255, 235, 59, 0.6); padding: 2px; border-radius: 3px;';
-                    break;
-                case 'green':
-                    highlightStyle = 'background-color: rgba(76, 175, 80, 0.6); padding: 2px; border-radius: 3px;';
-                    break;
-                case 'blue':
-                    highlightStyle = 'background-color: rgba(33, 150, 243, 0.6); padding: 2px; border-radius: 3px;';
-                    break;
-                case 'red':
-                    highlightStyle = 'background-color: rgba(244, 67, 54, 0.6); padding: 2px; border-radius: 3px;';
-                    break;
-                default:
-                    highlightStyle = 'background-color: rgba(255, 235, 59, 0.6); padding: 2px; border-radius: 3px;';
-            }
-            if (content.includes(highlight.text)) {
-                const markElement = `<mark style="${highlightStyle}" data-highlight-id="${highlight.id}">${highlight.text}</mark>`;
-                html = html.replace(new RegExp(escapeRegExp(highlight.text), 'g'), markElement);
-            }
-        });
-        
-        return html;
-    };
-
-    const handleMouseUp = useCallback((e: React.MouseEvent | MouseEvent) => {
-        const selection = window.getSelection();
-        if (selection && !selection.isCollapsed) {
-            // Check if selection is within any selectable content area
-            const target = e.target as HTMLElement;
-            const selectableContent = target.closest('.selectable-content, .content-wrapper');
-            
-            if (selectableContent) {
-                // Prevent default browser selection menu on mobile
-                e.preventDefault();
-                
-                const range = selection.getRangeAt(0);
-                const rect = range.getBoundingClientRect();
-                const containerRect = selectableContent.getBoundingClientRect();
-
-                setShowColorPicker(false);
-                setShowNoteInput(false);
-                
-                // Calculate position with screen bounds checking
-                let top = rect.top - containerRect.top - 80;
-                let left = rect.left - containerRect.left + rect.width / 2 - 125; // Center the menu better
-                
-                // Ensure menu stays within bounds
-                if (left < 10) left = 10;
-                if (left > containerRect.width - 250) left = containerRect.width - 250;
-                if (top < 10) top = rect.bottom - containerRect.top + 10;
-                
-                setHighlightMenu({
-                    top: rect.top + window.scrollY - 80,
-                    left: rect.left + window.scrollX + rect.width / 2 - 125,
-                    show: true
-                });
-            }
-        }
-    }, []);
-
-    const handleTouchEnd = useCallback((e: TouchEvent) => {
-        // Prevent default to avoid browser selection menu
-        e.preventDefault();
-        
-        // Small delay to allow selection to complete
-        setTimeout(() => {
-            const selection = window.getSelection();
-            if (selection && !selection.isCollapsed) {
-                const target = e.target as HTMLElement;
-                const selectableContent = target.closest('.selectable-content, .content-wrapper');
-                
-                if (selectableContent) {
-                    const range = selection.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    
-                    setShowColorPicker(false);
-                    setShowNoteInput(false);
-                    
-                    // Position menu above selection for mobile
-                    let top = window.scrollY + rect.top - 80;
-                    let left = window.scrollX + rect.left + (rect.width / 2) - 125;
-                    
-                    // Ensure menu stays within viewport bounds
-                    const viewportWidth = window.innerWidth;
-                    if (left < 10) left = 10;
-                    if (left + 250 > viewportWidth) left = viewportWidth - 260;
-                    if (top < 10) top = window.scrollY + rect.bottom + 10;
-                    
-                    setHighlightMenu({
-                        top: top,
-                        left: left,
-                        show: true
-                    });
-                }
-            }
-        }, 150); // Increased delay for mobile
-    }, []);
-
-    // Handle click outside to hide menu
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                setHighlightMenu({ top: 0, left: 0, show: false });
-                setShowColorPicker(false);
-                setShowNoteInput(false);
-                window.getSelection()?.removeAllRanges();
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, []);
-
-    // Add CSS for text selection and highlighting
-    useEffect(() => {
-        const style = document.createElement('style');
-        style.textContent = `
-            .selectable-content {
-                -webkit-user-select: text;
-                -moz-user-select: text;
-                -ms-user-select: text;
-                user-select: text;
-            }
-            
-            .selectable-content::selection {
-                background: rgba(59, 130, 246, 0.2);
-            }
-            .selectable-content::-moz-selection {
-                background: rgba(59, 130, 246, 0.2);
-            }
-            
-            /* Highlight styles */
-            .highlight-yellow {
-                background: linear-gradient(120deg, rgba(255, 235, 59, 0.4) 0%, rgba(255, 235, 59, 0.6) 100%) !important;
-                padding: 1px 2px;
-                border-radius: 2px;
-            }
-            
-            .highlight-green {
-                background: linear-gradient(120deg, rgba(76, 175, 80, 0.4) 0%, rgba(76, 175, 80, 0.6) 100%) !important;
-                padding: 1px 2px;
-                border-radius: 2px;
-            }
-            
-            .highlight-blue {
-                background: linear-gradient(120deg, rgba(33, 150, 243, 0.4) 0%, rgba(33, 150, 243, 0.6) 100%) !important;
-                padding: 1px 2px;
-                border-radius: 2px;
-            }
-            
-            .highlight-red {
-                background: linear-gradient(120deg, rgba(244, 67, 54, 0.4) 0%, rgba(244, 67, 54, 0.6) 100%) !important;
-                padding: 1px 2px;
-                border-radius: 2px;
-            }
-            
-            .highlight-menu {
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-                backdrop-filter: blur(8px);
-            }
-        `;
-        document.head.appendChild(style);
-        
-        return () => {
-            if (document.head.contains(style)) {
-                document.head.removeChild(style);
-            }
-        };
-    }, []);
-
-    const applyHighlight = (color: string) => {
-        const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-            hideMenu();
-            return;
-        }
-
-        try {
-            const range = selection.getRangeAt(0);
-            const selectedText = range.toString().trim();
-            
-            if (selectedText.length === 0) {
-                hideMenu();
-                return;
-            }
-            
-            // Create highlight span with proper styling
-            const span = document.createElement('span');
-            span.className = `highlight-${color}`;
-            span.setAttribute('data-highlight-id', Date.now().toString());
-            span.setAttribute('data-highlight-color', color);
-            span.style.backgroundColor = getColorStyle(color);
-            span.style.padding = '2px 4px';
-            span.style.borderRadius = '3px';
-            span.style.boxDecorationBreak = 'clone';
-            
-            // Wrap the selected text
-            try {
-                range.surroundContents(span);
-            } catch (e) {
-                // Fallback for complex selections
-                const contents = range.extractContents();
-                span.appendChild(contents);
-                range.insertNode(span);
-            }
-            
-            // Save to highlights store
-            addHighlight({ 
-                text: selectedText, 
-                color, 
-                chapterId: currentBook
-            });
-            
-            console.log(`✅ Text highlighted with ${color}: "${selectedText}"`);
-            
-        } catch (error) {
-            console.error('Highlighting failed:', error);
-        } finally {
-            // Clear selection and hide menu
-            setTimeout(() => {
-                if (selection) {
-                    selection.removeAllRanges();
-                }
-            }, 100);
-            hideMenu();
-            setShowColorPicker(false);
-        }
-    };
-
-    // Helper function to get color styles
-    const getColorStyle = (color: string): string => {
-        const colorMap: Record<string, string> = {
-            'yellow': 'rgba(255, 235, 59, 0.6)',
-            'green': 'rgba(76, 175, 80, 0.6)',
-            'blue': 'rgba(33, 150, 243, 0.6)',
-            'red': 'rgba(244, 67, 54, 0.6)'
-        };
-        return colorMap[color] || colorMap['yellow'];
-    };
-    
-    const addNote = () => {
-        const selection = window.getSelection();
-        if (selection && !selection.isCollapsed && noteText.trim()) {
-            const text = selection.toString().trim();
-            if (text.length > 0) {
-                // In a real app, this would save the note to a database
-                addHighlight({ text, color: 'blue', chapterId: currentBook }); // Using blue for notes
-                console.log('Note added:', { text, note: noteText });
-                
-                setTimeout(() => {
-                    selection.removeAllRanges();
-                }, 100);
-            }
-            setNoteText('');
-        }
-        setShowNoteInput(false);
-        hideMenu();
-    };
-    
-    const handleExplain = () => {
-        const selection = window.getSelection();
-        if (selection) {
-            const selectedText = selection.toString().trim();
-            if (selectedText) {
-                openAIGuru(selectedText);
-            }
-        }
-        hideMenu();
-    };
-
     const handleSubtopicExplain = (subtopic: string) => {
         openAIGuru(`Explain "${subtopic}" from ${currentChapter} chapter of ${currentBook} subject in detail.`);
+    };
+
+    // Handle AI explanation of selected text
+    const handleExplainSelectedText = (selectedText: string, context: string) => {
+        const prompt = `Explain this specific text: "${selectedText}" 
+
+Context: This is from the "${currentChapter}" chapter of the "${currentBook}" subject.
+
+Surrounding context: "${context}"
+
+Please provide a detailed explanation of the selected text, focusing on:
+1. What it means in simple terms
+2. Why it's important in this subject
+3. How it relates to the broader topic
+4. Any examples or real-world applications
+
+Make the explanation educational and easy to understand.`;
+
+        openAIGuru(prompt);
     };
 
     const handleVideoLink = (subtopic: string) => {
@@ -571,17 +241,29 @@ The emerging concept of "elephant-friendly" development promises to transform ho
                                         </div>
                                     </div>
                                     
-                                    {/* Content outside the box */}
+                                    {/* Content outside the box - Using new TextSelectionEngine */}
                                     {expandedSubtopics.has(subtopic) && (
                                         <div className="mt-6 mb-8 px-0">
                                             <div 
-                                                className="prose prose-sm sm:prose-base lg:prose-lg max-w-none theme-text selectable-content"
-                                                key={`${subtopic}-${highlights.length}`}
-                                                dangerouslySetInnerHTML={{ 
-                                                    __html: renderSubtopicContent(subtopic) 
-                                                }}
+                                                className="prose prose-sm sm:prose-base lg:prose-lg max-w-none theme-text"
                                                 style={{ width: '100%' }}
-                                            />
+                                            >
+                                                <KindleStyleTextViewer
+                                                    content={subtopicContent[subtopic] || 'Content for this subtopic will be added soon. Click the Explain button above for an AI explanation.'}
+                                                    highlights={highlights.filter(h => h.chapterId === currentBook)}
+                                                    currentBook={currentBook}
+                                                    onHighlight={(text: string, color: string) => {
+                                                        addHighlight({
+                                                            text,
+                                                            color,
+                                                            chapterId: currentBook
+                                                        });
+                                                    }}
+                                                    onRemoveHighlight={removeHighlight}
+                                                    className="subtopic-content-enhanced"
+                                                    onExplainWithAI={handleExplainSelectedText}
+                                                />
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -593,71 +275,7 @@ The emerging concept of "elephant-friendly" development promises to transform ho
                 <div 
                     className="relative pb-16 content-wrapper" 
                     ref={contentRef}
-                    style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
                 >
-                    {highlightMenu.show && (
-                        <div 
-                            ref={menuRef} 
-                            className="highlight-menu fixed bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 border border-gray-200 dark:border-gray-700"
-                            style={{ 
-                                top: `${highlightMenu.top}px`, 
-                                left: `${highlightMenu.left}px`,
-                                minWidth: '250px',
-                                maxWidth: '90vw'
-                            }}
-                        >
-                            {showColorPicker ? (
-                                <div className="flex items-center gap-2 p-3">
-                                    <span className="text-xs text-gray-600 dark:text-gray-300 mr-2">Color:</span>
-                                    <button onClick={() => applyHighlight('yellow')} className="w-6 h-6 bg-yellow-400 rounded-full border-2 border-gray-300 hover:scale-110 transition-transform" title="Yellow"></button>
-                                    <button onClick={() => applyHighlight('green')} className="w-6 h-6 bg-green-400 rounded-full border-2 border-gray-300 hover:scale-110 transition-transform" title="Green"></button>
-                                    <button onClick={() => applyHighlight('blue')} className="w-6 h-6 bg-blue-400 rounded-full border-2 border-gray-300 hover:scale-110 transition-transform" title="Blue"></button>
-                                    <button onClick={() => applyHighlight('red')} className="w-6 h-6 bg-red-400 rounded-full border-2 border-gray-300 hover:scale-110 transition-transform" title="Red"></button>
-                                    <button onClick={() => setShowColorPicker(false)} className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 ml-2">✕</button>
-                                </div>
-                            ) : showNoteInput ? (
-                                <div className="p-3 w-64">
-                                    <textarea
-                                        value={noteText}
-                                        onChange={(e) => setNoteText(e.target.value)}
-                                        placeholder="Write your note..."
-                                        className="w-full h-16 px-2 py-1 text-xs bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded border border-gray-300 dark:border-gray-600 resize-none mb-2"
-                                        autoFocus
-                                    />
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setShowNoteInput(false)} className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Cancel</button>
-                                        <button onClick={addNote} className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Save</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex items-center">
-                                    <button 
-                                        className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 border-r border-gray-200 dark:border-gray-600"
-                                        onClick={() => setShowColorPicker(true)}
-                                    >
-                                        <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
-                                        Highlight
-                                    </button>
-                                    <button 
-                                        className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 border-r border-gray-200 dark:border-gray-600"
-                                        onClick={() => setShowNoteInput(true)}
-                                    >
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        Notes
-                                    </button>
-                                    <button 
-                                        onClick={handleExplain} 
-                                        className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                    >
-                                        <SparklesIcon className="w-3 h-3 text-purple-400"/>
-                                        Explain
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
             </main>
             

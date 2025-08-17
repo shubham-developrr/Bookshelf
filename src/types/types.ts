@@ -14,6 +14,7 @@ export type Highlight = {
   text: string;
   color: string;
   chapterId: string;
+  timestamp?: Date;
 };
 
 export type SearchResult = {
