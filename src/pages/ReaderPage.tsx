@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BackIcon, AlertIcon, SparklesIcon } from '../components/icons';
 import { Highlight } from '../types/types';
@@ -20,14 +20,50 @@ const ReaderPage: React.FC<ReaderPageProps> = ({ openAIGuru, highlights, addHigh
     const { theme } = useTheme();
     
     const [expandedSubtopics, setExpandedSubtopics] = useState<Set<string>>(new Set());
+    const [customSubtopics, setCustomSubtopics] = useState<{title: string, content: string}[]>([]);
+    const [isCustomBook, setIsCustomBook] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
 
     const currentBook = subjectName ? decodeURIComponent(subjectName) : '';
     const currentChapter = chapterName ? decodeURIComponent(chapterName) : '';
     
-    const currentSubtopics = currentChapter && chapterSubtopics[currentBook] 
-        ? chapterSubtopics[currentBook][currentChapter] || []
-        : [];
+    // Check if this is a custom book and load custom subtopics
+    useEffect(() => {
+        const checkCustomBook = () => {
+            const createdBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+            const isCustom = createdBooks.some((book: any) => book.name === currentBook);
+            setIsCustomBook(isCustom);
+            
+            if (isCustom) {
+                // Find the book ID
+                const book = createdBooks.find((b: any) => b.name === currentBook);
+                if (book) {
+                    // Load custom subtopics
+                    const chapterKey = currentChapter.replace(/\s+/g, '_');
+                    const subtopicsKey = `subtopics_${book.id}_${chapterKey}`;
+                    const subtopicsData = localStorage.getItem(subtopicsKey);
+                    
+                    if (subtopicsData) {
+                        const parsedSubtopics = JSON.parse(subtopicsData);
+                        setCustomSubtopics(parsedSubtopics.map((sub: any) => ({
+                            title: sub.title,
+                            content: sub.content
+                        })));
+                    }
+                }
+            }
+        };
+        
+        if (currentBook && currentChapter) {
+            checkCustomBook();
+        }
+    }, [currentBook, currentChapter]);
+    
+    const currentSubtopics = isCustomBook 
+        ? customSubtopics.map(sub => sub.title)
+        : (currentChapter && chapterSubtopics[currentBook] 
+            ? chapterSubtopics[currentBook][currentChapter] || []
+            : []);
 
     // Determine unit number based on chapter name/position
     const getUnitNumber = (book: string, chapter: string): number => {
@@ -135,6 +171,16 @@ Please provide a detailed explanation of the selected text, focusing on:
 Make the explanation educational and easy to understand.`;
 
         openAIGuru(prompt);
+    };
+    
+    // Get content for subtopic (handles both legacy and custom books)
+    const getSubtopicContent = (subtopic: string): string => {
+        if (isCustomBook) {
+            const customSubtopic = customSubtopics.find(sub => sub.title === subtopic);
+            return customSubtopic?.content || 'Content for this subtopic will be added soon. Click the Explain button above for an AI explanation.';
+        } else {
+            return subtopicContent[subtopic] || 'Content for this subtopic will be added soon. Click the Explain button above for an AI explanation.';
+        }
     };
 
     const handleVideoLink = (subtopic: string) => {
@@ -249,7 +295,7 @@ Make the explanation educational and easy to understand.`;
                                                 style={{ width: '100%' }}
                                             >
                                                 <KindleStyleTextViewer
-                                                    content={subtopicContent[subtopic] || 'Content for this subtopic will be added soon. Click the Explain button above for an AI explanation.'}
+                                                    content={getSubtopicContent(subtopic)}
                                                     highlights={highlights.filter(h => h.chapterId === currentBook)}
                                                     currentBook={currentBook}
                                                     onHighlight={(text: string, color: string) => {
