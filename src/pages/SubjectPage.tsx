@@ -298,52 +298,90 @@ const SubjectPage: React.FC = () => {
                     <h2 className="text-lg font-semibold theme-text mb-4">Course Content</h2>
                     
                     {/* Custom Book Chapters */}
-                    {isCustomBook && customChapters.map((chapter) => (
-                        <div key={chapter.id} className="card w-full hover:scale-[1.01] theme-transition cursor-pointer"
-                             onClick={() => navigate(`/create/${encodeURIComponent(book)}/${encodeURIComponent(chapter.name)}`)}>
-                            <div className="flex items-center gap-4 p-4 sm:p-6">
-                                <div className="w-12 h-12 sm:w-16 sm:h-16 theme-accent rounded-lg flex items-center justify-center flex-shrink-0">
-                                    <span className="text-white font-bold text-sm sm:text-base">Unit {chapter.number}</span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold theme-text mb-1 text-sm sm:text-base leading-tight">{chapter.name}</h3>
-                                    <p className="theme-text-secondary text-xs">
-                                        {chapter.subtopics.length > 0 ? `${chapter.subtopics.length} subtopics` : 'No content yet'}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleEditChapter(chapter);
-                                        }}
-                                        className="p-2 text-blue-600 hover:text-blue-800 theme-transition"
-                                        title="Edit chapter"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteChapter(chapter.id);
-                                        }}
-                                        className="p-2 text-red-600 hover:text-red-800 theme-transition"
-                                        title="Delete chapter"
-                                    >
-                                        <TrashIcon />
-                                    </button>
+                    {isCustomBook && customChapters.map((chapter) => {
+                        // Get book details
+                        const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+                        const bookDetails = savedBooks.find((b: any) => b.name === book);
+                        
+                        return (
+                            <div key={chapter.id} className="card w-full hover:scale-[1.01] theme-transition cursor-pointer"
+                                 onClick={() => navigate(`/reader/${encodeURIComponent(book)}/${encodeURIComponent(chapter.name)}`)}>
+                                <div className="flex items-start gap-4 p-4 sm:p-6">
+                                    <div className="w-12 h-12 sm:w-16 sm:h-16 theme-accent rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <span className="text-white font-bold text-sm sm:text-base">Unit {chapter.number}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0 space-y-2">
+                                        <h3 className="font-semibold theme-text mb-1 text-sm sm:text-base leading-tight">{chapter.name}</h3>
+                                        
+                                        <div className="space-y-1">
+                                            <p className="theme-text-secondary text-xs">
+                                                {chapter.subtopics.length > 0 ? `${chapter.subtopics.length} subtopics` : 'No content yet'}
+                                            </p>
+                                            
+                                            {bookDetails && (
+                                                <div className="flex flex-wrap gap-2 text-xs theme-text-secondary">
+                                                    {bookDetails.language && (
+                                                        <span className="px-2 py-1 theme-accent-bg rounded-full">
+                                                            Language: {bookDetails.language}
+                                                        </span>
+                                                    )}
+                                                    {bookDetails.difficulty && (
+                                                        <span className="px-2 py-1 theme-accent-bg rounded-full">
+                                                            Level: {bookDetails.difficulty}
+                                                        </span>
+                                                    )}
+                                                    {bookDetails.audience && (
+                                                        <span className="px-2 py-1 theme-accent-bg rounded-full">
+                                                            For: {bookDetails.audience}
+                                                        </span>
+                                                    )}
+                                                    {bookDetails.category && (
+                                                        <span className="px-2 py-1 theme-accent-bg rounded-full">
+                                                            {bookDetails.category}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleEditChapter(chapter);
+                                            }}
+                                            className="p-2 text-blue-600 hover:text-blue-800 theme-transition"
+                                            title="Edit chapter"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteChapter(chapter.id);
+                                            }}
+                                            className="p-2 text-red-600 hover:text-red-800 theme-transition"
+                                            title="Delete chapter"
+                                        >
+                                            <TrashIcon />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     {/* Legacy Book Chapters */}
                     {!isCustomBook && syllabus[book] && syllabus[book].map((chapter: string, i: number) => {
                         const subtopicCount = chapterSubtopics[book] && chapterSubtopics[book][chapter] 
                             ? chapterSubtopics[book][chapter].length 
                             : 0;
+
+                        // Get book details if available
+                        const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+                        const bookDetails = savedBooks.find((b: any) => b.name === book);
                         
                         return (
                             <button 
@@ -351,17 +389,47 @@ const SubjectPage: React.FC = () => {
                                 onClick={() => navigate(`/reader/${encodeURIComponent(book)}/${encodeURIComponent(chapter)}`)} 
                                 className="card w-full text-left p-4 sm:p-6 hover:scale-[1.01] theme-transition"
                             >
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 sm:w-16 sm:h-16 theme-accent rounded-lg flex items-center justify-center flex-shrink-0">
                                         <span className="text-white font-bold text-sm sm:text-base">Unit {i + 1}</span>
                                     </div>
-                                    <div className="flex-1 min-w-0">
+                                    <div className="flex-1 min-w-0 space-y-2">
                                         <h3 className="font-semibold theme-text mb-1 text-sm sm:text-base leading-tight">{chapter}</h3>
-                                        <p className="theme-text-secondary text-xs">
-                                            {subtopicCount > 0 ? `${subtopicCount} subtopics` : 'Topics available'}
-                                        </p>
+                                        
+                                        {/* Chapter details */}
+                                        <div className="space-y-1">
+                                            <p className="theme-text-secondary text-xs">
+                                                {subtopicCount > 0 ? `${subtopicCount} subtopics` : 'Topics available'}
+                                            </p>
+                                            
+                                            {bookDetails && (
+                                                <div className="flex flex-wrap gap-2 text-xs theme-text-secondary">
+                                                    {bookDetails.language && (
+                                                        <span className="px-2 py-1 theme-accent-bg rounded-full">
+                                                            Language: {bookDetails.language}
+                                                        </span>
+                                                    )}
+                                                    {bookDetails.difficulty && (
+                                                        <span className="px-2 py-1 theme-accent-bg rounded-full">
+                                                            Level: {bookDetails.difficulty}
+                                                        </span>
+                                                    )}
+                                                    {bookDetails.audience && (
+                                                        <span className="px-2 py-1 theme-accent-bg rounded-full">
+                                                            For: {bookDetails.audience}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            
+                                            {bookDetails?.description && (
+                                                <p className="text-xs theme-text-secondary line-clamp-2 mt-2">
+                                                    {bookDetails.description}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="theme-text-secondary">
+                                    <div className="theme-text-secondary pt-1">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>

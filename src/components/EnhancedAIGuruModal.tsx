@@ -22,8 +22,41 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set());
     const chatContainerRef = React.useRef<HTMLDivElement>(null);
     const messagesRef = React.useRef<Message[]>([]);
+
+    // Component for user messages with collapse functionality
+    const UserMessage: React.FC<{ message: string; index: number }> = ({ message, index }) => {
+        const isLong = message.length > 200;
+        const isExpanded = expandedMessages.has(index);
+        
+        const toggleExpanded = () => {
+            const newExpanded = new Set(expandedMessages);
+            if (isExpanded) {
+                newExpanded.delete(index);
+            } else {
+                newExpanded.add(index);
+            }
+            setExpandedMessages(newExpanded);
+        };
+
+        return (
+            <div className="w-full max-w-full sm:max-w-md p-3 rounded-2xl theme-accent text-white rounded-br-none">
+                <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                    {isLong && !isExpanded ? message.substring(0, 200) + '...' : message}
+                </p>
+                {isLong && (
+                    <button 
+                        onClick={toggleExpanded}
+                        className="mt-2 text-xs underline opacity-80 hover:opacity-100"
+                    >
+                        {isExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                )}
+            </div>
+        );
+    };
 
     // Enhanced Educational AI tutor system prompt
     const getSystemPrompt = (isEnhanced: boolean = false) => {
@@ -185,13 +218,14 @@ Focus on helping a college student understand both the concept and its applicati
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="theme-surface w-full max-w-4xl h-[90vh] rounded-2xl flex flex-col shadow-2xl">
-                <header className="flex justify-between items-center p-4 border-b theme-border">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+            {/* Mobile-optimized modal */}
+            <div className="theme-surface w-full h-full sm:h-[90vh] sm:max-w-4xl sm:rounded-2xl flex flex-col shadow-2xl sm:m-4">
+                <header className="flex justify-between items-center p-3 sm:p-4 border-b theme-border flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <AIGuruIcon className="w-6 h-6 theme-accent-text" />
                         <div>
-                            <h2 className="text-lg font-bold theme-text">AI Guru</h2>
+                            <h2 className="text-base sm:text-lg font-bold theme-text">AI Guru</h2>
                             <p className="text-xs theme-text-secondary">Your Personal Learning Assistant</p>
                         </div>
                     </div>
@@ -200,16 +234,16 @@ Focus on helping a college student understand both the concept and its applicati
                     </button>
                 </header>
                 
-                {/* Quick Actions */}
+                {/* Quick Actions - Collapsible on mobile */}
                 {messages.length <= 1 && (
-                    <div className="p-4 border-b theme-border">
+                    <div className="p-3 sm:p-4 border-b theme-border flex-shrink-0">
                         <p className="text-sm theme-text-secondary mb-3">Quick actions:</p>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {quickActions.map((action, index) => (
                                 <button
                                     key={index}
                                     onClick={() => handleQuickAction(action.prompt)}
-                                    className="text-left p-2 text-xs btn-secondary theme-transition"
+                                    className="text-left p-2 text-xs btn-secondary theme-transition rounded-lg"
                                 >
                                     {action.text}
                                 </button>
@@ -218,64 +252,76 @@ Focus on helping a college student understand both the concept and its applicati
                     </div>
                 )}
                 
-                <main ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto space-y-4">
-                    {messages.map((msg, index) => (
-                        <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            {msg.role === 'user' ? (
-                                <div className="max-w-md p-3 rounded-2xl theme-accent text-white rounded-br-none">
-                                    <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
-                                </div>
-                            ) : msg.role === 'error' ? (
-                                <div className="max-w-md p-3 rounded-2xl bg-red-600 text-white rounded-bl-none">
-                                    <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
-                                </div>
-                            ) : (
-                                <div className="max-w-full w-full">
-                                    {msg.isEnhanced ? (
-                                        <EnhancedAIResponse 
-                                            content={msg.text} 
-                                            isLoading={isLoading && index === messages.length - 1 && msg.text === '...'}
-                                        />
-                                    ) : (
-                                        <div className="max-w-md p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
-                                            <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                    {isLoading && messages[messages.length - 1]?.role !== 'model' && (
-                         <div className="flex justify-start">
-                             <div className="max-w-md p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
-                                <div className="flex gap-1.5 items-center">
-                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-0"></span>
-                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></span>
-                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-300"></span>
-                                </div>
+                <main ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-4 min-h-0">
+                    <div className="px-3 py-4 sm:px-4">
+                        {messages.map((msg, index) => (
+                            <div key={index} className={`mb-4 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                {msg.role === 'user' ? (
+                                    <UserMessage message={msg.text} index={index} />
+                                ) : msg.role === 'error' ? (
+                                    <div className="w-full max-w-full sm:max-w-md p-3 rounded-2xl bg-red-600 text-white rounded-bl-none">
+                                        <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.text}</p>
+                                    </div>
+                                ) : (
+                                    <div className="w-full max-w-full">
+                                        {msg.isEnhanced ? (
+                                            <EnhancedAIResponse 
+                                                content={msg.text} 
+                                                isLoading={isLoading && index === messages.length - 1 && msg.text === '...'}
+                                            />
+                                        ) : (
+                                            <div className="w-full max-w-full p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
+                                                <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.text}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        {isLoading && messages[messages.length - 1]?.role !== 'model' && (
+                             <div className="flex justify-start">
+                                 <div className="max-w-full sm:max-w-md p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
+                                    <div className="flex gap-1.5 items-center">
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-0"></span>
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></span>
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-300"></span>
+                                    </div>
+                                 </div>
                              </div>
-                         </div>
-                    )}
+                        )}
+                    </div>
                 </main>
-                <footer className="p-4 border-t theme-border">
-                    <div className="flex items-center gap-2 theme-surface2 rounded-lg px-2">
+                
+                <footer className="p-3 sm:p-4 border-t theme-border flex-shrink-0">
+                    <div className="flex items-end gap-3 theme-surface2 rounded-lg p-2">
                         <textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(input); } }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(input); setInput(''); } }}
                             placeholder="Ask me to explain a concept, help with homework, or create a quiz..."
-                            className="flex-1 bg-transparent p-2 resize-none focus:outline-none text-sm theme-text"
+                            className="flex-1 bg-transparent resize-none focus:outline-none text-sm theme-text min-h-[40px] max-h-[120px] py-2 px-1"
                             rows={1}
+                            style={{ 
+                                overflowY: input.length > 100 ? 'auto' : 'hidden',
+                                lineHeight: '1.4'
+                            }}
+                            onInput={(e) => {
+                                const target = e.target as HTMLTextAreaElement;
+                                target.style.height = 'auto';
+                                target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                            }}
                         />
                         <button 
-                            onClick={() => handleSend(input)} 
+                            onClick={() => {handleSend(input); setInput('');}} 
                             disabled={isLoading || !input.trim()} 
-                            className="p-2 theme-accent-text disabled:theme-text-secondary rounded-full hover:theme-surface2 disabled:hover:bg-transparent theme-transition"
+                            className="p-2 theme-accent text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:hover:bg-opacity-100 theme-transition flex-shrink-0"
                         >
-                            <PaperAirplaneIcon className="w-6 h-6" />
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z" />
+                            </svg>
                         </button>
                     </div>
-                    <p className="text-xs theme-text-secondary mt-2 text-center">
+                    <p className="text-xs theme-text-secondary mt-2 text-center px-2">
                         💡 Tip: Enhanced responses include LaTeX math, proper formatting, and detailed explanations
                     </p>
                 </footer>

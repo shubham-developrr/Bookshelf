@@ -7,7 +7,6 @@ import EnhancedAIGuruModal from './EnhancedAIGuruModal';
 import EnhancedBookshelfPage from '../pages/EnhancedBookshelfPage';
 import SearchPage from '../pages/SearchPage';
 import SubjectPage from '../pages/SubjectPage';
-import ReaderPage from '../pages/ReaderPage';
 import EnhancedReaderPage from '../pages/EnhancedReaderPage';
 import HighlightsPage from '../pages/HighlightsPage';
 import BookContentPage from '../pages/BookContentPage';
@@ -49,22 +48,9 @@ function AppContent() {
                     <Route path="/subject/:subjectName" element={<SubjectPage />} />
                     <Route path="/book/:bookId/content" element={<BookContentPage />} />
                     
-                    {/* Reading Mode - Original ReaderPage for viewing content with highlighting */}
+                    {/* Reading Mode - Enhanced ReaderPage with template system */}
                     <Route 
                         path="/reader/:subjectName/:chapterName" 
-                        element={
-                            <ReaderPage 
-                                openAIGuru={openAIGuru}
-                                highlights={highlights}
-                                addHighlight={addHighlight}
-                                removeHighlight={removeHighlight}
-                            />
-                        } 
-                    />
-                    
-                    {/* Creation/Editing Mode - EnhancedReaderPage for creating and editing content */}
-                    <Route 
-                        path="/create/:subjectName/:chapterName" 
                         element={
                             <EnhancedReaderPage 
                                 openAIGuru={openAIGuru}
@@ -74,6 +60,7 @@ function AppContent() {
                             />
                         } 
                     />
+
                     <Route 
                             path="/highlights/:subjectName/:chapterName" 
                             element={

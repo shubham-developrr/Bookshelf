@@ -8,8 +8,13 @@ import { useTheme } from '../contexts/ThemeContext';
 import KindleStyleTextViewer from '../components/KindleStyleTextViewerFixed';
 import YouTubePlayerModal from '../components/YouTubePlayerModal';
 import InlineContentEditor from '../components/InlineContentEditor';
-import FlashCardManager from '../components/FlashCardManager';
+import FlashCardManager from '../components/AnkiFlashCardManager';
 import RichTextEditor from '../components/RichTextEditor';
+import MCQManager from '../components/MCQManager';
+import QAManager from '../components/QAManager';
+import MindMapManager from '../components/MindMapManager';
+import NotesManager from '../components/NotesManager';
+import VideosManager from '../components/VideosManager';
 
 interface SubtopicData {
     id: string;
@@ -48,13 +53,19 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
     const [expandedSubtopics, setExpandedSubtopics] = useState<Set<string>>(new Set());
     const [customSubtopics, setCustomSubtopics] = useState<SubtopicData[]>([]);
     const [isCustomChapter, setIsCustomChapter] = useState(false);
+    const [isLoadingSubtopics, setIsLoadingSubtopics] = useState(false);
     const [editingSubtopic, setEditingSubtopic] = useState<string | null>(null);
     const [showAddSubtopic, setShowAddSubtopic] = useState(false);
     const [newSubtopicTitle, setNewSubtopicTitle] = useState('');
-    const [activeTab, setActiveTab] = useState('edit'); // Changed from 'read' to 'edit'
-    const [customTabs, setCustomTabs] = useState<string[]>(['Flash card', 'PYQ']); // Add default tabs
-    const [newTabName, setNewTabName] = useState(''); // For adding new tabs
+    const [activeTab, setActiveTab] = useState('read'); // Main content tab now called 'read'
+    const [availableTemplates] = useState<string[]>(['Notes', 'Flash card', 'MCQ', 'Q&A', 'Mind Map', 'Videos']); // Template options
+    const [activeTabs, setActiveTabs] = useState<string[]>(['read', 'highlights']); // Default visible tabs - only Read and Highlights
+    const [showTemplateSelector, setShowTemplateSelector] = useState(false); // Show template selection modal
+    const [newTabName, setNewTabName] = useState(''); // For adding custom tabs
     const [showAddTab, setShowAddTab] = useState(false); // Show add tab form
+    const [tabNames, setTabNames] = useState<{ [key: string]: string }>({}); // Custom names for tabs
+    const [showRenameInput, setShowRenameInput] = useState<string | null>(null); // Tab being renamed
+    const [renameValue, setRenameValue] = useState(''); // Rename input value
     
     // YouTube Player Modal states
     const [showVideoModal, setShowVideoModal] = useState(false);
@@ -74,16 +85,26 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
 
     // Check if this is a custom chapter
     useEffect(() => {
-        const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
-        const customBook = savedBooks.find((book: any) => book.name === currentBook);
+        const checkAndLoadCustomChapter = async () => {
+            const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+            const customBook = savedBooks.find((book: any) => book.name === currentBook);
+            
+            if (customBook) {
+                setIsCustomChapter(true);
+                setIsLoadingSubtopics(true);
+                await loadCustomSubtopics(customBook.id, currentChapter);
+                setIsLoadingSubtopics(false);
+            } else {
+                setIsCustomChapter(false);
+                setIsLoadingSubtopics(false);
+            }
+        };
         
-        if (customBook) {
-            setIsCustomChapter(true);
-            loadCustomSubtopics(customBook.id, currentChapter);
-        }
+        checkAndLoadCustomChapter();
     }, [currentBook, currentChapter]);
 
-    const loadCustomSubtopics = (bookId: string, chapter: string) => {
+    const loadCustomSubtopics = async (bookId: string, chapter: string) => {
+        // Add a small delay to simulate loading if needed for UX
         const saved = localStorage.getItem(`subtopics_${bookId}_${chapter.replace(/\s+/g, '_')}`);
         if (saved) {
             setCustomSubtopics(JSON.parse(saved));
@@ -464,123 +485,118 @@ Make the explanation educational and easy to understand.`;
         openVideoModal(subtopic, existingVideo, 'edit');
     };
 
-    // Tab management functions
-    const handleAddTab = () => {
-        if (newTabName.trim() && !customTabs.includes(newTabName.trim())) {
-            setCustomTabs([...customTabs, newTabName.trim()]);
+    // Template and tab management functions
+    const handleAddTemplateTab = (templateName: string) => {
+        const baseId = templateName.toLowerCase().replace(/\s+/g, '');
+        let tabId = baseId;
+        let counter = 1;
+        
+        // Allow duplicates by adding numbers
+        while (activeTabs.includes(tabId)) {
+            counter++;
+            tabId = `${baseId}${counter}`;
+        }
+        
+        setActiveTabs([...activeTabs, tabId]);
+        
+        // Set custom name if it's a duplicate
+        if (counter > 1) {
+            setTabNames(prev => ({
+                ...prev,
+                [tabId]: `${templateName} ${counter}`
+            }));
+        }
+        
+        setActiveTab(tabId);
+        setShowTemplateSelector(false);
+    };
+
+    const handleAddCustomTab = () => {
+        if (newTabName.trim()) {
+            const baseId = newTabName.trim().toLowerCase().replace(/\s+/g, '');
+            let tabId = baseId;
+            let counter = 1;
+            
+            while (activeTabs.includes(tabId)) {
+                counter++;
+                tabId = `${baseId}${counter}`;
+            }
+            
+            setActiveTabs([...activeTabs, tabId]);
+            setTabNames(prev => ({
+                ...prev,
+                [tabId]: newTabName.trim()
+            }));
+            setActiveTab(tabId);
             setNewTabName('');
             setShowAddTab(false);
         }
     };
 
     const handleDeleteTab = (tabName: string) => {
-        if (confirm(`Are you sure you want to delete the "${tabName}" tab?`)) {
-            setCustomTabs(customTabs.filter(tab => tab !== tabName));
+        // Prevent deletion of core tabs
+        if (tabName === 'read' || tabName === 'highlights') {
+            alert('Cannot delete core tabs (Read, Highlights)');
+            return;
+        }
+        
+        if (confirm(`Are you sure you want to delete the "${getTabDisplayName(tabName)}" tab?`)) {
+            setActiveTabs(activeTabs.filter(tab => tab !== tabName));
+            // Remove custom name if exists
+            const newTabNames = { ...tabNames };
+            delete newTabNames[tabName];
+            setTabNames(newTabNames);
+            
             if (activeTab === tabName) {
-                setActiveTab('edit'); // Switch back to edit tab instead of read
+                setActiveTab('read'); // Switch back to read tab
             }
         }
     };
 
-    // New read-only content renderer (duplicate of edit but without edit controls)
-    const renderReadOnlyContent = () => {
-        return (
-            <div>
-                {/* Subtopics Display - Read Only */}
-                {isCustomChapter && customSubtopics.length === 0 && (
-                    <div className="text-center py-12">
-                        <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
-                            <SparklesIcon />
-                        </div>
-                        <h3 className="text-lg font-medium theme-text mb-2">No content yet</h3>
-                        <p className="theme-text-secondary mb-6">Switch to Edit tab to add content</p>
-                    </div>
-                )}
+    const handleRenameTab = (tabName: string) => {
+        if (renameValue.trim()) {
+            setTabNames(prev => ({
+                ...prev,
+                [tabName]: renameValue.trim()
+            }));
+        }
+        setShowRenameInput(null);
+        setRenameValue('');
+    };
 
-                {/* Regular/Custom Subtopic Content - Read Only */}
-                <div>
-                    {(isCustomChapter ? customSubtopics.map(sub => sub.title) : currentSubtopics).map((subtopic, index) => {
-                        const subtopicData = isCustomChapter ? customSubtopics.find(sub => sub.title === subtopic) : null;
-                        const isExpanded = expandedSubtopics.has(subtopic);
-                        const subtopicContent = {
-                            'Introduction to Object-Oriented Programming': 'Object-Oriented Programming (OOP) is a programming paradigm...',
-                            // Add more static content as needed
-                        };
+    const startRename = (tabName: string) => {
+        setShowRenameInput(tabName);
+        setRenameValue(getTabDisplayName(tabName));
+    };
 
-                        return (
-                            <div key={subtopic} className="mb-6 card">
-                                <div 
-                                    className="p-4 cursor-pointer hover:bg-opacity-80 theme-transition flex items-center justify-between"
-                                    onClick={() => {
-                                        if (isExpanded) {
-                                            setExpandedSubtopics(prev => {
-                                                const newSet = new Set(prev);
-                                                newSet.delete(subtopic);
-                                                return newSet;
-                                            });
-                                        } else {
-                                            setExpandedSubtopics(prev => new Set(prev).add(subtopic));
-                                        }
-                                    }}
-                                >
-                                    <h3 className="text-lg font-medium theme-text">{subtopic}</h3>
-                                </div>
-
-                                {isExpanded && (
-                                    <div className="p-4 pt-0">
-                                        {/* Read-only content display */}
-                                        {isCustomChapter && subtopicData && (
-                                            <InlineContentEditor
-                                                subtopicId={subtopicData.id}
-                                                initialContent={subtopicData.content}
-                                                images={subtopicData.images}
-                                                imageCaptions={subtopicData.imageCaptions || []}
-                                                onContentUpdate={() => {}} // No updates in read mode
-                                                onImageUpload={() => {}} // No uploads in read mode
-                                                className="max-w-none"
-                                                isEditing={false} // Always read-only
-                                                highlights={highlights.filter(h => h.chapterId === currentBook)}
-                                                currentBook={currentBook}
-                                                onHighlight={(text: string, color: string) => {
-                                                    addHighlight({
-                                                        text,
-                                                        color,
-                                                        chapterId: currentBook
-                                                    });
-                                                }}
-                                                onRemoveHighlight={removeHighlight}
-                                                onExplainWithAI={handleExplainSelectedText}
-                                            />
-                                        )}
-
-                                        {/* Static Content for Legacy Subtopics */}
-                                        {!isCustomChapter && (
-                                            <div className="prose prose-sm sm:prose-base lg:prose-lg max-w-none theme-text">
-                                                <KindleStyleTextViewer
-                                                    content={subtopicContent[subtopic] || 'Content for this subtopic will be added soon.'}
-                                                    highlights={highlights.filter(h => h.chapterId === currentBook)}
-                                                    currentBook={currentBook}
-                                                    onHighlight={(text: string, color: string) => {
-                                                        addHighlight({
-                                                            text,
-                                                            color,
-                                                            chapterId: currentBook
-                                                        });
-                                                    }}
-                                                    onRemoveHighlight={removeHighlight}
-                                                    className="subtopic-content-enhanced"
-                                                    onExplainWithAI={handleExplainSelectedText}
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
+    // Get display name for tabs
+    const getTabDisplayName = (tabName: string): string => {
+        // Return custom name if exists
+        if (tabNames[tabName]) {
+            return tabNames[tabName];
+        }
+        
+        const displayNames: { [key: string]: string } = {
+            'read': 'Read',
+            'highlights': 'Highlights',
+            'notes': 'Notes',
+            'flashcard': 'Flash Cards',
+            'mcq': 'MCQ',
+            'q&a': 'Q&A',
+            'video': 'Videos',
+            'videos': 'Videos',
+            'mindmap': 'Mind Maps'
+        };
+        
+        // Handle numbered duplicates
+        const baseMatch = tabName.match(/^([a-z]+)(\d+)$/);
+        if (baseMatch) {
+            const [, baseId, number] = baseMatch;
+            const baseName = displayNames[baseId] || baseId;
+            return `${baseName} ${number}`;
+        }
+        
+        return displayNames[tabName.toLowerCase()] || tabName;
     };
 
     // Flash card content renderer
@@ -594,23 +610,100 @@ Make the explanation educational and easy to understand.`;
         );
     };
 
+    // MCQ content renderer
+    const renderMCQContent = () => {
+        return (
+            <MCQManager 
+                currentBook={currentBook}
+                currentChapter={currentChapter}
+                className="w-full"
+            />
+        );
+    };
+
+    // Q&A content renderer
+    const renderQAContent = () => {
+        return (
+            <QAManager 
+                currentBook={currentBook}
+                currentChapter={currentChapter}
+                className="w-full"
+            />
+        );
+    };
+
+    // Video player handlers
+    const handlePlayVideo = (youtubeUrl: string, title: string) => {
+        setCurrentVideoData({
+            id: Date.now().toString(),
+            title: title,
+            youtubeUrl: youtubeUrl
+        });
+        setCurrentVideoMode('play');
+        setShowVideoModal(true);
+    };
+
+    // Mind Map content renderer
+    const renderMindMapContent = () => {
+        return (
+            <MindMapManager 
+                currentBook={currentBook}
+                currentChapter={currentChapter}
+                className="w-full"
+            />
+        );
+    };
+
+    // Videos content renderer
+    const renderVideosContent = () => {
+        return (
+            <VideosManager 
+                currentBook={currentBook}
+                currentChapter={currentChapter}
+                className="w-full"
+            />
+        );
+    };
+
     // Render content based on active tab
     const renderTabContent = () => {
-        switch (activeTab) {
-            case 'edit':
-                return renderReadContent(); // Edit content
+        switch (activeTab.toLowerCase()) {
             case 'read':
-                return renderReadOnlyContent(); // Read-only version
+                return renderReadContent(); // Main content
             case 'highlights':
                 return renderHighlightsContent();
-            case 'Flash card':
+            case 'notes':
+                return renderNotesContent();
+            case 'flashcard':
                 return renderFlashCardContent();
+            case 'mcq':
+                return renderMCQContent();
+            case 'q&a':
+                return renderQAContent();
+            case 'mindmap':
+                return renderMindMapContent();
+            case 'videos':
+                return renderVideosContent();
             default:
+                // Handle custom tabs
                 return renderCustomTabContent(activeTab);
         }
     };
 
     const renderReadContent = () => {
+        // Show loading state for custom chapters that are still loading
+        if (isCustomChapter && isLoadingSubtopics) {
+            return (
+                <div className="text-center py-12">
+                    <div className="w-8 h-8 mx-auto mb-4 animate-spin">
+                        <div className="w-full h-full border-4 border-gray-300 border-t-blue-600 rounded-full"></div>
+                    </div>
+                    <h3 className="text-lg font-medium theme-text mb-2">Loading content...</h3>
+                    <p className="theme-text-secondary">Please wait while we load your chapter content</p>
+                </div>
+            );
+        }
+
         // This will contain the existing subtopic content
         return (
             <div>
@@ -678,71 +771,144 @@ Make the explanation educational and easy to understand.`;
                                         {/* Subtopic Header */}
                                         <div className="theme-surface rounded-lg overflow-hidden theme-transition">
                                             <div 
-                                                className="flex items-center justify-between p-4 cursor-pointer hover:theme-surface2 theme-transition"
+                                                className="p-4 cursor-pointer hover:theme-surface2 theme-transition"
                                                 onClick={() => toggleSubtopic(subtopic)}
                                             >
-                                                <h3 className="font-semibold theme-text text-lg">
-                                                    {currentUnitNumber}.{index + 1} {subtopic}
-                                                </h3>
-                                                <div className="flex items-center gap-3">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleSubtopicExplain(subtopic);
-                                                        }}
-                                                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 theme-transition"
-                                                    >
-                                                        Explain
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleVideoLink(subtopic);
-                                                        }}
-                                                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-red-600/20 text-red-400 hover:bg-red-600/30 theme-transition"
-                                                    >
-                                                        Video
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleEditVideo(subtopic);
-                                                        }}
-                                                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 theme-transition"
-                                                    >
-                                                        Edit Video
-                                                    </button>
-                                                    {/* Edit and Delete buttons for custom subtopics */}
-                                                    {isCustomChapter && subtopicData && (
-                                                        <>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setEditingSubtopic(editingSubtopic === subtopicData.id ? null : subtopicData.id);
-                                                                }}
-                                                                className="px-3 py-1.5 text-xs font-medium rounded-full bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 theme-transition"
-                                                            >
-                                                                {editingSubtopic === subtopicData.id ? 'Cancel' : 'Edit'}
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDeleteSubtopic(subtopicData.id);
-                                                                }}
-                                                                className="p-1 text-red-600 hover:text-red-800 theme-transition"
-                                                            >
-                                                                <TrashIcon />
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                    <svg 
-                                                        className={`w-5 h-5 theme-text-secondary transition-transform ${expandedSubtopics.has(subtopic) ? 'rotate-180' : ''}`} 
-                                                        fill="none" 
-                                                        stroke="currentColor" 
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                    </svg>
+                                                {/* Desktop Layout - Title and Buttons in Same Row */}
+                                                <div className="hidden sm:flex items-center justify-between">
+                                                    <h3 className="font-semibold theme-text text-lg">
+                                                        {currentUnitNumber}.{index + 1} {subtopic}
+                                                    </h3>
+                                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSubtopicExplain(subtopic);
+                                                            }}
+                                                            className="px-3 py-1.5 text-xs font-medium rounded-full bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 theme-transition"
+                                                        >
+                                                            Explain
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleVideoLink(subtopic);
+                                                            }}
+                                                            className="px-3 py-1.5 text-xs font-medium rounded-full bg-red-600/20 text-red-400 hover:bg-red-600/30 theme-transition"
+                                                        >
+                                                            Video
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleEditVideo(subtopic);
+                                                            }}
+                                                            className="px-3 py-1.5 text-xs font-medium rounded-full bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 theme-transition"
+                                                        >
+                                                            Edit Video
+                                                        </button>
+                                                        {/* Edit and Delete buttons for custom subtopics */}
+                                                        {isCustomChapter && subtopicData && (
+                                                            <>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditingSubtopic(editingSubtopic === subtopicData.id ? null : subtopicData.id);
+                                                                    }}
+                                                                    className="px-3 py-1.5 text-xs font-medium rounded-full bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 theme-transition"
+                                                                >
+                                                                    {editingSubtopic === subtopicData.id ? 'Cancel' : 'Edit'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDeleteSubtopic(subtopicData.id);
+                                                                    }}
+                                                                    className="p-1 text-red-600 hover:text-red-800 theme-transition"
+                                                                >
+                                                                    <TrashIcon />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        <svg 
+                                                            className={`w-5 h-5 theme-text-secondary transition-transform ${expandedSubtopics.has(subtopic) ? 'rotate-180' : ''}`} 
+                                                            fill="none" 
+                                                            stroke="currentColor" 
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+
+                                                {/* Mobile Layout - Title and Buttons in Separate Rows */}
+                                                <div className="sm:hidden">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <h3 className="font-semibold theme-text text-lg pr-2">
+                                                            {currentUnitNumber}.{index + 1} {subtopic}
+                                                        </h3>
+                                                        <svg 
+                                                            className={`w-5 h-5 theme-text-secondary transition-transform flex-shrink-0 ${expandedSubtopics.has(subtopic) ? 'rotate-180' : ''}`} 
+                                                            fill="none" 
+                                                            stroke="currentColor" 
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </div>
+                                                    {/* Action buttons in separate compact row */}
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSubtopicExplain(subtopic);
+                                                            }}
+                                                            className="px-2 py-1 text-xs font-medium rounded-full bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 theme-transition"
+                                                        >
+                                                            💡 Explain
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleVideoLink(subtopic);
+                                                            }}
+                                                            className="px-2 py-1 text-xs font-medium rounded-full bg-red-600/20 text-red-400 hover:bg-red-600/30 theme-transition"
+                                                        >
+                                                            🎥 Video
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleEditVideo(subtopic);
+                                                            }}
+                                                            className="px-2 py-1 text-xs font-medium rounded-full bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 theme-transition"
+                                                        >
+                                                            ✏️ Edit
+                                                        </button>
+                                                        {/* Edit and Delete buttons for custom subtopics */}
+                                                        {isCustomChapter && subtopicData && (
+                                                            <>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditingSubtopic(editingSubtopic === subtopicData.id ? null : subtopicData.id);
+                                                                    }}
+                                                                    className="px-2 py-1 text-xs font-medium rounded-full bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 theme-transition"
+                                                                >
+                                                                    {editingSubtopic === subtopicData.id ? '❌ Cancel' : '✏️ Edit'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDeleteSubtopic(subtopicData.id);
+                                                                    }}
+                                                                    className="px-2 py-1 text-xs font-medium rounded-full bg-red-600/20 text-red-400 hover:bg-red-600/30 theme-transition"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -826,7 +992,7 @@ Make the explanation educational and easy to understand.`;
                 )}
 
                 {/* Empty State for Custom Chapters */}
-                {isCustomChapter && customSubtopics.length === 0 && (
+                {isCustomChapter && customSubtopics.length === 0 && !isLoadingSubtopics && (
                     <div className="text-center py-12">
                         <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
                             <SparklesIcon />
@@ -835,21 +1001,118 @@ Make the explanation educational and easy to understand.`;
                         <p className="theme-text-secondary mb-6">Click "Add Subtopic" to get started with your content</p>
                     </div>
                 )}
+
+                {/* Empty State for Regular Chapters with no subtopics */}
+                {!isCustomChapter && allSubtopics.length === 0 && (
+                    <div className="text-center py-12">
+                        <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                            <SparklesIcon />
+                        </div>
+                        <h3 className="text-lg font-medium theme-text mb-2">No content available</h3>
+                        <p className="theme-text-secondary">This chapter doesn't have any subtopics yet</p>
+                    </div>
+                )}
             </div>
         );
     };
 
     const renderHighlightsContent = () => {
+        const currentHighlights = highlights.filter(h => h.chapterId === currentBook);
+        
         return (
             <div className="theme-surface rounded-lg p-6">
-                <h2 className="text-lg font-semibold theme-text mb-4">Highlights & Notes</h2>
-                <p className="theme-text-secondary">Your highlighted content and notes will appear here.</p>
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-semibold theme-text">Highlights & Notes</h2>
+                    <span className="text-sm theme-text-secondary">
+                        {currentHighlights.length} highlight{currentHighlights.length !== 1 ? 's' : ''}
+                    </span>
+                </div>
+                
+                {currentHighlights.length === 0 ? (
+                    <div className="text-center py-8">
+                        <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                            <SparklesIcon />
+                        </div>
+                        <h3 className="text-lg font-medium theme-text mb-2">No highlights yet</h3>
+                        <p className="theme-text-secondary">
+                            Select text in any tab to create highlights and they'll appear here
+                        </p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {currentHighlights.map((highlight) => (
+                            <div key={highlight.id} className="border theme-border rounded-lg p-4">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span 
+                                                className="w-3 h-3 rounded-full"
+                                                style={{ backgroundColor: highlight.color }}
+                                            ></span>
+                                            <span className="text-xs theme-text-secondary">
+                                                {new Date(highlight.timestamp).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <p className="theme-text leading-relaxed">
+                                            "{highlight.text}"
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2 ml-4">
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(highlight.text);
+                                            }}
+                                            className="text-sm btn-secondary"
+                                            title="Copy highlight"
+                                        >
+                                            📋
+                                        </button>
+                                        <button
+                                            onClick={() => openAIGuru(highlight.text)}
+                                            className="text-sm btn-secondary"
+                                            title="Explain with AI"
+                                        >
+                                            🎓
+                                        </button>
+                                        <button
+                                            onClick={() => removeHighlight(highlight.id)}
+                                            className="text-sm btn-secondary hover:bg-red-500 hover:text-white"
+                                            title="Remove highlight"
+                                        >
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         );
     };
 
+    const renderNotesContent = () => {
+        return (
+            <NotesManager
+                currentBook={currentBook}
+                currentChapter={currentChapter}
+                className="h-full"
+            />
+        );
+    };
+
     const renderCustomTabContent = (tabName: string) => {
-        // Use RichTextEditor for all custom tabs (except Flash card which is handled separately)
+        // Handle Mind Map tab specifically
+        if (tabName === 'Mind Map') {
+            return (
+                <MindMapManager
+                    currentBook={currentBook}
+                    currentChapter={currentChapter}
+                />
+            );
+        }
+        
+        // Use RichTextEditor for all other custom tabs (except Flash card which is handled separately)
         return (
             <RichTextEditor
                 tabName={tabName}
@@ -881,121 +1144,381 @@ Make the explanation educational and easy to understand.`;
         ? customSubtopics.map(sub => sub.title)
         : currentSubtopics;
 
+    // Initialize loading state properly for new chapters
+    useEffect(() => {
+        if (!isCustomChapter && currentSubtopics.length === 0) {
+            setIsLoadingSubtopics(false); // Non-custom chapters don't need loading
+        }
+    }, [isCustomChapter, currentSubtopics]);
+
     return (
         <div className="theme-bg min-h-screen theme-text theme-transition">
-            <header className="sticky top-0 theme-surface backdrop-blur-sm z-10 p-4 theme-transition">
+            {/* Mobile-Optimized Header */}
+            <header className="sticky top-0 theme-surface backdrop-blur-sm z-10 p-3 sm:p-4 theme-transition">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate(`/subject/${encodeURIComponent(currentBook)}`)}>
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <button 
+                            onClick={() => navigate(`/subject/${encodeURIComponent(currentBook)}`)}
+                            className="p-2 rounded-lg hover:theme-surface2 theme-transition touch-manipulation"
+                            style={{ minWidth: '44px', minHeight: '44px' }}
+                        >
                             <BackIcon />
                         </button>
-                        <h1 className="font-semibold text-lg theme-text">
+                        <h1 className="font-semibold text-base sm:text-lg theme-text truncate">
                             {currentChapter}
                         </h1>
                     </div>
-                    <AlertIcon />
+                    <button 
+                        className="p-2 rounded-lg hover:theme-surface2 theme-transition touch-manipulation"
+                        style={{ minWidth: '44px', minHeight: '44px' }}
+                    >
+                        <AlertIcon />
+                    </button>
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6">
-                {/* Tab Navigation */}
-                <div className="py-4 flex flex-wrap gap-2 text-sm border-b theme-border mb-4">
-                    <button 
-                        onClick={() => setActiveTab('edit')}
-                        className={`px-4 py-2 rounded-lg transition-all ${
-                            activeTab === 'edit' 
-                                ? 'theme-accent text-white' 
-                                : 'btn-secondary hover:btn-primary'
-                        }`}
-                    >
-                        Edit
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('read')}
-                        className={`px-4 py-2 rounded-lg transition-all ${
-                            activeTab === 'read' 
-                                ? 'theme-accent text-white' 
-                                : 'btn-secondary hover:btn-primary'
-                        }`}
-                    >
-                        Read
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('highlights')}
-                        className={`px-4 py-2 rounded-lg transition-all ${
-                            activeTab === 'highlights' 
-                                ? 'theme-accent text-white' 
-                                : 'btn-secondary hover:btn-primary'
-                        }`}
-                    >
-                        Highlights & Notes
-                    </button>
-                    
-                    {/* Custom tabs */}
-                    {customTabs.map((tab) => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2 rounded-lg transition-all group relative ${
-                                activeTab === tab 
+            <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+                {/* Mobile-First Tab Navigation */}
+                <div className="py-3 sm:py-4">
+                    {/* Mobile: Stacked Layout */}
+                    <div className="block sm:hidden space-y-3">
+                        {/* Core tabs - full width on mobile */}
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => setActiveTab('read')}
+                                className={`flex-1 px-4 py-3 rounded-lg text-center font-medium transition-all touch-manipulation ${
+                                    activeTab === 'read' 
+                                        ? 'theme-accent text-white' 
+                                        : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
+                                }`}
+                                style={{ minHeight: '44px' }}
+                            >
+                                📖 Read
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('highlights')}
+                                className={`flex-1 px-4 py-3 rounded-lg text-center font-medium transition-all touch-manipulation ${
+                                    activeTab === 'highlights' 
+                                        ? 'theme-accent text-white' 
+                                        : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
+                                }`}
+                                style={{ minHeight: '44px' }}
+                            >
+                                ✨ Highlights
+                            </button>
+                        </div>
+
+                        {/* Active Template Tabs - Mobile Grid */}
+                        {activeTabs.filter(tab => tab !== 'read' && tab !== 'highlights').length > 0 && (
+                            <div className="grid grid-cols-2 gap-2">
+                                {activeTabs.filter(tab => tab !== 'read' && tab !== 'highlights').map((tab) => (
+                                    <div key={tab} className="relative">
+                                        {showRenameInput === tab ? (
+                                            <input
+                                                type="text"
+                                                value={renameValue}
+                                                onChange={(e) => setRenameValue(e.target.value)}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        handleRenameTab(tab);
+                                                    } else if (e.key === 'Escape') {
+                                                        setShowRenameInput(null);
+                                                        setRenameValue('');
+                                                    }
+                                                }}
+                                                onBlur={() => handleRenameTab(tab)}
+                                                className="w-full p-2 text-sm theme-surface2 border theme-border rounded-lg theme-text text-center"
+                                                style={{ minHeight: '44px' }}
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <div
+                                                onClick={() => setActiveTab(tab)}
+                                                onDoubleClick={() => startRename(tab)}
+                                                className={`w-full px-3 py-3 rounded-lg transition-all group relative text-sm font-medium touch-manipulation cursor-pointer ${
+                                                    activeTab === tab 
+                                                        ? 'theme-accent text-white' 
+                                                        : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
+                                                }`}
+                                                style={{ minHeight: '44px' }}
+                                                title="Double-tap to rename, tap × to delete"
+                                            >
+                                                <span className="block truncate pr-6">{getTabDisplayName(tab)}</span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteTab(tab);
+                                                    }}
+                                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 opacity-70 hover:opacity-100 hover:text-red-400 transition-opacity text-lg leading-none touch-manipulation"
+                                                    title="Delete tab"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        
+                        {/* Add Template Button - Full width on mobile */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowTemplateSelector(!showTemplateSelector)}
+                                className="w-full px-4 py-3 rounded-lg border-2 border-dashed theme-border hover:theme-accent-border transition-colors theme-text font-medium touch-manipulation"
+                                style={{ minHeight: '44px' }}
+                            >
+                                ➕ Add Learning Tool
+                            </button>
+                            
+                            {/* Mobile Template Dropdown */}
+                            {showTemplateSelector && (
+                                <div className="absolute top-full left-0 right-0 mt-2 theme-surface rounded-lg shadow-lg border theme-border z-20">
+                                    <div className="p-3">
+                                        <div className="text-sm font-semibold theme-text mb-3">Choose Learning Tool:</div>
+                                        <div className="grid grid-cols-2 gap-2 mb-3">
+                                            {availableTemplates.map((template) => {
+                                                const templateId = template.toLowerCase().replace(/\s+/g, '');
+                                                const hasTemplate = activeTabs.some(tab => tab.startsWith(templateId));
+                                                return (
+                                                    <button
+                                                        key={template}
+                                                        onClick={() => handleAddTemplateTab(template)}
+                                                        className={`px-3 py-3 rounded-lg text-sm font-medium transition-colors touch-manipulation ${
+                                                            hasTemplate 
+                                                                ? 'theme-surface2 theme-text' 
+                                                                : 'theme-accent text-white hover:bg-opacity-90'
+                                                        }`}
+                                                        style={{ minHeight: '44px' }}
+                                                    >
+                                                        <div className="text-center">
+                                                            <div>{template}</div>
+                                                            {hasTemplate && <div className="text-xs opacity-70">Add Another</div>}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        
+                                        <hr className="my-3 theme-border" />
+                                        
+                                        {/* Custom Tab Option */}
+                                        {showAddTab ? (
+                                            <div className="space-y-2">
+                                                <input
+                                                    type="text"
+                                                    value={newTabName}
+                                                    onChange={(e) => setNewTabName(e.target.value)}
+                                                    placeholder="Custom tool name..."
+                                                    className="w-full px-3 py-3 text-sm theme-surface2 border theme-border rounded-lg theme-text"
+                                                    onKeyPress={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            handleAddCustomTab();
+                                                        }
+                                                    }}
+                                                    style={{ minHeight: '44px' }}
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={handleAddCustomTab}
+                                                        className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 touch-manipulation"
+                                                    >
+                                                        Add
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowAddTab(false);
+                                                            setNewTabName('');
+                                                        }}
+                                                        className="flex-1 px-3 py-2 text-sm theme-surface2 theme-text rounded hover:theme-accent-bg touch-manipulation"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowAddTab(true)}
+                                                className="w-full px-3 py-3 rounded-lg text-sm hover:theme-accent-bg theme-text font-medium touch-manipulation"
+                                                style={{ minHeight: '44px' }}
+                                            >
+                                                ➕ Custom Tool
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Desktop: Horizontal Layout (unchanged for larger screens) */}
+                    <div className="hidden sm:flex flex-wrap gap-2 text-sm border-b theme-border mb-4">
+                        {/* Core tabs */}
+                        <button 
+                            onClick={() => setActiveTab('read')}
+                            className={`px-4 py-2 rounded-lg transition-all ${
+                                activeTab === 'read' 
                                     ? 'theme-accent text-white' 
-                                    : 'btn-secondary hover:btn-primary'
+                                    : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
                             }`}
                         >
-                            {tab}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteTab(tab);
-                                }}
-                                className="ml-2 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity"
-                                title="Delete tab"
-                            >
-                                ×
-                            </button>
+                            Read
                         </button>
-                    ))}
-                    
-                    {/* Add Tab Button */}
-                    {showAddTab ? (
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={newTabName}
-                                onChange={(e) => setNewTabName(e.target.value)}
-                                placeholder="Tab name..."
-                                className="px-3 py-1 text-sm theme-surface border rounded-lg theme-text"
-                                onKeyPress={(e) => {
-                                    if (e.key === 'Enter') {
-                                        handleAddTab();
-                                    }
-                                }}
-                                autoFocus
-                            />
+                        <button 
+                            onClick={() => setActiveTab('highlights')}
+                            className={`px-4 py-2 rounded-lg transition-all ${
+                                activeTab === 'highlights' 
+                                    ? 'theme-accent text-white' 
+                                    : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
+                            }`}
+                        >
+                            Highlights
+                        </button>
+                        
+                        {/* Active Tabs */}
+                        {activeTabs.filter(tab => tab !== 'read' && tab !== 'highlights').map((tab) => (
+                            <div key={tab} className="relative">
+                                {showRenameInput === tab ? (
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="text"
+                                            value={renameValue}
+                                            onChange={(e) => setRenameValue(e.target.value)}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleRenameTab(tab);
+                                                } else if (e.key === 'Escape') {
+                                                    setShowRenameInput(null);
+                                                    setRenameValue('');
+                                                }
+                                            }}
+                                            onBlur={() => handleRenameTab(tab)}
+                                            className="px-2 py-1 text-sm theme-surface2 border rounded theme-text min-w-0"
+                                            style={{ width: '120px' }}
+                                            autoFocus
+                                        />
+                                    </div>
+                                ) : (
+                                    <div
+                                        onClick={() => setActiveTab(tab)}
+                                        onDoubleClick={() => startRename(tab)}
+                                        className={`px-4 py-2 rounded-lg transition-all group relative cursor-pointer ${
+                                            activeTab === tab 
+                                                ? 'theme-accent text-white' 
+                                                : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
+                                        }`}
+                                        title="Double-click to rename, click X to delete"
+                                    >
+                                        {getTabDisplayName(tab)}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteTab(tab);
+                                            }}
+                                            className="ml-2 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity text-lg leading-none"
+                                            title="Delete tab"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        
+                        {/* Template Selector */}
+                        <div className="relative">
                             <button
-                                onClick={handleAddTab}
-                                className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                onClick={() => setShowTemplateSelector(!showTemplateSelector)}
+                                className="px-4 py-2 rounded-lg border-2 border-dashed theme-border hover:theme-accent-border transition-colors theme-text"
                             >
-                                Add
+                                + Add Template
                             </button>
-                            <button
+                            
+                            {/* Desktop Template Dropdown */}
+                            {showTemplateSelector && (
+                                <div className="absolute top-full left-0 mt-2 w-48 theme-surface rounded-lg shadow-lg border theme-border z-20">
+                                    <div className="p-2">
+                                        <div className="text-sm font-semibold theme-text mb-2">Choose Template:</div>
+                                        {availableTemplates.map((template) => {
+                                            const templateId = template.toLowerCase().replace(/\s+/g, '');
+                                            const hasTemplate = activeTabs.some(tab => tab.startsWith(templateId));
+                                            return (
+                                                <button
+                                                    key={template}
+                                                    onClick={() => handleAddTemplateTab(template)}
+                                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-1 transition-colors ${
+                                                        hasTemplate 
+                                                            ? 'theme-muted-bg theme-muted-text cursor-pointer' 
+                                                            : 'hover:theme-accent-bg theme-text'
+                                                    }`}
+                                                >
+                                                    {template} {hasTemplate && '(Add Another)'}
+                                                </button>
+                                            );
+                                        })}
+                                        
+                                        <hr className="my-2 theme-border" />
+                                        
+                                        {/* Custom Tab Option */}
+                                        {showAddTab ? (
+                                            <div className="flex flex-col gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newTabName}
+                                                    onChange={(e) => setNewTabName(e.target.value)}
+                                                    placeholder="Custom tab name..."
+                                                    className="px-2 py-1 text-sm theme-surface2 border rounded theme-text"
+                                                    onKeyPress={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            handleAddCustomTab();
+                                                        }
+                                                    }}
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        onClick={handleAddCustomTab}
+                                                        className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                                    >
+                                                        Add
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowAddTab(false);
+                                                            setNewTabName('');
+                                                        }}
+                                                        className="px-2 py-1 text-xs theme-muted-bg theme-text rounded hover:theme-accent-bg"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowAddTab(true)}
+                                                className="w-full text-left px-3 py-2 rounded-lg text-sm hover:theme-accent-bg theme-text"
+                                            >
+                                                + Custom Tab
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Close template selector when clicking outside */}
+                        {showTemplateSelector && (
+                            <div 
+                                className="fixed inset-0 z-10" 
                                 onClick={() => {
+                                    setShowTemplateSelector(false);
                                     setShowAddTab(false);
                                     setNewTabName('');
                                 }}
-                                className="px-3 py-1 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setShowAddTab(true)}
-                            className="px-4 py-2 rounded-lg border-2 border-dashed theme-border hover:theme-accent-border transition-colors"
-                        >
-                            + Add Tab
-                        </button>
-                    )}
+                            />
+                        )}
+                    </div>
                 </div>
 
                 {/* Tab Content Area */}
@@ -1003,12 +1526,32 @@ Make the explanation educational and easy to understand.`;
                 
             </main>
             
+            {/* Mobile-Optimized AI Guru Button */}
             <button 
                 onClick={() => openAIGuru()} 
-                className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 theme-accent p-3 sm:p-4 rounded-full shadow-lg hover:bg-opacity-90 theme-transition transform hover:scale-110 z-20"
+                className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 theme-accent rounded-full shadow-lg hover:bg-opacity-90 theme-transition transform hover:scale-110 z-20 touch-manipulation"
+                style={{ 
+                    width: '56px', 
+                    height: '56px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}
             >
                 <AIGuruIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white"/>
             </button>
+            
+            {/* Close mobile dropdowns when clicking outside */}
+            {showTemplateSelector && (
+                <div 
+                    className="fixed inset-0 z-10 sm:hidden" 
+                    onClick={() => {
+                        setShowTemplateSelector(false);
+                        setShowAddTab(false);
+                        setNewTabName('');
+                    }}
+                />
+            )}
             
             {/* YouTube Player Modal */}
             <YouTubePlayerModal

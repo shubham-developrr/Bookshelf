@@ -22,6 +22,7 @@ const ReaderPage: React.FC<ReaderPageProps> = ({ openAIGuru, highlights, addHigh
     const [expandedSubtopics, setExpandedSubtopics] = useState<Set<string>>(new Set());
     const [customSubtopics, setCustomSubtopics] = useState<{title: string, content: string}[]>([]);
     const [isCustomBook, setIsCustomBook] = useState(false);
+    const [isLoadingSubtopics, setIsLoadingSubtopics] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
 
     const currentBook = subjectName ? decodeURIComponent(subjectName) : '';
@@ -29,12 +30,13 @@ const ReaderPage: React.FC<ReaderPageProps> = ({ openAIGuru, highlights, addHigh
     
     // Check if this is a custom book and load custom subtopics
     useEffect(() => {
-        const checkCustomBook = () => {
+        const checkCustomBook = async () => {
             const createdBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
             const isCustom = createdBooks.some((book: any) => book.name === currentBook);
             setIsCustomBook(isCustom);
             
             if (isCustom) {
+                setIsLoadingSubtopics(true);
                 // Find the book ID
                 const book = createdBooks.find((b: any) => b.name === currentBook);
                 if (book) {
@@ -51,6 +53,9 @@ const ReaderPage: React.FC<ReaderPageProps> = ({ openAIGuru, highlights, addHigh
                         })));
                     }
                 }
+                setIsLoadingSubtopics(false);
+            } else {
+                setIsLoadingSubtopics(false);
             }
         };
         
@@ -238,6 +243,17 @@ Make the explanation educational and easy to understand.`;
                     </button>
                 </div>
 
+                {/* Loading state for custom books */}
+                {isCustomBook && isLoadingSubtopics && (
+                    <div className="mb-8 text-center py-12">
+                        <div className="w-8 h-8 mx-auto mb-4 animate-spin">
+                            <div className="w-full h-full border-4 border-gray-300 border-t-blue-600 rounded-full"></div>
+                        </div>
+                        <h3 className="text-lg font-medium theme-text mb-2">Loading content...</h3>
+                        <p className="theme-text-secondary">Please wait while we load your chapter content</p>
+                    </div>
+                )}
+
                 {/* Subtopics - Expandable with individual content */}
                 {currentSubtopics.length > 0 && (
                     <div className="mb-8">
@@ -315,6 +331,28 @@ Make the explanation educational and easy to understand.`;
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* Empty state for custom books with no subtopics */}
+                {isCustomBook && !isLoadingSubtopics && currentSubtopics.length === 0 && (
+                    <div className="mb-8 text-center py-12">
+                        <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                            <SparklesIcon />
+                        </div>
+                        <h3 className="text-lg font-medium theme-text mb-2">No subtopics yet</h3>
+                        <p className="theme-text-secondary">This chapter doesn't have any content yet. You can add subtopics from the enhanced reader.</p>
+                    </div>
+                )}
+
+                {/* Empty state for regular books with no subtopics */}
+                {!isCustomBook && currentSubtopics.length === 0 && (
+                    <div className="mb-8 text-center py-12">
+                        <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                            <SparklesIcon />
+                        </div>
+                        <h3 className="text-lg font-medium theme-text mb-2">No content available</h3>
+                        <p className="theme-text-secondary">This chapter doesn't have any subtopics yet</p>
                     </div>
                 )}
                 
