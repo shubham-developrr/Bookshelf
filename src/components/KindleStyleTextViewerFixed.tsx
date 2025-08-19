@@ -159,9 +159,9 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
         wordElements.push({
           text: word,
           x: currentX,
-          y: currentY,
+          y: currentY - (lineHeightPx * 0.1), // Adjust Y position to center text better
           width: wordWidth,
-          height: lineHeightPx * 0.8,
+          height: lineHeightPx * 0.9, // Slightly larger highlight area
           lineIndex: lineIndex
         });
 
@@ -1196,6 +1196,29 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
               🎓
             </button>
           )}
+
+          {/* Copy button */}
+          <button 
+            className="kindle-menu-button copy-button"
+            onClick={() => {
+              if (selectedText) {
+                navigator.clipboard.writeText(selectedText).then(() => {
+                  // Optional: Show a brief success indicator
+                }).catch(() => {
+                  // Fallback for older browsers
+                  const textArea = document.createElement('textarea');
+                  textArea.value = selectedText;
+                  document.body.appendChild(textArea);
+                  textArea.select();
+                  document.execCommand('copy');
+                  document.body.removeChild(textArea);
+                });
+              }
+            }}
+            title="Copy selected text"
+          >
+            📋
+          </button>
 
           {/* Remove highlight button - only show if text is exactly highlighted */}
           {onRemoveHighlight && getExactHighlightMatch(selectedText) && (

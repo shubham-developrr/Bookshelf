@@ -1,0 +1,761 @@
+import React, { useState } from 'react';
+import { SparklesIcon, PlusIcon, TrashIcon, UploadIcon } from './icons';
+import { processAIImport } from '../utils/aiImportService';
+
+interface QAQuestion {
+    id: string;
+    question: string;
+    answer: string;
+    marks: number;
+    category?: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    timestamp: Date;
+}
+
+interface QAManagerProps {
+    currentBook: string;
+    currentChapter: string;
+    className?: string;
+}
+
+const QAManager: React.FC<QAManagerProps> = ({
+    currentBook,
+    currentChapter,
+    className = ''
+}) => {
+    const [qaQuestions, setQaQuestions] = useState<QAQuestion[]>([]);
+    const [mode, setMode] = useState<'practice' | 'manage' | 'add' | 'import'>('practice');
+    const [displayMode, setDisplayMode] = useState<'individual' | 'batch'>('individual');
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [selectedMarks, setSelectedMarks] = useState<number[]>([]);
+    const [showAnswers, setShowAnswers] = useState<{ [key: string]: boolean }>({});
+
+    // Form states for adding new questions
+    const [newQuestion, setNewQuestion] = useState('');
+    const [newAnswer, setNewAnswer] = useState('');
+    const [newMarks, setNewMarks] = useState<number>(2);
+    const [newCategory, setNewCategory] = useState('');
+    const [customMarks, setCustomMarks] = useState<number[]>([]);
+    const [showCustomMarks, setShowCustomMarks] = useState(false);
+    const [customMarkInput, setCustomMarkInput] = useState('');
+    const [selectedFormat, setSelectedFormat] = useState('tab');
+    const [showFormatModal, setShowFormatModal] = useState(false);
+    const [isAIProcessing, setIsAIProcessing] = useState(false);
+
+    const storageKey = `qa_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+
+    // Base marks options
+    const baseMarksOptions = [1, 2, 5, 10, 20];
+    
+    // Get all marks options (base + custom)
+    const getAllMarksOptions = () => {
+        const allMarks = [...baseMarksOptions, ...customMarks];
+        return [...new Set(allMarks)].sort((a, b) => a - b);
+    };
+
+    // Get marks that actually have questions
+    const getAvailableMarks = () => {
+        const questionMarks = qaQuestions.map(q => q.marks);
+        return getAllMarksOptions().filter(mark => questionMarks.includes(mark));
+    };
+
+    // Load Q&As from localStorage
+    React.useEffect(() => {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            const questions = JSON.parse(saved).map((q: any) => ({
+                ...q,
+                timestamp: new Date(q.timestamp)
+            }));
+            setQaQuestions(questions);
+        }
+    }, [storageKey]);
+
+    // Save Q&As to localStorage
+    const saveQaQuestions = (questions: QAQuestion[]) => {
+        localStorage.setItem(storageKey, JSON.stringify(questions));
+        setQaQuestions(questions);
+    };
+
+    // Create new Q&A
+    const handleAddQuestion = () => {
+        if (newQuestion.trim() && newAnswer.trim()) {
+            const newQA: QAQuestion = {
+                id: Date.now().toString(),
+                question: newQuestion.trim(),
+                answer: newAnswer.trim(),
+                marks: newMarks,
+                category: newCategory.trim() || undefined,
+                timestamp: new Date()
+            };
+            
+            const updatedQuestions = [...qaQuestions, newQA];
+            saveQaQuestions(updatedQuestions);
+            
+            // Reset form
+            setNewQuestion('');
+            setNewAnswer('');
+            setNewMarks(2);
+            setNewCategory('');
+        }
+    };
+
+    // Handle AI-powered smart import
+    const handleSmartImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.includes('text')) {
+            alert('Please select a text file (.txt)');
+            return;
+        }
+
+        setIsAIProcessing(true);
+        
+        try {
+            const text = await file.text();
+            
+            if (!text.trim()) {
+                alert('The selected file is empty.');
+                return;
+            }
+            
+            // Use AI service to process the text
+            const result = await processAIImport(text, 'qa');
+            
+            if (result.success && result.data.length > 0) {
+                const updatedQuestions = [...qaQuestions, ...result.data];
+                saveQaQuestions(updatedQuestions);
+                alert(`🤖 AI Import Success! Extracted ${result.data.length} Q&A pairs from your text content.`);
+                setMode('practice');
+            } else {
+                alert(result.message || 'No Q&A pairs could be extracted from the text. Please ensure your text contains questions and answers.');
+            }
+        } catch (error) {
+            console.error('AI import error:', error);
+            alert('Failed to process the file. Please check the content and try again.');
+        } finally {
+            setIsAIProcessing(false);
+            // Reset file input
+            event.target.value = '';
+        }
+    };
+
+    // Handle file import
+    const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            if (file.type === 'text/plain') {
+                const text = await file.text();
+                await processTextImport(text);
+            } else {
+                alert('Please select a .txt file');
+            }
+        } catch (error) {
+            console.error('Import error:', error);
+            alert('Error importing file. Please check the format.');
+        }
+        
+        // Reset file input
+        event.target.value = '';
+    };
+
+    // Process text import based on selected format
+    const processTextImport = async (text: string) => {
+        const lines = text.trim().split('\n').filter(line => line.trim());
+        const importedQuestions: QAQuestion[] = [];
+        
+        for (const line of lines) {
+            try {
+                let parts: string[] = [];
+                
+                if (selectedFormat === 'tab') {
+                    parts = line.split('\t').map(p => p.trim());
+                } else if (selectedFormat === 'semicolon') {
+                    parts = line.split(';').map(p => p.trim());
+                } else if (selectedFormat === 'pipe') {
+                    parts = line.split('|').map(p => p.trim());
+                }
+                
+                if (parts.length >= 2) {
+                    const question: QAQuestion = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        question: parts[0],
+                        answer: parts[1],
+                        marks: parts[2] ? parseInt(parts[2]) || 2 : 2,
+                        category: parts[3] || undefined,
+                        timestamp: new Date()
+                    };
+                    importedQuestions.push(question);
+                }
+            } catch (err) {
+                console.warn('Skipping invalid line:', line);
+            }
+        }
+        
+        if (importedQuestions.length > 0) {
+            const updatedQuestions = [...qaQuestions, ...importedQuestions];
+            saveQaQuestions(updatedQuestions);
+            alert(`Successfully imported ${importedQuestions.length} questions!`);
+            setMode('practice');
+        } else {
+            alert('No valid questions found. Please check your format.');
+        }
+    };
+
+    // Process manual text input
+    const handleManualImport = async () => {
+        const textarea = document.querySelector('textarea[placeholder*="Question"]') as HTMLTextAreaElement;
+        if (textarea && textarea.value.trim()) {
+            await processTextImport(textarea.value);
+            textarea.value = '';
+        }
+    };
+
+    // Copy format to clipboard
+    const copyFormatToClipboard = async () => {
+        const formats = {
+            tab: "Question[TAB]Answer[TAB]Marks[TAB]Category",
+            semicolon: "Question;Answer;Marks;Category",
+            pipe: "Question|Answer|Marks|Category"
+        };
+        
+        try {
+            await navigator.clipboard.writeText(formats[selectedFormat as keyof typeof formats]);
+            alert('Format template copied to clipboard!');
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy format. Please copy manually from the example.');
+        }
+    };
+
+    // Show format example
+    const showFormatExample = () => {
+        setShowFormatModal(true);
+    };
+
+    // Filter questions by selected marks
+    const getFilteredQuestions = () => {
+        if (selectedMarks.length === 0) return qaQuestions;
+        return qaQuestions.filter(q => selectedMarks.includes(q.marks));
+    };
+
+    const filteredQuestions = getFilteredQuestions();
+
+    // Format example modal
+    const FormatExampleModal = () => {
+        if (!showFormatModal) return null;
+        
+        const examples = {
+            tab: `What is a Database Management System?	A software system that stores, retrieves, and runs queries on data in databases.	5	Theory
+Explain the concept of normalization in databases	Normalization is the process of organizing data to reduce redundancy and improve integrity	10	Theory
+Calculate the time complexity of bubble sort	O(n²) in worst case, where we compare each element with every other element in nested loops	15	Numerical`,
+            semicolon: `What is Object-Oriented Programming?;A programming paradigm based on objects that contain data and code;5;Theory
+What is inheritance in OOP?;Inheritance allows a class to acquire properties and methods from another class;8;Theory
+Implement a binary search algorithm;A divide-and-conquer algorithm that finds target in sorted array by repeatedly halving search space;20;Programming`,
+            pipe: `What is machine learning?|A type of AI that enables systems to learn from data without explicit programming|10|Theory
+Explain supervised learning|Learning with labeled training data to make predictions on new data|15|Theory
+Code a simple linear regression|Algorithm that models relationship between variables using a straight line|25|Programming`
+        };
+        
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="theme-surface rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
+                    <div className="p-4 border-b theme-border flex justify-between items-center">
+                        <h3 className="text-lg font-semibold theme-text">Format Example: {selectedFormat.toUpperCase()} Separated</h3>
+                        <button
+                            onClick={() => setShowFormatModal(false)}
+                            className="text-gray-500 hover:text-gray-700"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    <div className="p-4 overflow-y-auto max-h-[60vh]">
+                        <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono theme-text whitespace-pre-wrap overflow-x-auto">
+                            {examples[selectedFormat as keyof typeof examples]}
+                        </pre>
+                        <div className="mt-4 flex gap-2">
+                            <button
+                                onClick={() => copyFormatToClipboard()}
+                                className="btn-primary text-sm"
+                            >
+                                📋 Copy This Example
+                            </button>
+                            <button
+                                onClick={() => setShowFormatModal(false)}
+                                className="btn-secondary text-sm"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    if (mode === 'add') {
+        return (
+            <div className={`theme-surface rounded-lg p-6 ${className}`}>
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
+                        <PlusIcon />
+                        Add Q&A Question
+                    </h2>
+                    <button
+                        onClick={() => setMode('practice')}
+                        className="btn-secondary text-sm"
+                    >
+                        Back to Practice
+                    </button>
+                </div>
+
+                <div className="space-y-4 max-w-2xl">
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Question:
+                        </label>
+                        <textarea
+                            value={newQuestion}
+                            onChange={(e) => setNewQuestion(e.target.value)}
+                            placeholder="Enter the question..."
+                            className="w-full h-24 p-3 theme-surface border rounded-lg theme-text resize-none"
+                        />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium theme-text mb-2">
+                                Marks:
+                            </label>
+                            <select
+                                value={newMarks}
+                                onChange={(e) => setNewMarks(Number(e.target.value))}
+                                className="w-full p-2 theme-surface border rounded theme-text"
+                            >
+                                {getAllMarksOptions().map(mark => (
+                                    <option key={mark} value={mark}>{mark} mark{mark !== 1 ? 's' : ''}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={() => setShowCustomMarks(!showCustomMarks)}
+                                className="mt-1 text-xs btn-secondary"
+                            >
+                                {showCustomMarks ? 'Hide' : 'Add'} Custom Marks
+                            </button>
+                            {showCustomMarks && (
+                                <div className="mt-2 flex gap-2">
+                                    <input
+                                        type="number"
+                                        value={customMarkInput}
+                                        onChange={(e) => setCustomMarkInput(e.target.value)}
+                                        placeholder="e.g., 15"
+                                        className="flex-1 p-1 text-sm theme-surface border rounded theme-text"
+                                        min="1"
+                                        max="100"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            const marks = parseInt(customMarkInput);
+                                            if (marks && marks > 0 && marks <= 100 && !getAllMarksOptions().includes(marks)) {
+                                                setCustomMarks([...customMarks, marks]);
+                                                setCustomMarkInput('');
+                                            }
+                                        }}
+                                        className="px-2 py-1 text-xs btn-primary"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium theme-text mb-2">
+                                Category (optional):
+                            </label>
+                            <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                placeholder="e.g., Theory, Numerical"
+                                className="w-full p-2 theme-surface border rounded theme-text"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Answer:
+                        </label>
+                        <textarea
+                            value={newAnswer}
+                            onChange={(e) => setNewAnswer(e.target.value)}
+                            placeholder="Enter the answer..."
+                            className="w-full h-32 p-3 theme-surface border rounded-lg theme-text resize-none"
+                        />
+                    </div>
+
+                    <button
+                        onClick={handleAddQuestion}
+                        disabled={!newQuestion.trim() || !newAnswer.trim()}
+                        className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Add Question
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (mode === 'import') {
+        return (
+            <div className={`theme-surface rounded-lg p-6 ${className}`}>
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
+                        <UploadIcon />
+                        Import Q&A Questions
+                    </h2>
+                    <button
+                        onClick={() => setMode('practice')}
+                        className="btn-secondary text-sm"
+                    >
+                        Back to Practice
+                    </button>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Import format explanation */}
+                    <div className="theme-surface border theme-border rounded-lg p-4">
+                        <h3 className="font-medium theme-text mb-2">
+                            📝 Import Format
+                        </h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium theme-text mb-1">
+                                    Choose Format:
+                                </label>
+                                <select 
+                                    value={selectedFormat}
+                                    onChange={(e) => setSelectedFormat(e.target.value)}
+                                    className="w-full p-2 theme-surface border rounded theme-text text-sm"
+                                >
+                                    <option value="tab">Tab separated (recommended)</option>
+                                    <option value="semicolon">Semicolon separated</option>
+                                    <option value="pipe">Pipe separated</option>
+                                </select>
+                            </div>
+                            
+                            {/* Copy Format Button */}
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => copyFormatToClipboard()}
+                                    className="flex-1 btn-secondary text-sm flex items-center justify-center gap-2"
+                                >
+                                    📋 Copy Format
+                                </button>
+                                <button 
+                                    onClick={() => showFormatExample()}
+                                    className="flex-1 btn-secondary text-sm"
+                                >
+                                    👁️ View Example
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <p className="text-xs theme-text-secondary mt-2">
+                            Format: Question{selectedFormat === 'tab' ? '[TAB]' : selectedFormat === 'semicolon' ? ';' : '|'}Answer{selectedFormat === 'tab' ? '[TAB]' : selectedFormat === 'semicolon' ? ';' : '|'}Marks{selectedFormat === 'tab' ? '[TAB]' : selectedFormat === 'semicolon' ? ';' : '|'}Category (optional)
+                        </p>
+                    </div>
+
+                    {/* File import */}
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Upload .txt file:
+                        </label>
+                        <input
+                            type="file"
+                            accept=".txt"
+                            onChange={handleFileImport}
+                            className="w-full p-2 theme-surface border rounded theme-text"
+                        />
+                    </div>
+
+                    {/* AI Smart Import */}
+                    <div className="border theme-border rounded-lg p-4">
+                        <h3 className="font-medium theme-text mb-3">🤖 AI Smart Import</h3>
+                        <p className="text-sm theme-text-secondary mb-4">
+                            AI-powered intelligent extraction from unstructured text - no formatting required!
+                        </p>
+                        <div className="space-y-3">
+                            <input
+                                type="file"
+                                accept=".txt"
+                                onChange={handleSmartImport}
+                                className="w-full p-2 theme-surface border rounded theme-text text-sm"
+                                disabled={isAIProcessing}
+                            />
+                            <button 
+                                onClick={() => {
+                                    const input = document.querySelector('input[type="file"][accept=".txt"]') as HTMLInputElement;
+                                    input?.click();
+                                }}
+                                className="w-full btn-primary text-sm flex items-center justify-center gap-2"
+                                disabled={isAIProcessing}
+                            >
+                                {isAIProcessing ? (
+                                    <>
+                                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                        Processing with AI...
+                                    </>
+                                ) : (
+                                    <>
+                                        🤖 AI Smart Import
+                                    </>
+                                )}
+                            </button>
+                            <p className="text-xs theme-text-secondary">
+                                Upload any text file and AI will intelligently extract Q&A pairs with proper formatting. No specific format required!
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Manual import */}
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Or paste questions manually:
+                        </label>
+                        <textarea
+                            placeholder="Question 1[TAB]Answer 1[TAB]5[TAB]Theory&#10;Question 2[TAB]Answer 2[TAB]10[TAB]Numerical"
+                            className="w-full h-32 p-3 theme-surface border rounded-lg theme-text font-mono text-sm"
+                        />
+                        <button 
+                            onClick={handleManualImport}
+                            className="mt-3 btn-primary"
+                        >
+                            Import Questions
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={`theme-surface rounded-lg p-6 ${className}`}>
+            <FormatExampleModal />
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
+                    <SparklesIcon />
+                    Q&A Practice
+                </h2>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setMode('add')}
+                        className="btn-secondary text-sm flex items-center gap-2"
+                    >
+                        <PlusIcon />
+                        Add
+                    </button>
+                    <button
+                        onClick={() => setMode('import')}
+                        className="btn-secondary text-sm flex items-center gap-2"
+                    >
+                        <UploadIcon />
+                        Import
+                    </button>
+                </div>
+            </div>
+
+            {qaQuestions.length === 0 ? (
+                <div className="text-center py-8">
+                    <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                        <SparklesIcon />
+                    </div>
+                    <h3 className="text-lg font-medium theme-text mb-2">No Q&A questions yet</h3>
+                    <p className="theme-text-secondary mb-4">Add questions to start practicing</p>
+                    <button
+                        onClick={() => setMode('add')}
+                        className="btn-primary flex items-center gap-2 mx-auto"
+                    >
+                        <PlusIcon />
+                        Add First Question
+                    </button>
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {/* Controls */}
+                    <div className="flex flex-wrap gap-4 items-center">
+                        {/* Display mode toggle */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setDisplayMode('individual')}
+                                className={`px-3 py-1 text-sm rounded ${
+                                    displayMode === 'individual' 
+                                        ? 'theme-accent text-white' 
+                                        : 'btn-secondary'
+                                }`}
+                            >
+                                Individual
+                            </button>
+                            <button
+                                onClick={() => setDisplayMode('batch')}
+                                className={`px-3 py-1 text-sm rounded ${
+                                    displayMode === 'batch' 
+                                        ? 'theme-accent text-white' 
+                                        : 'btn-secondary'
+                                }`}
+                            >
+                                Batch View
+                            </button>
+                        </div>
+
+                        {/* Marks filter */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm theme-text">Filter by marks:</span>
+                            {getAvailableMarks().map(mark => (
+                                <button
+                                    key={mark}
+                                    onClick={() => {
+                                        setSelectedMarks(prev => 
+                                            prev.includes(mark) 
+                                                ? prev.filter(m => m !== mark)
+                                                : [...prev, mark]
+                                        );
+                                    }}
+                                    className={`px-2 py-1 text-xs rounded ${
+                                        selectedMarks.includes(mark)
+                                            ? 'theme-accent text-white'
+                                            : 'btn-secondary'
+                                    }`}
+                                >
+                                    {mark}
+                                </button>
+                            ))}
+                            {selectedMarks.length > 0 && (
+                                <button
+                                    onClick={() => setSelectedMarks([])}
+                                    className="px-2 py-1 text-xs btn-secondary"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Questions display */}
+                    {displayMode === 'individual' ? (
+                        // Individual question display
+                        filteredQuestions.length > 0 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between text-sm theme-text-secondary">
+                                    <span>Question {currentQuestionIndex + 1} of {filteredQuestions.length}</span>
+                                    <span>{filteredQuestions[currentQuestionIndex]?.marks} mark{filteredQuestions[currentQuestionIndex]?.marks !== 1 ? 's' : ''}</span>
+                                </div>
+
+                                <div className="border theme-border rounded-lg p-6">
+                                    <h3 className="text-lg font-medium theme-text mb-4">
+                                        {filteredQuestions[currentQuestionIndex]?.question}
+                                    </h3>
+                                    
+                                    {showAnswers[filteredQuestions[currentQuestionIndex]?.id] && (
+                                        <div className="mt-4 pt-4 border-t theme-border">
+                                            <h4 className="font-medium theme-text mb-2">Answer:</h4>
+                                            <p className="theme-text-secondary leading-relaxed">
+                                                {filteredQuestions[currentQuestionIndex]?.answer}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Controls */}
+                                <div className="flex justify-center gap-4">
+                                    <button
+                                        onClick={() => {
+                                            const currentId = filteredQuestions[currentQuestionIndex]?.id;
+                                            setShowAnswers(prev => ({
+                                                ...prev,
+                                                [currentId]: !prev[currentId]
+                                            }));
+                                        }}
+                                        className="btn-primary"
+                                    >
+                                        {showAnswers[filteredQuestions[currentQuestionIndex]?.id] ? 'Hide Answer' : 'Show Answer'}
+                                    </button>
+                                </div>
+
+                                {/* Navigation */}
+                                <div className="flex justify-center gap-4">
+                                    <button
+                                        onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
+                                        disabled={currentQuestionIndex === 0}
+                                        className="btn-secondary disabled:opacity-50"
+                                    >
+                                        Previous
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentQuestionIndex(Math.min(filteredQuestions.length - 1, currentQuestionIndex + 1))}
+                                        disabled={currentQuestionIndex === filteredQuestions.length - 1}
+                                        className="btn-secondary disabled:opacity-50"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )
+                    ) : (
+                        // Batch view - all questions together
+                        <div className="space-y-6">
+                            {filteredQuestions.map((question) => (
+                                <div key={question.id} className="border theme-border rounded-lg p-6">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <h3 className="text-lg font-medium theme-text flex-1">
+                                            {question.question}
+                                        </h3>
+                                        <span className="text-sm theme-text-secondary bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded ml-4">
+                                            {question.marks} mark{question.marks !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                    
+                                    {showAnswers[question.id] && (
+                                        <div className="mt-4 pt-4 border-t theme-border">
+                                            <h4 className="font-medium theme-text mb-2">Answer:</h4>
+                                            <p className="theme-text-secondary leading-relaxed">
+                                                {question.answer}
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="mt-4">
+                                        <button
+                                            onClick={() => {
+                                                setShowAnswers(prev => ({
+                                                    ...prev,
+                                                    [question.id]: !prev[question.id]
+                                                }));
+                                            }}
+                                            className="btn-secondary text-sm"
+                                        >
+                                            {showAnswers[question.id] ? 'Hide Answer' : 'Show Answer'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Summary */}
+                    <div className="text-center text-sm theme-text-secondary">
+                        Total: {qaQuestions.length} questions | 
+                        Filtered: {filteredQuestions.length} questions | 
+                        Total marks: {filteredQuestions.reduce((sum, q) => sum + q.marks, 0)}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default QAManager;

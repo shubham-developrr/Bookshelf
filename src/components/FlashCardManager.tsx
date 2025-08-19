@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { SparklesIcon, PlusIcon, TrashIcon, UploadIcon } from './icons';
+import { SparklesIcon, PlusIcon, TrashIcon } from './icons';
+import { processAIImport } from '../utils/aiImportService';
 
 interface FlashCard {
     id: string;
-    front: string;
-    back: string;
-    difficulty: 0 | 1 | 2 | 3; // 0=Again, 1=Hard, 2=Good, 3=Easy
-    nextReview: Date;
-    reviewCount: number;
-    easeFactor: number;
-    interval: number;
+    question: string;
+    answer: string;
+    created: Date;
+    difficulty: 'easy' | 'medium' | 'hard';
 }
 
 interface FlashCardManagerProps {
@@ -26,12 +24,12 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
     const [flashCards, setFlashCards] = useState<FlashCard[]>([]);
     const [currentCardIndex, setCurrentCardIndex] = useState(0);
     const [showAnswer, setShowAnswer] = useState(false);
-    const [mode, setMode] = useState<'study' | 'manage' | 'add'>('study');
-    const [newFront, setNewFront] = useState('');
-    const [newBack, setNewBack] = useState('');
-    const [importText, setImportText] = useState('');
-    const [showImport, setShowImport] = useState(false);
-    const [separator, setSeparator] = useState<'tab' | 'semicolon' | 'pipe'>('tab');
+    const [mode, setMode] = useState<'study' | 'create' | 'manage' | 'import'>('study');
+    const [newQuestion, setNewQuestion] = useState('');
+    const [newAnswer, setNewAnswer] = useState('');
+    const [selectedFormat, setSelectedFormat] = useState('tab');
+    const [showFormatModal, setShowFormatModal] = useState(false);
+    const [isAIProcessing, setIsAIProcessing] = useState(false);
 
     const storageKey = `flashcards_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
 
@@ -41,11 +39,65 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         if (saved) {
             const cards = JSON.parse(saved).map((card: any) => ({
                 ...card,
-                nextReview: new Date(card.nextReview)
+                created: new Date(card.created)
             }));
             setFlashCards(cards);
         }
     }, [storageKey]);
+
+    // Handle AI-powered smart import
+    const handleSmartImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.includes('text')) {
+            alert('Please select a text file (.txt)');
+            return;
+        }
+
+        setIsAIProcessing(true);
+        
+        try {
+            const text = await file.text();
+            
+            if (!text.trim()) {
+                alert('The selected file is empty.');
+                return;
+            }
+            
+            // Use AI service to process the text
+            const result = await processAIImport(text, 'flashcard');
+            
+            if (result.success && result.data.length > 0) {
+                const updatedCards = [...flashCards, ...result.data];
+                saveFlashCards(updatedCards);
+                alert(`🤖 AI Import Success! Extracted ${result.data.length} flash cards from your text content.`);
+                setMode('study');
+            } else {
+                alert(result.message || 'No flash cards could be extracted from the text. Please ensure your text contains questions and answers or term-definition pairs.');
+            }
+        } catch (error) {
+            console.error('AI import error:', error);
+            alert('Failed to process the file. Please check the content and try again.');
+        } finally {
+            setIsAIProcessing(false);
+            // Reset file input
+            event.target.value = '';
+        }
+    };
+    
+    // Create FlashCard from smart processing
+    const createSmartFlashCard = (question: string, answer: string): FlashCard | null => {
+        if (!question.trim() || !answer.trim()) return null;
+        
+        return {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            question: question.trim(),
+            answer: answer.trim(),
+            created: new Date(),
+            difficulty: 'medium'
+        };
+    };
 
     // Save flashcards to localStorage
     const saveFlashCards = (cards: FlashCard[]) => {
@@ -53,411 +105,573 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         setFlashCards(cards);
     };
 
-    // Create new flashcard
-    const createFlashCard = (front: string, back: string): FlashCard => {
-        return {
-            id: Date.now().toString(),
-            front: front.trim(),
-            back: back.trim(),
-            difficulty: 2,
-            nextReview: new Date(),
-            reviewCount: 0,
-            easeFactor: 2.5,
-            interval: 1
-        };
+    // Handle file import
+    const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            if (file.type === 'text/plain') {
+                const text = await file.text();
+                await processTextImport(text);
+            } else {
+                alert('Please select a .txt file');
+            }
+        } catch (error) {
+            console.error('Import error:', error);
+            alert('Error importing file. Please check the format.');
+        }
+        
+        // Reset file input
+        event.target.value = '';
     };
 
-    // Add single flashcard
-    const handleAddCard = () => {
-        if (newFront.trim() && newBack.trim()) {
-            const newCard = createFlashCard(newFront, newBack);
-            const updatedCards = [...flashCards, newCard];
+    // Process text import based on selected format
+    const processTextImport = async (text: string) => {
+        const lines = text.trim().split('\n').filter(line => line.trim());
+        const importedCards: FlashCard[] = [];
+        
+        for (const line of lines) {
+            try {
+                let parts: string[] = [];
+                
+                if (selectedFormat === 'tab') {
+                    parts = line.split('\t').map(p => p.trim());
+                } else if (selectedFormat === 'semicolon') {
+                    parts = line.split(';').map(p => p.trim());
+                } else if (selectedFormat === 'pipe') {
+                    parts = line.split('|').map(p => p.trim());
+                }
+                
+                if (parts.length >= 2) {
+                    const card: FlashCard = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        question: parts[0],
+                        answer: parts[1],
+                        created: new Date(),
+                        difficulty: 'medium'
+                    };
+                    importedCards.push(card);
+                }
+            } catch (err) {
+                console.warn('Skipping invalid line:', line);
+            }
+        }
+        
+        if (importedCards.length > 0) {
+            const updatedCards = [...flashCards, ...importedCards];
             saveFlashCards(updatedCards);
-            setNewFront('');
-            setNewBack('');
+            alert(`Successfully imported ${importedCards.length} flash cards!`);
+            setMode('study');
+        } else {
+            alert('No valid flash cards found. Please check your format.');
         }
     };
 
-    // Import flashcards from text
-    const handleImportCards = () => {
-        if (!importText.trim()) return;
+    // Process manual text input
+    const handleManualImport = async () => {
+        const textarea = document.querySelector('textarea[placeholder*="Question 1"]') as HTMLTextAreaElement;
+        if (textarea && textarea.value.trim()) {
+            await processTextImport(textarea.value);
+            textarea.value = '';
+        }
+    };
 
-        const separatorMap = {
-            'tab': '\t',
-            'semicolon': ';',
-            'pipe': '|'
+    // Copy format to clipboard
+    const copyFormatToClipboard = async () => {
+        const formats = {
+            tab: "Question[TAB]Answer",
+            semicolon: "Question;Answer", 
+            pipe: "Question|Answer"
         };
+        
+        try {
+            await navigator.clipboard.writeText(formats[selectedFormat as keyof typeof formats]);
+            alert('Format template copied to clipboard!');
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy format. Please copy manually from the example.');
+        }
+    };
 
-        const lines = importText.split('\n').filter(line => line.trim());
-        const newCards: FlashCard[] = [];
+    // Show format example
+    const showFormatExample = () => {
+        setShowFormatModal(true);
+    };
 
-        lines.forEach(line => {
-            const parts = line.split(separatorMap[separator]);
-            if (parts.length >= 2) {
-                const front = parts[0].trim();
-                const back = parts.slice(1).join(' ').trim(); // Join remaining parts for back
-                if (front && back) {
-                    newCards.push(createFlashCard(front, back));
-                }
-            }
-        });
-
-        if (newCards.length > 0) {
-            const updatedCards = [...flashCards, ...newCards];
+    // Add new flashcard
+    const handleAddCard = () => {
+        if (newQuestion.trim() && newAnswer.trim()) {
+            const newCard: FlashCard = {
+                id: Date.now().toString(),
+                question: newQuestion.trim(),
+                answer: newAnswer.trim(),
+                created: new Date(),
+                difficulty: 'medium'
+            };
+            const updatedCards = [...flashCards, newCard];
             saveFlashCards(updatedCards);
-            setImportText('');
-            setShowImport(false);
+            setNewQuestion('');
+            setNewAnswer('');
+            setMode('study');
         }
     };
 
     // Delete flashcard
-    const handleDeleteCard = (id: string) => {
-        const updatedCards = flashCards.filter(card => card.id !== id);
+    const handleDeleteCard = (cardId: string) => {
+        const updatedCards = flashCards.filter(card => card.id !== cardId);
         saveFlashCards(updatedCards);
         if (currentCardIndex >= updatedCards.length && updatedCards.length > 0) {
             setCurrentCardIndex(updatedCards.length - 1);
         }
     };
 
-    // Spaced repetition algorithm (simplified Anki SM-2)
-    const calculateNextReview = (card: FlashCard, rating: 0 | 1 | 2 | 3): FlashCard => {
-        let { easeFactor, interval, reviewCount } = card;
-        const now = new Date();
-
-        reviewCount += 1;
-
-        if (rating < 2) {
-            // Again or Hard - reset interval
-            interval = 1;
-        } else {
-            // Good or Easy
-            if (reviewCount === 1) {
-                interval = 1;
-            } else if (reviewCount === 2) {
-                interval = 6;
-            } else {
-                interval = Math.round(interval * easeFactor);
-            }
-
-            // Adjust ease factor based on rating
-            easeFactor = easeFactor + (0.1 - (3 - rating) * (0.08 + (3 - rating) * 0.02));
-            easeFactor = Math.max(1.3, easeFactor); // Minimum ease factor
-        }
-
-        const nextReview = new Date(now.getTime() + interval * 24 * 60 * 60 * 1000);
-
-        return {
-            ...card,
-            difficulty: rating,
-            easeFactor,
-            interval,
-            reviewCount,
-            nextReview
-        };
-    };
-
-    // Handle rating submission
-    const handleRating = (rating: 0 | 1 | 2 | 3) => {
-        if (flashCards.length === 0) return;
-
-        const currentCard = flashCards[currentCardIndex];
-        const updatedCard = calculateNextReview(currentCard, rating);
-        const updatedCards = flashCards.map(card => 
-            card.id === currentCard.id ? updatedCard : card
-        );
-
-        saveFlashCards(updatedCards);
+    // Navigate cards
+    const nextCard = () => {
+        setCurrentCardIndex((prev) => (prev + 1) % flashCards.length);
         setShowAnswer(false);
-
-        // Move to next card
-        if (currentCardIndex < flashCards.length - 1) {
-            setCurrentCardIndex(currentCardIndex + 1);
-        } else {
-            setCurrentCardIndex(0);
-        }
     };
 
-    // Get cards due for review
-    const getDueCards = () => {
-        const now = new Date();
-        return flashCards.filter(card => card.nextReview <= now);
+    const prevCard = () => {
+        setCurrentCardIndex((prev) => (prev - 1 + flashCards.length) % flashCards.length);
+        setShowAnswer(false);
     };
 
-    const dueCards = getDueCards();
     const currentCard = flashCards[currentCardIndex];
 
-    if (mode === 'add') {
+    // Format example modal
+    const FormatExampleModal = () => {
+        if (!showFormatModal) return null;
+        
+        const examples = {
+            tab: `What is HTML?	HyperText Markup Language - the standard markup language for creating web pages
+What is CSS?	Cascading Style Sheets - used for styling and layout of web pages
+What is JavaScript?	A programming language for web development and interactive features`,
+            semicolon: `What is React?;A JavaScript library for building user interfaces and web applications
+What is Node.js?;A JavaScript runtime environment for server-side development
+What is MongoDB?;A NoSQL document database for modern applications`,
+            pipe: `What is Python?|A high-level programming language known for its simplicity and readability
+What is Git?|A version control system for tracking changes in source code
+What is Docker?|A platform for developing and running applications in containers`
+        };
+        
         return (
-            <div className={`theme-surface rounded-lg p-6 ${className}`}>
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
-                        <SparklesIcon />
-                        Add Flash Card
-                    </h2>
-                    <button
-                        onClick={() => setMode('study')}
-                        className="btn-secondary text-sm"
-                    >
-                        Back to Study
-                    </button>
-                </div>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium theme-text mb-2">
-                            Front (Question/Prompt):
-                        </label>
-                        <textarea
-                            value={newFront}
-                            onChange={(e) => setNewFront(e.target.value)}
-                            placeholder="Enter the question or prompt..."
-                            className="w-full h-24 p-3 theme-surface border rounded-lg theme-text resize-none"
-                        />
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="theme-surface rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
+                    <div className="p-4 border-b theme-border flex justify-between items-center">
+                        <h3 className="text-lg font-semibold theme-text">Format Example: {selectedFormat.toUpperCase()} Separated</h3>
+                        <button
+                            onClick={() => setShowFormatModal(false)}
+                            className="text-gray-500 hover:text-gray-700"
+                        >
+                            ✕
+                        </button>
                     </div>
-
-                    <div>
-                        <label className="block text-sm font-medium theme-text mb-2">
-                            Back (Answer):
-                        </label>
-                        <textarea
-                            value={newBack}
-                            onChange={(e) => setNewBack(e.target.value)}
-                            placeholder="Enter the answer..."
-                            className="w-full h-24 p-3 theme-surface border rounded-lg theme-text resize-none"
-                        />
-                    </div>
-
-                    <button
-                        onClick={handleAddCard}
-                        disabled={!newFront.trim() || !newBack.trim()}
-                        className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Add Card
-                    </button>
-                </div>
-
-                {/* Import Section */}
-                <div className="mt-8 pt-6 border-t theme-border">
-                    <button
-                        onClick={() => setShowImport(!showImport)}
-                        className="flex items-center gap-2 btn-secondary mb-4"
-                    >
-                        <UploadIcon />
-                        Import from Text File
-                    </button>
-
-                    {showImport && (
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium theme-text mb-2">
-                                    Separator:
-                                </label>
-                                <select
-                                    value={separator}
-                                    onChange={(e) => setSeparator(e.target.value as any)}
-                                    className="p-2 theme-surface border rounded theme-text"
-                                >
-                                    <option value="tab">Tab</option>
-                                    <option value="semicolon">Semicolon (;)</option>
-                                    <option value="pipe">Pipe (|)</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium theme-text mb-2">
-                                    Import Text (Front{separator === 'tab' ? '[TAB]' : separator === 'semicolon' ? ';' : '|'}Back format):
-                                </label>
-                                <textarea
-                                    value={importText}
-                                    onChange={(e) => setImportText(e.target.value)}
-                                    placeholder={`Example:\nWhat is React?${separator === 'tab' ? '\t' : separator === 'semicolon' ? ';' : '|'}A JavaScript library for building user interfaces\nWhat is JSX?${separator === 'tab' ? '\t' : separator === 'semicolon' ? ';' : '|'}A syntax extension for JavaScript`}
-                                    className="w-full h-32 p-3 theme-surface border rounded-lg theme-text resize-none font-mono text-sm"
-                                />
-                            </div>
-
+                    <div className="p-4 overflow-y-auto max-h-[60vh]">
+                        <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono theme-text whitespace-pre-wrap overflow-x-auto">
+                            {examples[selectedFormat as keyof typeof examples]}
+                        </pre>
+                        <div className="mt-4 flex gap-2">
                             <button
-                                onClick={handleImportCards}
-                                disabled={!importText.trim()}
-                                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => copyFormatToClipboard()}
+                                className="btn-primary text-sm"
                             >
-                                Import Cards
+                                📋 Copy This Example
+                            </button>
+                            <button
+                                onClick={() => setShowFormatModal(false)}
+                                className="btn-secondary text-sm"
+                            >
+                                Close
                             </button>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
         );
-    }
+    };
 
-    if (mode === 'manage') {
-        return (
-            <div className={`theme-surface rounded-lg p-6 ${className}`}>
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-semibold theme-text">
-                        Manage Cards ({flashCards.length} total)
-                    </h2>
-                    <button
-                        onClick={() => setMode('study')}
-                        className="btn-secondary text-sm"
-                    >
-                        Back to Study
-                    </button>
-                </div>
+    return (
+        <div className={`p-6 theme-surface rounded-lg ${className}`}>
+            <FormatExampleModal />
+            {mode === 'import' ? (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
+                            <SparklesIcon className="w-5 h-5" />
+                            Import Flash Cards
+                        </h2>
+                        <button
+                            onClick={() => setMode('study')}
+                            className="btn-secondary text-sm"
+                        >
+                            Back to Study
+                        </button>
+                    </div>
 
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {flashCards.map((card, index) => (
-                        <div key={card.id} className="p-4 border theme-border rounded-lg">
-                            <div className="flex justify-between items-start mb-2">
-                                <div className="flex-1">
-                                    <div className="text-sm font-medium theme-text mb-1">Front:</div>
-                                    <div className="text-sm theme-text-secondary mb-2">{card.front}</div>
-                                    <div className="text-sm font-medium theme-text mb-1">Back:</div>
-                                    <div className="text-sm theme-text-secondary">{card.back}</div>
-                                </div>
-                                <button
-                                    onClick={() => handleDeleteCard(card.id)}
-                                    className="text-red-500 hover:text-red-700 ml-4"
-                                    title="Delete card"
+                    {/* Format selection */}
+                    <div className="theme-surface border theme-border rounded-lg p-4">
+                        <h3 className="font-medium theme-text mb-2">
+                            📝 Import Format
+                        </h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium theme-text mb-1">
+                                    Choose Format:
+                                </label>
+                                <select 
+                                    value={selectedFormat}
+                                    onChange={(e) => setSelectedFormat(e.target.value)}
+                                    className="w-full p-2 theme-surface border rounded theme-text text-sm"
                                 >
-                                    <TrashIcon />
+                                    <option value="tab">Tab separated (recommended)</option>
+                                    <option value="semicolon">Semicolon separated</option>
+                                    <option value="pipe">Pipe separated</option>
+                                </select>
+                            </div>
+                            
+                            {/* Copy Format Button */}
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => copyFormatToClipboard()}
+                                    className="flex-1 btn-secondary text-sm flex items-center justify-center gap-2"
+                                >
+                                    📋 Copy Format
+                                </button>
+                                <button 
+                                    onClick={() => showFormatExample()}
+                                    className="flex-1 btn-secondary text-sm"
+                                >
+                                    👁️ View Example
                                 </button>
                             </div>
-                            <div className="text-xs theme-text-secondary">
-                                Reviews: {card.reviewCount} | Next: {card.nextReview.toLocaleDateString()}
+                        </div>
+                        
+                        <p className="text-xs theme-text-secondary mt-2">
+                            Format: Question{selectedFormat === 'tab' ? '[TAB]' : selectedFormat === 'semicolon' ? ';' : '|'}Answer
+                        </p>
+                    </div>
+
+                    {/* File import */}
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Upload .txt file:
+                        </label>
+                        <input
+                            type="file"
+                            accept=".txt"
+                            onChange={handleFileImport}
+                            className="w-full p-2 theme-surface border rounded theme-text"
+                        />
+                    </div>
+
+                    {/* AI Smart Import - Anki Style */}
+                    <div className="border theme-border rounded-lg p-4">
+                        <h3 className="font-medium theme-text mb-3">🤖 ANKI-Style AI Import</h3>
+                        <p className="text-sm theme-text-secondary mb-4">
+                            Best-in-class flash card generator using ANKI principles for maximum learning effectiveness!
+                        </p>
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+                            <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">✨ ANKI Best Practices Applied:</h4>
+                            <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                                <li>• <strong>Atomic Principle:</strong> One concept per card</li>
+                                <li>• <strong>Active Recall:</strong> Questions that test understanding</li>
+                                <li>• <strong>Minimum Information:</strong> Concise but complete answers</li>
+                                <li>• <strong>Spaced Repetition Ready:</strong> Optimized for long-term retention</li>
+                            </ul>
+                        </div>
+                        <div className="space-y-3">
+                            <input
+                                type="file"
+                                accept=".txt"
+                                onChange={handleSmartImport}
+                                className="hidden"
+                                disabled={isAIProcessing}
+                                id="ai-import-file-input"
+                            />
+                            <button 
+                                onClick={() => {
+                                    const input = document.getElementById('ai-import-file-input') as HTMLInputElement;
+                                    input?.click();
+                                }}
+                                className="w-full btn-primary text-sm flex items-center justify-center gap-2"
+                                disabled={isAIProcessing}
+                            >
+                                {isAIProcessing ? (
+                                    <>
+                                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                        Generating ANKI cards...
+                                    </>
+                                ) : (
+                                    <>
+                                        � Generate ANKI-Style Flash Cards
+                                    </>
+                                )}
+                            </button>
+                            <p className="text-xs theme-text-secondary">
+                                Upload any text and AI will create optimized flash cards following ANKI methodology. Perfect for medical, technical, and academic content!
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Manual import */}
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Or paste flash cards manually:
+                        </label>
+                        <textarea
+                            placeholder="Question 1[TAB]Answer 1&#10;Question 2[TAB]Answer 2"
+                            className="w-full h-32 p-3 theme-surface border rounded-lg theme-text font-mono text-sm"
+                        />
+                        <button 
+                            onClick={handleManualImport}
+                            className="mt-3 btn-primary"
+                        >
+                            Import Flash Cards
+                        </button>
+                    </div>
+                </div>
+            ) : flashCards.length === 0 ? (
+                // Empty state with proper flash card structure
+                <div className="text-center py-12">
+                    <SparklesIcon className="w-16 h-16 mx-auto mb-4 theme-text-secondary" />
+                    <h3 className="text-xl font-semibold mb-2 theme-text">Create Your Flash Cards</h3>
+                    <p className="theme-text-secondary mb-4">Build effective study cards with question/answer format</p>
+                    
+                    {/* Example Flash Card Structure */}
+                    <div className="mb-6 p-4 theme-surface2 rounded-lg max-w-lg mx-auto">
+                        <div className="text-sm theme-text-secondary mb-3 font-medium">Example Flash Card Structure:</div>
+                        <div className="space-y-3">
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
+                                <div className="font-semibold text-blue-800 dark:text-blue-300 mb-2 flex items-center">
+                                    <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs mr-2">Q</span>
+                                    Question (Front)
+                                </div>
+                                <div className="text-sm text-blue-700 dark:text-blue-200 pl-8">
+                                    "What is a Database Management System?"
+                                </div>
+                            </div>
+                            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
+                                <div className="font-semibold text-green-800 dark:text-green-300 mb-2 flex items-center">
+                                    <span className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs mr-2">A</span>
+                                    Answer (Back)
+                                </div>
+                                <div className="text-sm text-green-700 dark:text-green-200 pl-8">
+                                    "A software system that stores, retrieves, and runs queries on data in databases."
+                                </div>
                             </div>
                         </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    // Study mode
-    return (
-        <div className={`theme-surface rounded-lg p-6 ${className}`}>
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
-                    <SparklesIcon />
-                    Flash Cards
-                </h2>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setMode('add')}
-                        className="btn-secondary text-sm flex items-center gap-2"
-                    >
-                        <PlusIcon />
-                        Add
-                    </button>
-                    <button
-                        onClick={() => setMode('manage')}
-                        className="btn-secondary text-sm"
-                    >
-                        Manage ({flashCards.length})
-                    </button>
-                </div>
-            </div>
-
-            {flashCards.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
-                        <SparklesIcon />
                     </div>
-                    <h3 className="text-lg font-medium theme-text mb-2">No flash cards yet</h3>
-                    <p className="theme-text-secondary mb-4">Create your first flash card to start studying</p>
+
                     <button
-                        onClick={() => setMode('add')}
-                        className="btn-primary flex items-center gap-2 mx-auto"
+                        onClick={() => setMode('create')}
+                        className="px-6 py-3 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition mr-3"
                     >
-                        <PlusIcon />
-                        Add First Card
+                        <PlusIcon className="w-5 h-5 inline mr-2" />
+                        Create Your First Flash Card
+                    </button>
+                    <button
+                        onClick={() => setMode('import')}
+                        className="px-6 py-3 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                    >
+                        Import Flash Cards
                     </button>
                 </div>
             ) : (
-                <div className="space-y-6">
-                    {/* Study Progress */}
-                    <div className="flex items-center justify-between text-sm theme-text-secondary">
-                        <span>Card {currentCardIndex + 1} of {flashCards.length}</span>
-                        <span>{dueCards.length} cards due for review</span>
+                <div>
+                    {/* Header */}
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 className="text-2xl font-bold theme-text flex items-center">
+                                <SparklesIcon className="w-6 h-6 mr-2" />
+                                Flash Cards
+                            </h2>
+                            <p className="theme-text-secondary">
+                                {flashCards.length} card{flashCards.length !== 1 ? 's' : ''} • 
+                                Card {currentCardIndex + 1} of {flashCards.length}
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setMode(mode === 'study' ? 'manage' : 'study')}
+                                className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                            >
+                                {mode === 'study' ? 'Manage' : 'Study Mode'}
+                            </button>
+                            <button
+                                onClick={() => setMode('import')}
+                                className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                            >
+                                Import
+                            </button>
+                            <button
+                                onClick={() => setMode('create')}
+                                className="px-4 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                            >
+                                <PlusIcon className="w-4 h-4 inline mr-1" />
+                                Add Card
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Flash Card */}
-                    <div className="min-h-48 theme-surface-secondary rounded-lg p-6 border border-2 theme-border">
-                        <div className="text-center">
-                            <div className="text-lg font-medium theme-text mb-4">
-                                {currentCard.front}
-                            </div>
-                            
-                            {showAnswer && (
-                                <div className="mt-6 pt-6 border-t theme-border">
-                                    <div className="text-lg theme-text">
-                                        {currentCard.back}
+                    {mode === 'study' && (
+                        <div className="space-y-6">
+                            {/* Flash Card Display */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-lg min-h-[300px] flex flex-col justify-center border-2 theme-border">
+                                <div className="text-center">
+                                    <div className="mb-4">
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                                            {showAnswer ? 'Answer' : 'Question'}
+                                        </span>
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                                    
+                                    <div className="text-xl font-medium theme-text mb-6 leading-relaxed">
+                                        {showAnswer ? currentCard.answer : currentCard.question}
+                                    </div>
 
-                    {/* Controls */}
-                    {!showAnswer ? (
-                        <div className="text-center">
-                            <button
-                                onClick={() => setShowAnswer(true)}
-                                className="btn-primary text-lg px-8 py-3"
-                            >
-                                Show Answer
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap gap-3 justify-center">
-                            <button
-                                onClick={() => handleRating(0)}
-                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                            >
-                                Again (&lt;1min)
-                            </button>
-                            <button
-                                onClick={() => handleRating(1)}
-                                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                            >
-                                Hard (&lt;6min)
-                            </button>
-                            <button
-                                onClick={() => handleRating(2)}
-                                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                            >
-                                Good (&lt;10min)
-                            </button>
-                            <button
-                                onClick={() => handleRating(3)}
-                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                            >
-                                Easy (4d)
-                            </button>
+                                    {!showAnswer ? (
+                                        <button
+                                            onClick={() => setShowAnswer(true)}
+                                            className="px-6 py-3 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                                        >
+                                            Show Answer
+                                        </button>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <button
+                                                onClick={() => setShowAnswer(false)}
+                                                className="block mx-auto px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                            >
+                                                Hide Answer
+                                            </button>
+                                            <div className="flex justify-center gap-3">
+                                                <button
+                                                    onClick={nextCard}
+                                                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 theme-transition"
+                                                >
+                                                    Got it! ✓
+                                                </button>
+                                                <button
+                                                    onClick={nextCard}
+                                                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 theme-transition"
+                                                >
+                                                    Review again
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Navigation */}
+                            <div className="flex justify-between items-center">
+                                <button
+                                    onClick={prevCard}
+                                    className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                >
+                                    ← Previous
+                                </button>
+                                
+                                <div className="text-sm theme-text-secondary">
+                                    Card {currentCardIndex + 1} of {flashCards.length}
+                                </div>
+                                
+                                <button
+                                    onClick={nextCard}
+                                    className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                >
+                                    Next →
+                                </button>
+                            </div>
                         </div>
                     )}
 
-                    {/* Navigation */}
-                    <div className="flex justify-center gap-4 pt-4">
+                    {mode === 'manage' && (
+                        <div className="space-y-4">
+                            <div className="grid gap-4">
+                                {flashCards.map((card, index) => (
+                                    <div key={card.id} className="theme-surface2 rounded-lg p-4 border theme-border">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex-1">
+                                                <div className="font-medium theme-text mb-2">{card.question}</div>
+                                                <div className="text-sm theme-text-secondary">{card.answer}</div>
+                                                <div className="text-xs theme-text-secondary mt-2">
+                                                    Created: {card.created.toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteCard(card.id)}
+                                                className="ml-4 p-2 text-red-400 hover:text-red-600 theme-transition"
+                                            >
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {mode === 'create' && (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold theme-text">Create New Flash Card</h3>
                         <button
-                            onClick={() => {
-                                setCurrentCardIndex(Math.max(0, currentCardIndex - 1));
-                                setShowAnswer(false);
-                            }}
-                            disabled={currentCardIndex === 0}
-                            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => setMode('study')}
+                            className="px-3 py-1 theme-surface2 theme-text rounded hover:theme-accent-bg hover:text-white theme-transition"
                         >
-                            Previous
+                            ✕
                         </button>
-                        <button
-                            onClick={() => {
-                                setCurrentCardIndex(Math.min(flashCards.length - 1, currentCardIndex + 1));
-                                setShowAnswer(false);
-                            }}
-                            disabled={currentCardIndex === flashCards.length - 1}
-                            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Next
-                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium theme-text mb-2">
+                                Question (Front of card)
+                            </label>
+                            <textarea
+                                value={newQuestion}
+                                onChange={(e) => setNewQuestion(e.target.value)}
+                                placeholder="Enter your question here..."
+                                className="w-full p-3 theme-surface2 border theme-border rounded-lg theme-text resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                rows={3}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium theme-text mb-2">
+                                Answer (Back of card)
+                            </label>
+                            <textarea
+                                value={newAnswer}
+                                onChange={(e) => setNewAnswer(e.target.value)}
+                                placeholder="Enter the answer here..."
+                                className="w-full p-3 theme-surface2 border theme-border rounded-lg theme-text resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                rows={3}
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleAddCard}
+                                disabled={!newQuestion.trim() || !newAnswer.trim()}
+                                className="px-6 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Add Flash Card
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setNewQuestion('');
+                                    setNewAnswer('');
+                                    setMode('study');
+                                }}
+                                className="px-6 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
