@@ -1,0 +1,13 @@
+{
+  "name": "Test Import Book",
+  "image": "test-book-image.png",
+  "creatorName": "Test Creator",
+  "university": "Test University",
+  "semester": "Test Semester",
+  "subjectCode": "TEST101",
+  "language": "English",
+  "difficulty": "Medium",
+  "audience": "Students",
+  "category": "Computer Science",
+  "description": "Test book for import functionality"
+}

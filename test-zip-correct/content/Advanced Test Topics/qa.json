@@ -1,0 +1,9 @@
+[
+  {
+    "id": "qa_1",
+    "question": "How do you implement advanced testing strategies?",
+    "answer": "Advanced testing strategies involve systematic planning, risk assessment, test automation, and continuous improvement through feedback loops.",
+    "difficulty": "medium",
+    "tags": ["strategy", "advanced", "planning"]
+  }
+]

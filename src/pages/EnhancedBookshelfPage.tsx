@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpenIcon, MenuIcon, AlertIcon, AIGuruIcon, PlusIcon, SearchIconSvg, PaperAirplaneIcon } from '../components/icons';
 import { getBookImage } from '../assets/images/index';
@@ -13,6 +13,7 @@ import SearchModal from '../components/SearchModal';
 import BookOptionsMenu from '../components/BookOptionsMenu';
 import PublishModal from '../components/PublishModal';
 import EnhancedAIGuruModal from '../components/EnhancedAIGuruModal';
+import { BookImportService } from '../services/importService';
 
 const EnhancedBookshelfPage: React.FC = () => {
     const navigate = useNavigate();
@@ -27,18 +28,26 @@ const EnhancedBookshelfPage: React.FC = () => {
     const [aiGuruPrompt, setAIGuruPrompt] = useState('');
     const [loadedBooks, setLoadedBooks] = useState<BookModule[]>([]);
     const [createdBooks, setCreatedBooks] = useState<Array<BookData & { id: string }>>([]);
+    const [importedBooks, setImportedBooks] = useState<Array<any>>([]);
     const [loading, setLoading] = useState(true);
     const [editingBook, setEditingBook] = useState<string | null>(null);
     const [editingBookData, setEditingBookData] = useState<BookData | null>(null);
+    
+    // Import functionality state
+    const [isImporting, setIsImporting] = useState(false);
+    const [importMessage, setImportMessage] = useState<string>('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Legacy subjects for backward compatibility
+    // Legacy subjects for backward compatibility + imported books
     const legacySubjects = [
         'Object Oriented System Design with C++', 
         'Application of Soft Computing', 
         'Database Management System', 
         'Web Technology', 
         'Design and Analysis of Algorithm', 
-        'Mechanics of Robots'
+        'Mechanics of Robots',
+        // Add imported books to legacy subjects
+        ...importedBooks.map(book => book.name)
     ];
 
     useEffect(() => {
@@ -47,6 +56,12 @@ const EnhancedBookshelfPage: React.FC = () => {
         const savedBooks = localStorage.getItem('createdBooks');
         if (savedBooks) {
             setCreatedBooks(JSON.parse(savedBooks));
+        }
+        
+        // Load imported books from localStorage
+        const savedImportedBooks = localStorage.getItem('importedBooks');
+        if (savedImportedBooks) {
+            setImportedBooks(JSON.parse(savedImportedBooks));
         }
     }, []);
 
@@ -155,6 +170,56 @@ const EnhancedBookshelfPage: React.FC = () => {
         localStorage.setItem('createdBooks', JSON.stringify(updatedBooks));
         
         console.log('Book deleted:', bookId);
+    };
+
+    const handleImportBook = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.name.endsWith('.zip')) {
+            setImportMessage('Please select a valid ZIP file.');
+            return;
+        }
+
+        setIsImporting(true);
+        setImportMessage('');
+
+        try {
+            // Validate file first
+            const validation = await BookImportService.validateImportFile(file);
+            if (!validation.isValid) {
+                throw new Error(validation.error || 'Invalid import file');
+            }
+
+            // Import the book
+            await BookImportService.importBook(file);
+            
+            setImportMessage(`Successfully imported "${validation.bookName}" with ${validation.chapterCount} chapters!`);
+            
+            // Refresh the books
+            await loadInitialBooks();
+            const savedBooks = localStorage.getItem('createdBooks');
+            if (savedBooks) {
+                setCreatedBooks(JSON.parse(savedBooks));
+            }
+            
+            // Refresh imported books
+            const savedImportedBooks = localStorage.getItem('importedBooks');
+            if (savedImportedBooks) {
+                setImportedBooks(JSON.parse(savedImportedBooks));
+            }
+            
+            // Clear file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+            
+        } catch (error) {
+            console.error('Import failed:', error);
+            setImportMessage(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsImporting(false);
+        }
     };
 
     const handlePublishBooks = (bookIds: string[]) => {
@@ -309,6 +374,14 @@ const EnhancedBookshelfPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-3">
                         <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                            className="px-3 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                            title="Import Books"
+                        >
+                            📥 Import
+                        </button>
+                        <button 
                             onClick={() => setMarketplaceOpen(true)}
                             className="p-2 hover:theme-surface2 rounded-lg theme-transition"
                             title="Browse Book Marketplace"
@@ -334,6 +407,27 @@ const EnhancedBookshelfPage: React.FC = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+                {/* Hidden Import File Input */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".zip"
+                    onChange={handleImportBook}
+                    className="hidden"
+                    disabled={isImporting}
+                />
+                
+                {/* Import Message */}
+                {importMessage && (
+                    <div className={`mb-6 p-4 rounded-lg ${
+                        importMessage.includes('Successfully') 
+                            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' 
+                            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                    }`}>
+                        {importMessage}
+                    </div>
+                )}
+
                 {/* Book Management Section */}
                 <div className="mb-8">
                     <div className="flex flex-wrap gap-4 justify-center">

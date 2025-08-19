@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SparklesIcon, PlusIcon, TrashIcon, UploadIcon } from './icons';
 import { processAIImport } from '../utils/aiImportService';
+import { MCQTest } from './TestComponents';
 
 interface MCQOption {
     id: string;
@@ -30,12 +31,22 @@ const MCQManager: React.FC<MCQManagerProps> = ({
 }) => {
     const [mcqQuestions, setMcqQuestions] = useState<MCQQuestion[]>([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [mode, setMode] = useState<'practice' | 'manage' | 'add' | 'import'>('practice');
+    const [mode, setMode] = useState<'practice' | 'manage' | 'add' | 'import' | 'test'>('practice');
     const [selectedAnswers, setSelectedAnswers] = useState<{ [key: string]: string }>({});
     const [showResults, setShowResults] = useState(false);
     const [selectedFormat, setSelectedFormat] = useState('pipe');
     const [showFormatModal, setShowFormatModal] = useState(false);
     const [isAIProcessing, setIsAIProcessing] = useState(false);
+
+    // Edit state
+    const [editingQuestion, setEditingQuestion] = useState<MCQQuestion | null>(null);
+
+    // Form state for adding/editing
+    const [newQuestion, setNewQuestion] = useState('');
+    const [newOptions, setNewOptions] = useState<string[]>(['', '', '', '']);
+    const [correctOption, setCorrectOption] = useState<number>(0);
+    const [newExplanation, setNewExplanation] = useState('');
+    const [newCategory, setNewCategory] = useState('');
 
     const storageKey = `mcq_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
 
@@ -51,6 +62,58 @@ const MCQManager: React.FC<MCQManagerProps> = ({
     const saveMcqQuestions = (questions: MCQQuestion[]) => {
         localStorage.setItem(storageKey, JSON.stringify(questions));
         setMcqQuestions(questions);
+    };
+
+    // Handle adding/editing MCQ questions
+    const handleAddMCQ = () => {
+        if (!newQuestion.trim() || newOptions.some(opt => !opt.trim())) {
+            return;
+        }
+
+        if (editingQuestion) {
+            // Edit existing question
+            const updatedQuestions = mcqQuestions.map(q => 
+                q.id === editingQuestion.id 
+                    ? {
+                        ...q,
+                        question: newQuestion.trim(),
+                        options: newOptions.map((text, index) => ({
+                            id: `${editingQuestion.id}_opt_${index}`,
+                            text: text.trim(),
+                            isCorrect: index === correctOption
+                        })),
+                        explanation: newExplanation.trim() || undefined,
+                        category: newCategory.trim() || undefined,
+                    }
+                    : q
+            );
+            saveMcqQuestions(updatedQuestions);
+            setEditingQuestion(null);
+        } else {
+            // Add new question
+            const newMCQ: MCQQuestion = {
+                id: Date.now().toString(),
+                question: newQuestion.trim(),
+                options: newOptions.map((text, index) => ({
+                    id: `${Date.now()}_opt_${index}`,
+                    text: text.trim(),
+                    isCorrect: index === correctOption
+                })),
+                explanation: newExplanation.trim() || undefined,
+                category: newCategory.trim() || undefined,
+            };
+            
+            const updatedQuestions = [...mcqQuestions, newMCQ];
+            saveMcqQuestions(updatedQuestions);
+        }
+        
+        // Reset form
+        setNewQuestion('');
+        setNewOptions(['', '', '', '']);
+        setCorrectOption(0);
+        setNewExplanation('');
+        setNewCategory('');
+        setMode('practice');
     };
 
     // Handle AI-powered import
@@ -224,6 +287,17 @@ const MCQManager: React.FC<MCQManagerProps> = ({
     const showFormatExample = () => {
         setShowFormatModal(true);
     };
+
+    if (mode === 'test') {
+        return (
+            <MCQTest
+                questions={mcqQuestions}
+                currentBook={currentBook}
+                currentChapter={currentChapter}
+                onBack={() => setMode('practice')}
+            />
+        );
+    }
 
     if (mode === 'import') {
         return (
@@ -441,32 +515,41 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
         );
     };
 
+    // Mobile detection
+    const isMobile = () => window.innerWidth <= 768;
+
     return (
-        <div className={`theme-surface rounded-lg p-6 ${className}`}>
+        <div className={`theme-surface rounded-lg p-2 sm:p-6 ${className}`}>
             <FormatExampleModal />
-            <div className="flex items-center justify-between mb-6">
+            <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 sm:mb-6`}>
                 <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
                     <SparklesIcon />
                     MCQ Practice
                 </h2>
-                <div className="flex gap-2">
+                <div className={`flex ${isMobile() ? 'flex-wrap gap-1' : 'gap-2'}`}>
                     <button
                         onClick={() => setMode('add')}
-                        className="btn-secondary text-sm flex items-center gap-2"
+                        className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'} flex items-center gap-1`}
                     >
                         <PlusIcon />
                         Add
                     </button>
                     <button
+                        onClick={() => setMode('test')}
+                        className={`${isMobile() ? 'btn-primary text-xs px-2 py-1' : 'btn-primary text-sm'} flex items-center gap-1`}
+                    >
+                        🧪 Test
+                    </button>
+                    <button
                         onClick={() => setMode('import')}
-                        className="btn-secondary text-sm flex items-center gap-2"
+                        className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'} flex items-center gap-1`}
                     >
                         <UploadIcon />
                         Import
                     </button>
                     <button
                         onClick={() => setMode('manage')}
-                        className="btn-secondary text-sm"
+                        className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'}`}
                     >
                         Manage ({mcqQuestions.length})
                     </button>
@@ -474,23 +557,23 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
             </div>
 
             {mcqQuestions.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                <div className="text-center py-6 sm:py-8">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 theme-text-secondary">
                         <SparklesIcon />
                     </div>
-                    <h3 className="text-lg font-medium theme-text mb-2">No MCQ questions yet</h3>
-                    <p className="theme-text-secondary mb-4">Add questions manually or import from files</p>
-                    <div className="flex gap-3 justify-center">
+                    <h3 className="text-base sm:text-lg font-medium theme-text mb-2">No MCQ questions yet</h3>
+                    <p className="theme-text-secondary mb-3 sm:mb-4 text-sm">Add questions manually or import from files</p>
+                    <div className={`flex ${isMobile() ? 'flex-col gap-2' : 'gap-3 justify-center'}`}>
                         <button
                             onClick={() => setMode('add')}
-                            className="btn-primary flex items-center gap-2"
+                            className={`${isMobile() ? 'btn-primary w-full text-sm py-2' : 'btn-primary'} flex items-center justify-center gap-2`}
                         >
                             <PlusIcon />
                             Add Question
                         </button>
                         <button
                             onClick={() => setMode('import')}
-                            className="btn-secondary flex items-center gap-2"
+                            className={`${isMobile() ? 'btn-secondary w-full text-sm py-2' : 'btn-secondary'} flex items-center justify-center gap-2`}
                         >
                             <UploadIcon />
                             Import Questions
@@ -502,9 +585,19 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                     {mode === 'add' && (
                         <div className="space-y-4 max-w-2xl">
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg font-semibold theme-text">Add New MCQ Question</h3>
+                                <h3 className="text-lg font-semibold theme-text">
+                                    {editingQuestion ? 'Edit MCQ Question' : 'Add New MCQ Question'}
+                                </h3>
                                 <button
-                                    onClick={() => setMode('practice')}
+                                    onClick={() => {
+                                        setMode('practice');
+                                        setEditingQuestion(null);
+                                        setNewQuestion('');
+                                        setNewOptions(['', '', '', '']);
+                                        setCorrectOption(0);
+                                        setNewExplanation('');
+                                        setNewCategory('');
+                                    }}
                                     className="btn-secondary text-sm"
                                 >
                                     Back to Practice
@@ -516,6 +609,8 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                     Question:
                                 </label>
                                 <textarea
+                                    value={newQuestion}
+                                    onChange={(e) => setNewQuestion(e.target.value)}
                                     placeholder="Enter your question here..."
                                     className="w-full h-24 p-3 theme-surface border rounded-lg theme-text resize-none"
                                 />
@@ -531,6 +626,12 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                             <span className="font-medium theme-text">{letter}.</span>
                                             <input
                                                 type="text"
+                                                value={newOptions[index]}
+                                                onChange={(e) => {
+                                                    const updated = [...newOptions];
+                                                    updated[index] = e.target.value;
+                                                    setNewOptions(updated);
+                                                }}
                                                 placeholder={`Option ${letter}`}
                                                 className="flex-1 p-2 theme-surface border rounded theme-text"
                                             />
@@ -538,6 +639,8 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                                 <input
                                                     type="radio"
                                                     name="correct-answer"
+                                                    checked={correctOption === index}
+                                                    onChange={() => setCorrectOption(index)}
                                                     className="mr-1"
                                                 />
                                                 <span className="text-sm theme-text-secondary">Correct</span>
@@ -552,13 +655,32 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                     Explanation (optional):
                                 </label>
                                 <textarea
+                                    value={newExplanation}
+                                    onChange={(e) => setNewExplanation(e.target.value)}
                                     placeholder="Explain why this is the correct answer..."
                                     className="w-full h-20 p-3 theme-surface border rounded-lg theme-text resize-none"
                                 />
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium theme-text mb-2">
+                                    Category (optional):
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newCategory}
+                                    onChange={(e) => setNewCategory(e.target.value)}
+                                    placeholder="e.g., Physics, Chemistry, Math..."
+                                    className="w-full p-2 theme-surface border rounded theme-text"
+                                />
+                            </div>
                             
-                            <button className="btn-primary">
-                                Add Question
+                            <button 
+                                onClick={handleAddMCQ}
+                                disabled={!newQuestion.trim() || newOptions.some(opt => !opt.trim())}
+                                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {editingQuestion ? 'Update Question' : 'Add Question'}
                             </button>
                         </div>
                     )}
@@ -566,8 +688,8 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                     {mode === 'practice' && (
                         <div>
                             {/* Question Display */}
-                            <div className="theme-surface rounded-lg p-6 mb-6 border theme-border">
-                                <div className="flex justify-between items-center mb-4">
+                            <div className={`theme-surface rounded-lg ${isMobile() ? 'p-3' : 'p-6'} mb-4 sm:mb-6 border theme-border`}>
+                                <div className={`flex ${isMobile() ? 'flex-col gap-2' : 'justify-between items-center'} mb-3 sm:mb-4`}>
                                     <span className="text-sm theme-text-secondary">
                                         Question {currentQuestionIndex + 1} of {mcqQuestions.length}
                                     </span>
@@ -576,12 +698,12 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                     </span>
                                 </div>
                                 
-                                <h3 className="text-lg font-medium theme-text mb-6">
+                                <h3 className={`${isMobile() ? 'text-base' : 'text-lg'} font-medium theme-text mb-4 sm:mb-6`}>
                                     {mcqQuestions[currentQuestionIndex]?.question}
                                 </h3>
                                 
                                 {/* Options */}
-                                <div className="space-y-3 mb-6">
+                                <div className={`space-y-2 sm:space-y-3 ${isMobile() ? 'mb-4' : 'mb-6'}`}>
                                     {mcqQuestions[currentQuestionIndex]?.options.map((option, index) => (
                                         <button
                                             key={option.id}
@@ -592,9 +714,9 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                                     [currentId]: option.id
                                                 }));
                                             }}
-                                            className={`w-full text-left p-4 rounded-lg border theme-transition ${
+                                            className={`w-full text-left ${isMobile() ? 'p-3 text-sm' : 'p-4'} rounded-lg border theme-transition ${
                                                 selectedAnswers[mcqQuestions[currentQuestionIndex].id] === option.id
-                                                    ? 'theme-accent-bg theme-accent-text border-current'
+                                                    ? 'theme-accent-bg theme-accent-bg-text border-current'
                                                     : 'theme-border hover:theme-surface2 theme-text'
                                             }`}
                                         >
@@ -608,16 +730,16 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                 
                                 {/* Show Answer Button */}
                                 {selectedAnswers[mcqQuestions[currentQuestionIndex].id] && (
-                                    <div className="space-y-4">
+                                    <div className="space-y-3 sm:space-y-4">
                                         <button
                                             onClick={() => setShowResults(true)}
-                                            className="btn-primary"
+                                            className={`${isMobile() ? 'btn-primary w-full text-sm py-2' : 'btn-primary'}`}
                                         >
                                             Check Answer
                                         </button>
                                         
                                         {showResults && (
-                                            <div className="p-4 rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20">
+                                            <div className={`${isMobile() ? 'p-3' : 'p-4'} rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20`}>
                                                 <div className="flex items-center mb-2">
                                                     <span className={`font-medium ${
                                                         mcqQuestions[currentQuestionIndex].options.find(opt => 
@@ -632,14 +754,14 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                                     </span>
                                                 </div>
                                                 
-                                                <p className="text-sm text-green-700 dark:text-green-300 mb-2">
+                                                <p className={`${isMobile() ? 'text-xs' : 'text-sm'} text-green-700 dark:text-green-300 mb-2`}>
                                                     <strong>Correct Answer:</strong> {
                                                         mcqQuestions[currentQuestionIndex].options.find(opt => opt.isCorrect)?.text
                                                     }
                                                 </p>
                                                 
                                                 {mcqQuestions[currentQuestionIndex].explanation && (
-                                                    <p className="text-sm text-green-700 dark:text-green-300">
+                                                    <p className={`${isMobile() ? 'text-xs' : 'text-sm'} text-green-700 dark:text-green-300`}>
                                                         <strong>Explanation:</strong> {mcqQuestions[currentQuestionIndex].explanation}
                                                     </p>
                                                 )}
@@ -649,14 +771,14 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                 )}
                                 
                                 {/* Navigation */}
-                                <div className="flex justify-between mt-6">
+                                <div className={`flex ${isMobile() ? 'justify-center gap-3' : 'justify-between'} mt-4 sm:mt-6`}>
                                     <button
                                         onClick={() => {
                                             setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1));
                                             setShowResults(false);
                                         }}
                                         disabled={currentQuestionIndex === 0}
-                                        className="btn-secondary disabled:opacity-50"
+                                        className={`${isMobile() ? 'btn-secondary text-sm px-3 py-2' : 'btn-secondary'} disabled:opacity-50`}
                                     >
                                         Previous
                                     </button>
@@ -666,7 +788,7 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                             setShowResults(false);
                                         }}
                                         disabled={currentQuestionIndex === mcqQuestions.length - 1}
-                                        className="btn-secondary disabled:opacity-50"
+                                        className={`${isMobile() ? 'btn-secondary text-sm px-3 py-2' : 'btn-secondary'} disabled:opacity-50`}
                                     >
                                         Next
                                     </button>
@@ -676,16 +798,16 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                     )}
                     
                     {mode === 'manage' && (
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold theme-text">Manage Questions</h3>
+                        <div className="space-y-3 sm:space-y-4">
+                            <h3 className="text-base sm:text-lg font-semibold theme-text">Manage Questions</h3>
                             {mcqQuestions.map((question, index) => (
-                                <div key={question.id} className="theme-surface2 rounded-lg p-4 border theme-border">
+                                <div key={question.id} className={`theme-surface2 rounded-lg ${isMobile() ? 'p-3' : 'p-4'} border theme-border`}>
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
-                                            <div className="font-medium theme-text mb-2">
+                                            <div className={`font-medium theme-text ${isMobile() ? 'text-sm mb-2' : 'mb-2'}`}>
                                                 Q{index + 1}. {question.question}
                                             </div>
-                                            <div className="text-sm theme-text-secondary space-y-1">
+                                            <div className={`${isMobile() ? 'text-xs' : 'text-sm'} theme-text-secondary space-y-1`}>
                                                 {question.options.map((option, optIndex) => (
                                                     <div key={option.id} className={option.isCorrect ? 'text-green-600 font-medium' : ''}>
                                                         {String.fromCharCode(65 + optIndex)}. {option.text}
@@ -694,20 +816,38 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                                                 ))}
                                             </div>
                                             {question.explanation && (
-                                                <div className="text-xs theme-text-secondary mt-2">
+                                                <div className={`${isMobile() ? 'text-xs' : 'text-xs'} theme-text-secondary mt-2`}>
                                                     <strong>Explanation:</strong> {question.explanation}
                                                 </div>
                                             )}
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                const updated = mcqQuestions.filter(q => q.id !== question.id);
-                                                saveMcqQuestions(updated);
-                                            }}
-                                            className="ml-4 p-2 text-red-400 hover:text-red-600 theme-transition"
-                                        >
-                                            <TrashIcon />
-                                        </button>
+                                        <div className={`flex ${isMobile() ? 'flex-col gap-1 ml-2' : 'gap-2 ml-4'}`}>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingQuestion(question);
+                                                    setNewQuestion(question.question);
+                                                    setNewOptions(question.options.map(opt => opt.text));
+                                                    setCorrectOption(question.options.findIndex(opt => opt.isCorrect));
+                                                    setNewExplanation(question.explanation || '');
+                                                    setNewCategory(question.category || '');
+                                                    setMode('add');
+                                                }}
+                                                className={`${isMobile() ? 'p-1 text-xs' : 'p-2'} theme-text-secondary hover:theme-text theme-transition`}
+                                                title="Edit Question"
+                                            >
+                                                ✏️
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const updated = mcqQuestions.filter(q => q.id !== question.id);
+                                                    saveMcqQuestions(updated);
+                                                }}
+                                                className={`${isMobile() ? 'p-1 text-xs' : 'p-2'} text-red-400 hover:text-red-600 theme-transition`}
+                                                title="Delete Question"
+                                            >
+                                                <TrashIcon />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}

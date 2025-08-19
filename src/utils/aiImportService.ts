@@ -246,7 +246,7 @@ function validateQAItem(item: any): any {
     
     // Validate marks
     let marks = item.marks || 2;
-    const validMarks = [1, 2, 5, 10, 20];
+    const validMarks = [1, 2, 5, 7, 10];
     if (!validMarks.includes(marks)) {
         // Find closest valid mark
         marks = validMarks.reduce((prev, curr) => 

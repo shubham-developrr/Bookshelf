@@ -8,13 +8,144 @@ import { useTheme } from '../contexts/ThemeContext';
 import KindleStyleTextViewer from '../components/KindleStyleTextViewerFixed';
 import YouTubePlayerModal from '../components/YouTubePlayerModal';
 import InlineContentEditor from '../components/InlineContentEditor';
-import FlashCardManager from '../components/AnkiFlashCardManager';
+import FlashCardManager from '../components/FlashCardManager';
 import RichTextEditor from '../components/RichTextEditor';
 import MCQManager from '../components/MCQManager';
 import QAManager from '../components/QAManager';
 import MindMapManager from '../components/MindMapManager';
 import NotesManager from '../components/NotesManager';
 import VideosManager from '../components/VideosManager';
+import HTMLCodeEditor from '../components/HTMLCodeEditor';
+import { ResponsiveTabBar } from '../components/ResponsiveTabBar';
+
+// Template ID Constants - Built-in IDs that cannot be changed
+const TEMPLATE_IDS = {
+    'Notes': 'NOTES',
+    'Flash card': 'FLASHCARD', 
+    'MCQ': 'MCQ',
+    'Q&A': 'QA',
+    'Videos': 'VIDEOS',
+    'Mind Map': 'MINDMAP'
+} as const;
+
+// Desktop Tab Icon Mapping Function
+const getDesktopTabIcon = (tabName: string) => {
+  const iconMap: { [key: string]: JSX.Element } = {
+    notes: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M13.4 2H6.6C5.7 2 5 2.7 5 3.6v16.8c0 .9.7 1.6 1.6 1.6h10.8c.9 0 1.6-.7 1.6-1.6V7.6L13.4 2z"></path>
+        <path d="M13 2v6h6"></path>
+        <path d="M9 14h4"></path>
+        <path d="M9 18h7"></path>
+      </svg>
+    ),
+    qa: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        <path d="M8 10h.01"></path>
+        <path d="M12 10h.01"></path>
+        <path d="M16 10h.01"></path>
+      </svg>
+    ),
+    'q&a': (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        <path d="M8 10h.01"></path>
+        <path d="M12 10h.01"></path>
+        <path d="M16 10h.01"></path>
+      </svg>
+    ),
+    quiz: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    mcq: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    flashcard: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
+    'flash-card': (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
+    mindmap: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M12 8a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
+        <path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
+        <path d="M12 24a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
+        <path d="M12 12v-1"></path>
+        <path d="M12 20v-1"></path>
+        <path d="M12 4V3"></path>
+        <path d="m5 10-.8-.4"></path>
+        <path d="m5 18-.8-.4"></path>
+        <path d="m19 10.4-.8-.4"></path>
+        <path d="m19 18.4-.8-.4"></path>
+      </svg>
+    ),
+    'mind-map': (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M12 8a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
+        <path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
+        <path d="M12 24a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
+        <path d="M12 12v-1"></path>
+        <path d="M12 20v-1"></path>
+        <path d="M12 4V3"></path>
+        <path d="m5 10-.8-.4"></path>
+        <path d="m5 18-.8-.4"></path>
+        <path d="m19 10.4-.8-.4"></path>
+        <path d="m19 18.4-.8-.4"></path>
+      </svg>
+    ),
+    summary: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    videos: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+      </svg>
+    ),
+    video: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+      </svg>
+    ),
+    custom: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+      </svg>
+    )
+  };
+
+  const normalizedName = tabName.toLowerCase().replace(/[\s-_]/g, '');
+  
+  // Direct match
+  if (iconMap[normalizedName]) return iconMap[normalizedName];
+  
+  // Partial matching for common patterns
+  if (normalizedName.includes('quiz') || normalizedName.includes('mcq')) return iconMap.quiz;
+  if (normalizedName.includes('flashcard') || normalizedName.includes('flash')) return iconMap.flashcard;
+  if (normalizedName.includes('mindmap') || normalizedName.includes('mind')) return iconMap.mindmap;
+  if (normalizedName.includes('note')) return iconMap.notes;
+  if (normalizedName.includes('video')) return iconMap.video;
+  if (normalizedName.includes('summary') || normalizedName.includes('summar')) return iconMap.summary;
+  if (normalizedName.includes('qa') || normalizedName.includes('q&a') || normalizedName.includes('question')) return iconMap.qa;
+  
+  // Default fallback icon (general tab icon)
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+    </svg>
+  );
+};
 
 interface SubtopicData {
     id: string;
@@ -101,6 +232,87 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
         };
         
         checkAndLoadCustomChapter();
+    }, [currentBook, currentChapter]);
+
+    // Detect existing templates and restore tabs
+    useEffect(() => {
+        if (!currentBook || !currentChapter) return;
+
+        const detectExistingTemplates = (): string[] => {
+            const existingTabs: string[] = ['read', 'highlights']; // Always include core tabs
+            const chapterKey = currentChapter.replace(/\s+/g, '_');
+
+            // Check for template data in localStorage using new template ID system
+            const templateMappings = [
+                { storageKeys: [`flashcards_${currentBook}_${chapterKey}`], templateId: 'FLASHCARD', displayName: 'Flash card' },
+                { storageKeys: [`mcq_${currentBook}_${chapterKey}`], templateId: 'MCQ', displayName: 'MCQ' },
+                { storageKeys: [`qa_${currentBook}_${chapterKey}`], templateId: 'QA', displayName: 'Q&A' },
+                { storageKeys: [`videos_${currentBook}_${chapterKey}`], templateId: 'VIDEOS', displayName: 'Videos' },
+                { storageKeys: [`notes_${currentBook}_${chapterKey}`], templateId: 'NOTES', displayName: 'Notes' },
+                { storageKeys: [`mindmaps_${currentBook}_${chapterKey}`], templateId: 'MINDMAP', displayName: 'Mind Map' }
+            ];
+
+            // Check each template type and create tabs with new ID system
+            templateMappings.forEach(({ storageKeys, templateId, displayName }) => {
+                let hasData = false;
+                
+                // Check all possible storage keys for this template
+                storageKeys.forEach(storageKey => {
+                    const data = localStorage.getItem(storageKey);
+                    if (data && data !== 'null' && data !== '[]') {
+                        try {
+                            const parsed = JSON.parse(data);
+                            // Only add if there's meaningful content
+                            if ((Array.isArray(parsed) && parsed.length > 0) || 
+                                (typeof parsed === 'object' && Object.keys(parsed).length > 0)) {
+                                hasData = true;
+                            }
+                        } catch (err) {
+                            console.warn(`Failed to parse template data for ${storageKey}:`, err);
+                        }
+                    }
+                });
+                
+                if (hasData) {
+                    const tabId = `${templateId}_1`;
+                    existingTabs.push(tabId);
+                    // Set display name
+                    setTabNames(prev => ({
+                        ...prev,
+                        [tabId]: displayName
+                    }));
+                }
+            });
+
+            // Check for custom tabs (RichTextEditor content)
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(`customtab_${currentBook}_${chapterKey}_`)) {
+                    const tabName = key.replace(`customtab_${currentBook}_${chapterKey}_`, '');
+                    const content = localStorage.getItem(key);
+                    if (content && content.trim() && content !== 'null') {
+                        // Generate tab ID from custom name
+                        const customTabId = tabName.toLowerCase().replace(/\s+/g, '');
+                        if (!existingTabs.includes(customTabId)) {
+                            existingTabs.push(customTabId);
+                            // Store custom name mapping
+                            setTabNames(prev => ({
+                                ...prev,
+                                [customTabId]: tabName
+                            }));
+                        }
+                    }
+                }
+            }
+
+            return existingTabs;
+        };
+
+        // Restore existing template tabs
+        const existingTemplateTabs = detectExistingTemplates();
+        if (existingTemplateTabs.length > 2) { // More than just 'read' and 'highlights'
+            setActiveTabs(existingTemplateTabs);
+        }
     }, [currentBook, currentChapter]);
 
     const loadCustomSubtopics = async (bookId: string, chapter: string) => {
@@ -487,25 +699,28 @@ Make the explanation educational and easy to understand.`;
 
     // Template and tab management functions
     const handleAddTemplateTab = (templateName: string) => {
-        const baseId = templateName.toLowerCase().replace(/\s+/g, '');
-        let tabId = baseId;
-        let counter = 1;
+        const templateId = TEMPLATE_IDS[templateName as keyof typeof TEMPLATE_IDS];
+        if (!templateId) {
+            console.error(`Unknown template: ${templateName}`);
+            return;
+        }
         
-        // Allow duplicates by adding numbers
+        let counter = 1;
+        let tabId = `${templateId}_${counter}`;
+        
+        // Find next available counter for this template type
         while (activeTabs.includes(tabId)) {
             counter++;
-            tabId = `${baseId}${counter}`;
+            tabId = `${templateId}_${counter}`;
         }
         
         setActiveTabs([...activeTabs, tabId]);
         
-        // Set custom name if it's a duplicate
-        if (counter > 1) {
-            setTabNames(prev => ({
-                ...prev,
-                [tabId]: `${templateName} ${counter}`
-            }));
-        }
+        // Set display name with counter if > 1
+        setTabNames(prev => ({
+            ...prev,
+            [tabId]: counter > 1 ? `${templateName} ${counter}` : templateName
+        }));
         
         setActiveTab(tabId);
         setShowTemplateSelector(false);
@@ -542,10 +757,42 @@ Make the explanation educational and easy to understand.`;
         
         if (confirm(`Are you sure you want to delete the "${getTabDisplayName(tabName)}" tab?`)) {
             setActiveTabs(activeTabs.filter(tab => tab !== tabName));
+            
             // Remove custom name if exists
             const newTabNames = { ...tabNames };
             delete newTabNames[tabName];
             setTabNames(newTabNames);
+            
+            // Clear localStorage data for this template
+            if (currentBook && currentChapter) {
+                const chapterKey = currentChapter.replace(/\s+/g, '_');
+                
+                // Define template to storage key mapping
+                const templateStorageMappings: { [key: string]: string[] } = {
+                    'flashcard': [`flashcards_${currentBook}_${chapterKey}`],
+                    'mcq': [`mcq_${currentBook}_${chapterKey}`],
+                    'q&a': [`qa_${currentBook}_${chapterKey}`],
+                    'videos': [`videos_${currentBook}_${chapterKey}`],
+                    'ankiflashcard': [`anki_cards_${currentBook}_${chapterKey}`],
+                    'notes': [`notes_${currentBook}_${chapterKey}`],
+                    'mindmap': [`mindmaps_${currentBook}_${chapterKey}`]
+                };
+                
+                // Check if it's a known template type
+                if (templateStorageMappings[tabName]) {
+                    templateStorageMappings[tabName].forEach(key => {
+                        localStorage.removeItem(key);
+                    });
+                } else {
+                    // Check if it's a custom tab
+                    const customTabKey = `customtab_${currentBook}_${chapterKey}_${getTabDisplayName(tabName)}`;
+                    localStorage.removeItem(customTabKey);
+                    
+                    // Also try the original tab name in case of renamed tabs
+                    const originalCustomTabKey = `customtab_${currentBook}_${chapterKey}_${tabName}`;
+                    localStorage.removeItem(originalCustomTabKey);
+                }
+            }
             
             if (activeTab === tabName) {
                 setActiveTab('read'); // Switch back to read tab
@@ -585,7 +832,8 @@ Make the explanation educational and easy to understand.`;
             'q&a': 'Q&A',
             'video': 'Videos',
             'videos': 'Videos',
-            'mindmap': 'Mind Maps'
+            'mindmap': 'Mind Maps',
+            'general': 'General'
         };
         
         // Handle numbered duplicates
@@ -667,11 +915,40 @@ Make the explanation educational and easy to understand.`;
 
     // Render content based on active tab
     const renderTabContent = () => {
+        // Handle core tabs
+        if (activeTab === 'read') {
+            return renderReadContent(); // Main content
+        }
+        if (activeTab === 'highlights') {
+            return renderHighlightsContent();
+        }
+        
+        // Extract template type for new ID format (e.g., 'MCQ_1' -> 'MCQ')
+        const getTemplateType = (tabId: string): string => {
+            const match = tabId.match(/^([A-Z]+)_\d+$/);
+            return match ? match[1] : tabId.toLowerCase();
+        };
+        
+        const templateType = getTemplateType(activeTab);
+        
+        // Handle template-based tabs using template type
+        switch (templateType) {
+            case 'NOTES':
+                return renderNotesContent();
+            case 'FLASHCARD':
+                return renderFlashCardContent();
+            case 'MCQ':
+                return renderMCQContent();
+            case 'QA':
+                return renderQAContent();
+            case 'MINDMAP':
+                return renderMindMapContent();
+            case 'VIDEOS':
+                return renderVideosContent();
+        }
+        
+        // Handle legacy tab names for backward compatibility
         switch (activeTab.toLowerCase()) {
-            case 'read':
-                return renderReadContent(); // Main content
-            case 'highlights':
-                return renderHighlightsContent();
             case 'notes':
                 return renderNotesContent();
             case 'flashcard':
@@ -776,7 +1053,7 @@ Make the explanation educational and easy to understand.`;
                                             >
                                                 {/* Desktop Layout - Title and Buttons in Same Row */}
                                                 <div className="hidden sm:flex items-center justify-between">
-                                                    <h3 className="font-semibold theme-text text-lg">
+                                                    <h3 className="font-semibold theme-text text-base sm:text-lg">
                                                         {currentUnitNumber}.{index + 1} {subtopic}
                                                     </h3>
                                                     <div className="flex items-center gap-3 flex-shrink-0">
@@ -844,7 +1121,7 @@ Make the explanation educational and easy to understand.`;
                                                 {/* Mobile Layout - Title and Buttons in Separate Rows */}
                                                 <div className="sm:hidden">
                                                     <div className="flex items-center justify-between mb-3">
-                                                        <h3 className="font-semibold theme-text text-lg pr-2">
+                                                        <h3 className="font-semibold theme-text text-sm sm:text-base pr-2">
                                                             {currentUnitNumber}.{index + 1} {subtopic}
                                                         </h3>
                                                         <svg 
@@ -1020,44 +1297,93 @@ Make the explanation educational and easy to understand.`;
         const currentHighlights = highlights.filter(h => h.chapterId === currentBook);
         
         return (
-            <div className="theme-surface rounded-lg p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-semibold theme-text">Highlights & Notes</h2>
-                    <span className="text-sm theme-text-secondary">
-                        {currentHighlights.length} highlight{currentHighlights.length !== 1 ? 's' : ''}
-                    </span>
+            <div className="theme-surface rounded-lg p-3 sm:p-6 mx-1 sm:mx-0">
+                {/* Mobile-First Header */}
+                <div className="mb-4 sm:mb-6">
+                    {/* Mobile Header */}
+                    <div className="block sm:hidden">
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="text-lg font-semibold theme-text">Highlights</h2>
+                            <span className="text-xs theme-text-secondary px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
+                                {currentHighlights.length}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Desktop Header */}
+                    <div className="hidden sm:flex items-center justify-between">
+                        <h2 className="text-lg font-semibold theme-text">Highlights & Notes</h2>
+                        <span className="text-sm theme-text-secondary">
+                            {currentHighlights.length} highlight{currentHighlights.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
                 </div>
                 
                 {currentHighlights.length === 0 ? (
-                    <div className="text-center py-8">
-                        <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                    <div className="text-center py-6 sm:py-8">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 theme-text-secondary">
                             <SparklesIcon />
                         </div>
-                        <h3 className="text-lg font-medium theme-text mb-2">No highlights yet</h3>
-                        <p className="theme-text-secondary">
+                        <h3 className="text-base sm:text-lg font-medium theme-text mb-2">No highlights yet</h3>
+                        <p className="text-sm theme-text-secondary px-4">
                             Select text in any tab to create highlights and they'll appear here
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                         {currentHighlights.map((highlight) => (
-                            <div key={highlight.id} className="border theme-border rounded-lg p-4">
+                            <div key={highlight.id} className="border theme-border rounded-lg p-3 sm:p-4">
                                 <div className="flex items-start justify-between">
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0 pr-2">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span 
-                                                className="w-3 h-3 rounded-full"
+                                                className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0"
                                                 style={{ backgroundColor: highlight.color }}
                                             ></span>
                                             <span className="text-xs theme-text-secondary">
                                                 {new Date(highlight.timestamp).toLocaleDateString()}
                                             </span>
                                         </div>
-                                        <p className="theme-text leading-relaxed">
+                                        <p className="theme-text leading-relaxed text-sm sm:text-base">
                                             "{highlight.text}"
                                         </p>
                                     </div>
-                                    <div className="flex gap-2 ml-4">
+                                    
+                                    {/* Mobile Action Buttons */}
+                                    <div className="flex sm:hidden flex-col gap-1">
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(highlight.text);
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg theme-surface2 text-sm hover:theme-accent hover:text-white transition-all"
+                                            title="Copy"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => openAIGuru(highlight.text)}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg theme-surface2 text-sm hover:theme-accent hover:text-white transition-all"
+                                            title="AI Explain"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => removeHighlight(highlight.id)}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg theme-surface2 text-sm hover:bg-red-500 hover:text-white transition-all"
+                                            title="Delete"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    {/* Desktop Action Buttons */}
+                                    <div className="hidden sm:flex gap-2 ml-4">
                                         <button
                                             onClick={() => {
                                                 navigator.clipboard.writeText(highlight.text);
@@ -1101,9 +1427,158 @@ Make the explanation educational and easy to understand.`;
         );
     };
 
+    // Custom Tab with Editor Switching Component
+    const CustomTabWithEditorSwitching: React.FC<{ tabName: string; currentBook: string; currentChapter: string }> = ({ tabName, currentBook, currentChapter }) => {
+        const [editorMode, setEditorMode] = useState<'rich' | 'html'>('rich');
+        const storageKey = `editor_mode_${currentBook}_${currentChapter}_${tabName}`;
+        
+        useEffect(() => {
+            const savedMode = localStorage.getItem(storageKey);
+            if (savedMode === 'html' || savedMode === 'rich') {
+                setEditorMode(savedMode);
+            }
+        }, [storageKey]);
+        
+        const handleModeSwitch = (mode: 'rich' | 'html') => {
+            setEditorMode(mode);
+            localStorage.setItem(storageKey, mode);
+        };
+        
+        const isMobile = () => window.innerWidth <= 768;
+        
+        return (
+            <div className="w-full">
+                {/* Editor Mode Switcher */}
+                <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-4 border-b theme-border`}>
+                    <div className={`flex items-center gap-2 ${isMobile() ? 'justify-center' : ''}`}>
+                        <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <h3 className="text-lg font-semibold theme-text">Custom Editor</h3>
+                    </div>
+                    
+                    <div className={`flex ${isMobile() ? 'justify-center' : ''} gap-1 p-1 theme-surface2 rounded-lg`}>
+                        <button
+                            onClick={() => handleModeSwitch('rich')}
+                            className={`flex items-center gap-2 ${isMobile() ? 'px-3 py-2 text-sm' : 'px-4 py-2'} rounded-md transition-all ${
+                                editorMode === 'rich'
+                                    ? 'theme-accent text-white shadow-sm'
+                                    : 'theme-text hover:theme-surface hover:theme-text'
+                            }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14,2 14,8 20,8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                <polyline points="10,9 9,9 8,9"/>
+                            </svg>
+                            Rich Text
+                        </button>
+                        <button
+                            onClick={() => handleModeSwitch('html')}
+                            className={`flex items-center gap-2 ${isMobile() ? 'px-3 py-2 text-sm' : 'px-4 py-2'} rounded-md transition-all ${
+                                editorMode === 'html'
+                                    ? 'theme-accent text-white shadow-sm'
+                                    : 'theme-text hover:theme-surface hover:theme-text'
+                            }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                <polyline points="16,18 22,12 16,6"/>
+                                <polyline points="8,6 2,12 8,18"/>
+                            </svg>
+                            HTML Code
+                        </button>
+                    </div>
+                </div>
+                
+                {/* Editor Content */}
+                {editorMode === 'rich' ? (
+                    <RichTextEditor
+                        tabName={tabName}
+                        currentBook={currentBook}
+                        currentChapter={currentChapter}
+                        className="w-full"
+                    />
+                ) : (
+                    <HTMLCodeEditor
+                        tabName={tabName}
+                        currentBook={currentBook}
+                        currentChapter={currentChapter}
+                        className="w-full"
+                    />
+                )}
+            </div>
+        );
+    };
+
     const renderCustomTabContent = (tabName: string) => {
-        // Handle Mind Map tab specifically
-        if (tabName === 'Mind Map') {
+        // Extract template type from new ID format (e.g., 'MCQ_1' -> 'MCQ')
+        const getTemplateType = (tabId: string): string => {
+            const match = tabId.match(/^([A-Z]+)_\d+$/);
+            return match ? match[1] : tabId.toLowerCase();
+        };
+        
+        const templateType = getTemplateType(tabName);
+        
+        // Handle template-based tabs using template type
+        switch (templateType) {
+            case 'NOTES':
+                return (
+                    <NotesManager
+                        currentBook={currentBook}
+                        currentChapter={currentChapter}
+                        className="w-full"
+                    />
+                );
+                
+            case 'FLASHCARD':
+                return (
+                    <FlashCardManager
+                        currentBook={currentBook}
+                        currentChapter={currentChapter}
+                        className="w-full"
+                    />
+                );
+                
+            case 'MCQ':
+                return (
+                    <MCQManager
+                        currentBook={currentBook}
+                        currentChapter={currentChapter}
+                        className="w-full"
+                    />
+                );
+                
+            case 'QA':
+                return (
+                    <QAManager
+                        currentBook={currentBook}
+                        currentChapter={currentChapter}
+                        className="w-full"
+                    />
+                );
+                
+            case 'VIDEOS':
+                return (
+                    <VideosManager
+                        currentBook={currentBook}
+                        currentChapter={currentChapter}
+                        className="w-full"
+                    />
+                );
+                
+            case 'MINDMAP':
+                return (
+                    <MindMapManager
+                        currentBook={currentBook}
+                        currentChapter={currentChapter}
+                    />
+                );
+        }
+        
+        // Handle legacy tab names for backward compatibility
+        if (tabName === 'Mind Map' || tabName === 'mindmap') {
             return (
                 <MindMapManager
                     currentBook={currentBook}
@@ -1112,7 +1587,18 @@ Make the explanation educational and easy to understand.`;
             );
         }
         
-        // Use RichTextEditor for all other custom tabs (except Flash card which is handled separately)
+        // Handle Custom tab with editor switching functionality (Rich Text <-> HTML Code Editor)
+        if (tabName.toLowerCase().includes('custom')) {
+            return (
+                <CustomTabWithEditorSwitching
+                    tabName={tabName}
+                    currentBook={currentBook}
+                    currentChapter={currentChapter}
+                />
+            );
+        }
+        
+        // Use RichTextEditor for all other custom tabs
         return (
             <RichTextEditor
                 tabName={tabName}
@@ -1178,205 +1664,61 @@ Make the explanation educational and easy to understand.`;
             </header>
 
             <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-                {/* Mobile-First Tab Navigation */}
+                {/* Responsive Tab Navigation */}
                 <div className="py-3 sm:py-4">
-                    {/* Mobile: Stacked Layout */}
-                    <div className="block sm:hidden space-y-3">
-                        {/* Core tabs - full width on mobile */}
-                        <div className="flex gap-2">
-                            <button 
-                                onClick={() => setActiveTab('read')}
-                                className={`flex-1 px-4 py-3 rounded-lg text-center font-medium transition-all touch-manipulation ${
-                                    activeTab === 'read' 
-                                        ? 'theme-accent text-white' 
-                                        : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
-                                }`}
-                                style={{ minHeight: '44px' }}
-                            >
-                                📖 Read
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('highlights')}
-                                className={`flex-1 px-4 py-3 rounded-lg text-center font-medium transition-all touch-manipulation ${
-                                    activeTab === 'highlights' 
-                                        ? 'theme-accent text-white' 
-                                        : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
-                                }`}
-                                style={{ minHeight: '44px' }}
-                            >
-                                ✨ Highlights
-                            </button>
-                        </div>
-
-                        {/* Active Template Tabs - Mobile Grid */}
-                        {activeTabs.filter(tab => tab !== 'read' && tab !== 'highlights').length > 0 && (
-                            <div className="grid grid-cols-2 gap-2">
-                                {activeTabs.filter(tab => tab !== 'read' && tab !== 'highlights').map((tab) => (
-                                    <div key={tab} className="relative">
-                                        {showRenameInput === tab ? (
-                                            <input
-                                                type="text"
-                                                value={renameValue}
-                                                onChange={(e) => setRenameValue(e.target.value)}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        handleRenameTab(tab);
-                                                    } else if (e.key === 'Escape') {
-                                                        setShowRenameInput(null);
-                                                        setRenameValue('');
-                                                    }
-                                                }}
-                                                onBlur={() => handleRenameTab(tab)}
-                                                className="w-full p-2 text-sm theme-surface2 border theme-border rounded-lg theme-text text-center"
-                                                style={{ minHeight: '44px' }}
-                                                autoFocus
-                                            />
-                                        ) : (
-                                            <div
-                                                onClick={() => setActiveTab(tab)}
-                                                onDoubleClick={() => startRename(tab)}
-                                                className={`w-full px-3 py-3 rounded-lg transition-all group relative text-sm font-medium touch-manipulation cursor-pointer ${
-                                                    activeTab === tab 
-                                                        ? 'theme-accent text-white' 
-                                                        : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
-                                                }`}
-                                                style={{ minHeight: '44px' }}
-                                                title="Double-tap to rename, tap × to delete"
-                                            >
-                                                <span className="block truncate pr-6">{getTabDisplayName(tab)}</span>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteTab(tab);
-                                                    }}
-                                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 opacity-70 hover:opacity-100 hover:text-red-400 transition-opacity text-lg leading-none touch-manipulation"
-                                                    title="Delete tab"
-                                                >
-                                                    ×
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        
-                        {/* Add Template Button - Full width on mobile */}
-                        <div className="relative">
-                            <button
-                                onClick={() => setShowTemplateSelector(!showTemplateSelector)}
-                                className="w-full px-4 py-3 rounded-lg border-2 border-dashed theme-border hover:theme-accent-border transition-colors theme-text font-medium touch-manipulation"
-                                style={{ minHeight: '44px' }}
-                            >
-                                ➕ Add Learning Tool
-                            </button>
-                            
-                            {/* Mobile Template Dropdown */}
-                            {showTemplateSelector && (
-                                <div className="absolute top-full left-0 right-0 mt-2 theme-surface rounded-lg shadow-lg border theme-border z-20">
-                                    <div className="p-3">
-                                        <div className="text-sm font-semibold theme-text mb-3">Choose Learning Tool:</div>
-                                        <div className="grid grid-cols-2 gap-2 mb-3">
-                                            {availableTemplates.map((template) => {
-                                                const templateId = template.toLowerCase().replace(/\s+/g, '');
-                                                const hasTemplate = activeTabs.some(tab => tab.startsWith(templateId));
-                                                return (
-                                                    <button
-                                                        key={template}
-                                                        onClick={() => handleAddTemplateTab(template)}
-                                                        className={`px-3 py-3 rounded-lg text-sm font-medium transition-colors touch-manipulation ${
-                                                            hasTemplate 
-                                                                ? 'theme-surface2 theme-text' 
-                                                                : 'theme-accent text-white hover:bg-opacity-90'
-                                                        }`}
-                                                        style={{ minHeight: '44px' }}
-                                                    >
-                                                        <div className="text-center">
-                                                            <div>{template}</div>
-                                                            {hasTemplate && <div className="text-xs opacity-70">Add Another</div>}
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                        
-                                        <hr className="my-3 theme-border" />
-                                        
-                                        {/* Custom Tab Option */}
-                                        {showAddTab ? (
-                                            <div className="space-y-2">
-                                                <input
-                                                    type="text"
-                                                    value={newTabName}
-                                                    onChange={(e) => setNewTabName(e.target.value)}
-                                                    placeholder="Custom tool name..."
-                                                    className="w-full px-3 py-3 text-sm theme-surface2 border theme-border rounded-lg theme-text"
-                                                    onKeyPress={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            handleAddCustomTab();
-                                                        }
-                                                    }}
-                                                    style={{ minHeight: '44px' }}
-                                                    autoFocus
-                                                />
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={handleAddCustomTab}
-                                                        className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 touch-manipulation"
-                                                    >
-                                                        Add
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setShowAddTab(false);
-                                                            setNewTabName('');
-                                                        }}
-                                                        className="flex-1 px-3 py-2 text-sm theme-surface2 theme-text rounded hover:theme-accent-bg touch-manipulation"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => setShowAddTab(true)}
-                                                className="w-full px-3 py-3 rounded-lg text-sm hover:theme-accent-bg theme-text font-medium touch-manipulation"
-                                                style={{ minHeight: '44px' }}
-                                            >
-                                                ➕ Custom Tool
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                    {/* Mobile Only: Enhanced SVG Tab System */}
+                    <div className="block sm:hidden">
+                        <ResponsiveTabBar
+                            activeTab={activeTab}
+                            onTabChange={(tab) => setActiveTab(tab)}
+                            activeTabs={activeTabs}
+                            onDeleteTab={handleDeleteTab}
+                            getTabDisplayName={getTabDisplayName}
+                            showTemplateSelector={showTemplateSelector}
+                            onToggleTemplateSelector={() => setShowTemplateSelector(!showTemplateSelector)}
+                            showRenameInput={showRenameInput}
+                            renameValue={renameValue}
+                            onRenameValueChange={(value) => setRenameValue(value)}
+                            onStartRename={startRename}
+                            onHandleRename={handleRenameTab}
+                        />
                     </div>
 
-                    {/* Desktop: Horizontal Layout (unchanged for larger screens) */}
+                    {/* Desktop Only: Original Design Restored */}
                     <div className="hidden sm:flex flex-wrap gap-2 text-sm border-b theme-border mb-4">
-                        {/* Core tabs */}
+                        {/* Core tabs - Original Desktop Design */}
                         <button 
                             onClick={() => setActiveTab('read')}
-                            className={`px-4 py-2 rounded-lg transition-all ${
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
                                 activeTab === 'read' 
                                     ? 'theme-accent text-white' 
                                     : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
                             }`}
                         >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                            </svg>
                             Read
                         </button>
                         <button 
                             onClick={() => setActiveTab('highlights')}
-                            className={`px-4 py-2 rounded-lg transition-all ${
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
                                 activeTab === 'highlights' 
                                     ? 'theme-accent text-white' 
                                     : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
                             }`}
                         >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                <path d="m16 5-1.5-1.5a2.12 2.12 0 0 0-3 0L3 12.06V16h3.94L15.5 7.5a2.12 2.12 0 0 0 0-3Z"></path>
+                                <path d="m14.5 6.5 3 3"></path>
+                                <path d="M12 21v-2.5a2.5 2.5 0 0 1 2.5-2.5H17"></path>
+                                <path d="M21 15v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2"></path>
+                            </svg>
                             Highlights
                         </button>
                         
-                        {/* Active Tabs */}
+                        {/* Active Tabs - Original Desktop Design with SVG Icons */}
                         {activeTabs.filter(tab => tab !== 'read' && tab !== 'highlights').map((tab) => (
                             <div key={tab} className="relative">
                                 {showRenameInput === tab ? (
@@ -1403,13 +1745,14 @@ Make the explanation educational and easy to understand.`;
                                     <div
                                         onClick={() => setActiveTab(tab)}
                                         onDoubleClick={() => startRename(tab)}
-                                        className={`px-4 py-2 rounded-lg transition-all group relative cursor-pointer ${
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all group relative cursor-pointer ${
                                             activeTab === tab 
                                                 ? 'theme-accent text-white' 
                                                 : 'theme-surface2 theme-text hover:theme-accent-bg hover:text-white'
                                         }`}
                                         title="Double-click to rename, click X to delete"
                                     >
+                                        {getDesktopTabIcon(tab)}
                                         {getTabDisplayName(tab)}
                                         <button
                                             onClick={(e) => {
@@ -1426,13 +1769,16 @@ Make the explanation educational and easy to understand.`;
                             </div>
                         ))}
                         
-                        {/* Template Selector */}
+                        {/* Template Selector - Original Desktop Design */}
                         <div className="relative">
                             <button
                                 onClick={() => setShowTemplateSelector(!showTemplateSelector)}
-                                className="px-4 py-2 rounded-lg border-2 border-dashed theme-border hover:theme-accent-border transition-colors theme-text"
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed theme-border hover:theme-accent-border transition-colors theme-text"
                             >
-                                + Add Template
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                    <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                Add Template
                             </button>
                             
                             {/* Desktop Template Dropdown */}
@@ -1441,8 +1787,8 @@ Make the explanation educational and easy to understand.`;
                                     <div className="p-2">
                                         <div className="text-sm font-semibold theme-text mb-2">Choose Template:</div>
                                         {availableTemplates.map((template) => {
-                                            const templateId = template.toLowerCase().replace(/\s+/g, '');
-                                            const hasTemplate = activeTabs.some(tab => tab.startsWith(templateId));
+                                            const templateId = TEMPLATE_IDS[template as keyof typeof TEMPLATE_IDS];
+                                            const hasTemplate = activeTabs.some(tab => tab.startsWith(`${templateId}_`));
                                             return (
                                                 <button
                                                     key={template}
@@ -1499,7 +1845,7 @@ Make the explanation educational and easy to understand.`;
                                                 onClick={() => setShowAddTab(true)}
                                                 className="w-full text-left px-3 py-2 rounded-lg text-sm hover:theme-accent-bg theme-text"
                                             >
-                                                + Custom Tab
+                                                ➕ Custom Tab
                                             </button>
                                         )}
                                     </div>
@@ -1519,6 +1865,105 @@ Make the explanation educational and easy to understand.`;
                             />
                         )}
                     </div>
+                    
+                    {/* Template Selector Modal - For Mobile Only */}
+                    {showTemplateSelector && (
+                        <div className="block sm:hidden">
+                            <div className="fixed inset-0 z-20 flex items-center justify-center bg-black bg-opacity-50" 
+                                 onClick={(e) => {
+                                     if (e.target === e.currentTarget) {
+                                         setShowTemplateSelector(false);
+                                         setShowAddTab(false);
+                                         setNewTabName('');
+                                     }
+                                 }}>
+                                <div className="w-full max-w-md mx-4 theme-surface rounded-lg shadow-xl border theme-border max-h-[80vh] overflow-y-auto">
+                                    <div className="p-4">
+                                        <h3 className="text-lg font-semibold theme-text mb-4">Choose Learning Tool</h3>
+                                        
+                                        {/* Template Grid */}
+                                        <div className="grid grid-cols-2 gap-2 mb-4">
+                                            {availableTemplates.map((template) => {
+                                                const templateId = TEMPLATE_IDS[template as keyof typeof TEMPLATE_IDS];
+                                                const hasTemplate = activeTabs.some(tab => tab.startsWith(`${templateId}_`));
+                                                return (
+                                                    <button
+                                                        key={template}
+                                                        onClick={() => {
+                                                            handleAddTemplateTab(template);
+                                                            setShowTemplateSelector(false);
+                                                        }}
+                                                        className={`px-3 py-3 rounded-lg text-sm font-medium transition-colors touch-manipulation ${
+                                                            hasTemplate 
+                                                                ? 'theme-surface2 theme-text' 
+                                                                : 'theme-accent text-white hover:bg-opacity-90'
+                                                        }`}
+                                                        style={{ minHeight: '44px' }}
+                                                    >
+                                                        <div className="text-center">
+                                                            <div>{template}</div>
+                                                            {hasTemplate && <div className="text-xs opacity-70">Add Another</div>}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        
+                                        <hr className="my-4 theme-border" />
+                                        
+                                        {/* Custom Tool Option */}
+                                        {showAddTab ? (
+                                            <div className="space-y-3">
+                                                <input
+                                                    type="text"
+                                                    value={newTabName}
+                                                    onChange={(e) => setNewTabName(e.target.value)}
+                                                    placeholder="Custom tool name..."
+                                                    className="w-full px-3 py-3 text-sm theme-surface2 border theme-border rounded-lg theme-text"
+                                                    onKeyPress={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            handleAddCustomTab();
+                                                            setShowTemplateSelector(false);
+                                                        }
+                                                    }}
+                                                    style={{ minHeight: '44px' }}
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            handleAddCustomTab();
+                                                            setShowTemplateSelector(false);
+                                                        }}
+                                                        className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 touch-manipulation"
+                                                    >
+                                                        Add Tool
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowAddTab(false);
+                                                            setNewTabName('');
+                                                        }}
+                                                        className="flex-1 px-3 py-2 text-sm theme-surface2 theme-text rounded hover:theme-accent-bg touch-manipulation"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowAddTab(true)}
+                                                className="w-full px-3 py-3 rounded-lg text-sm hover:theme-accent-bg theme-text font-medium touch-manipulation"
+                                                style={{ minHeight: '44px' }}
+                                            >
+                                                ➕ Create Custom Tool
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Tab Content Area */}

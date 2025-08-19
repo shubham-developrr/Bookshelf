@@ -4,6 +4,7 @@ import { BackIcon, BookOpenIcon, PlusIcon, TrashIcon } from '../components/icons
 import { getBookImage } from '../assets/images/index';
 import { syllabus, chapterSubtopics } from '../constants/constants';
 import { useTheme } from '../contexts/ThemeContext';
+import { BookExportService } from '../services/exportService';
 
 interface Chapter {
     id: string;
@@ -21,11 +22,16 @@ const SubjectPage: React.FC = () => {
     
     // Custom book management state
     const [isCustomBook, setIsCustomBook] = useState(false);
+    const [isImportedBook, setIsImportedBook] = useState(false);
     const [customChapters, setCustomChapters] = useState<Chapter[]>([]);
     const [showAddChapter, setShowAddChapter] = useState(false);
     const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
     const [newChapterNumber, setNewChapterNumber] = useState(1);
     const [newChapterName, setNewChapterName] = useState('');
+    
+    // Export functionality state
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportMessage, setExportMessage] = useState('');
 
     useEffect(() => {
         // Check if this is a custom book created by user
@@ -35,6 +41,24 @@ const SubjectPage: React.FC = () => {
         if (customBook) {
             setIsCustomBook(true);
             loadCustomChapters(customBook.id);
+            return;
+        }
+
+        // Check if this is an imported book
+        const importedBooks = JSON.parse(localStorage.getItem('importedBooks') || '[]');
+        const importedBook = importedBooks.find((importBook: any) => importBook.name === book);
+        
+        if (importedBook) {
+            setIsImportedBook(true);
+            // Convert imported book chapters to the expected format
+            const importedChapters = importedBook.chapters.map((chapterName: string, index: number) => ({
+                id: `imported-${importedBook.id}-${index + 1}`,
+                number: index + 1,
+                name: chapterName,
+                subtopics: [] // Will be loaded separately if needed
+            }));
+            setCustomChapters(importedChapters);
+            return;
         }
     }, [book]);
 
@@ -107,7 +131,60 @@ const SubjectPage: React.FC = () => {
         }
     };
 
-    if (!book || (!isCustomBook && !syllabus[book])) {
+    const handleExportBook = async () => {
+        setIsExporting(true);
+        setExportMessage('');
+        
+        try {
+            let bookData;
+            
+            if (isCustomBook) {
+                // Export custom book
+                const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+                const customBook = savedBooks.find((savedBook: any) => savedBook.name === book);
+                if (!customBook) {
+                    throw new Error('Custom book not found');
+                }
+                
+                bookData = {
+                    bookId: customBook.id,
+                    bookName: book,
+                    chapters: customChapters.map(chapter => ({
+                        id: chapter.id,
+                        name: chapter.name,
+                        number: chapter.number
+                    }))
+                };
+            } else {
+                // Export built-in book
+                const chapters = syllabus[book];
+                if (!chapters) {
+                    throw new Error('Book not found');
+                }
+                
+                bookData = {
+                    bookId: book.toLowerCase().replace(/\s+/g, '_'),
+                    bookName: book,
+                    chapters: chapters.map((chapterName, index) => ({
+                        id: `chapter_${index + 1}`,
+                        name: chapterName,
+                        number: index + 1
+                    }))
+                };
+            }
+            
+            await BookExportService.exportBook(bookData.bookName, bookData.bookId);
+            setExportMessage(`Successfully exported "${book}"!`);
+            
+        } catch (error) {
+            console.error('Export failed:', error);
+            setExportMessage(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    if (!book || (!isCustomBook && !isImportedBook && !syllabus[book])) {
         return (
             <div className="theme-bg min-h-screen theme-transition">
                 <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -136,16 +213,33 @@ const SubjectPage: React.FC = () => {
                         </button>
                         <h1 className="text-lg sm:text-xl font-bold theme-text">Chapters</h1>
                     </div>
-                    {/* Add Chapter button for custom books */}
-                    {isCustomBook && (
+                    <div className="flex items-center gap-2">
+                        {/* Export button */}
                         <button
-                            onClick={() => setShowAddChapter(!showAddChapter)}
-                            className="flex items-center gap-2 px-4 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                            onClick={handleExportBook}
+                            disabled={isExporting}
+                            className="flex items-center gap-2 px-3 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            title="Export this book"
                         >
-                            <PlusIcon />
-                            <span>Add Chapter</span>
+                            {isExporting ? (
+                                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                            ) : (
+                                '📤'
+                            )}
+                            <span className="hidden sm:inline">Export</span>
                         </button>
-                    )}
+                        
+                        {/* Add Chapter button for custom books */}
+                        {isCustomBook && (
+                            <button
+                                onClick={() => setShowAddChapter(!showAddChapter)}
+                                className="flex items-center gap-2 px-4 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                            >
+                                <PlusIcon />
+                                <span className="hidden sm:inline">Add Chapter</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </header>
 
@@ -162,15 +256,32 @@ const SubjectPage: React.FC = () => {
                                     className="w-full h-full object-cover" 
                                 />
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <h1 className="text-lg font-bold theme-text mb-1 leading-tight">{book}</h1>
-                                <p className="theme-text-secondary text-sm mb-2">Subject • Semester 5</p>
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-lg font-bold theme-text mb-1 leading-tight">{book}</h1>
+                            {(() => {
+                                if (isCustomBook) {
+                                    const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+                                    const customBook = savedBooks.find((savedBook: any) => savedBook.name === book);
+                                    if (customBook) {
+                                        return (
+                                            <div className="space-y-1 mb-2">
+                                                <p className="theme-text-secondary text-xs">Created by {customBook.creatorName}</p>
+                                                <p className="theme-text-secondary text-xs">{customBook.university} • {customBook.semester}</p>
+                                                {customBook.subjectCode && (
+                                                    <p className="theme-text-secondary text-xs">Code: {customBook.subjectCode}</p>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+                                }
+                                return <p className="theme-text-secondary text-sm mb-2">Subject • Semester 5</p>;
+                            })()}
                                 <div className="flex flex-wrap gap-1">
                                     <div className="bg-green-600 bg-opacity-20 text-green-400 text-xs px-2 py-1 rounded">
                                         ✓ Added
                                     </div>
                                     <div className="theme-accent bg-opacity-20 theme-accent-text text-xs px-2 py-1 rounded">
-                                        {isCustomBook ? customChapters.length : syllabus[book]?.length || 0} Ch
+                                        {(isCustomBook || isImportedBook) ? customChapters.length : syllabus[book]?.length || 0} Ch
                                     </div>
                                 </div>
                             </div>
@@ -191,13 +302,30 @@ const SubjectPage: React.FC = () => {
                         </div>
                         <div className="flex-1">
                             <h1 className="text-xl md:text-2xl lg:text-3xl font-bold theme-text mb-2">{book}</h1>
-                            <p className="theme-text-secondary mb-4">Subject • Semester 5</p>
+                            {(() => {
+                                if (isCustomBook) {
+                                    const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+                                    const customBook = savedBooks.find((savedBook: any) => savedBook.name === book);
+                                    if (customBook) {
+                                        return (
+                                            <div className="space-y-1 mb-4">
+                                                <p className="theme-text-secondary text-sm">Created by {customBook.creatorName}</p>
+                                                <p className="theme-text-secondary text-sm">{customBook.university} • {customBook.semester}</p>
+                                                {customBook.subjectCode && (
+                                                    <p className="theme-text-secondary text-sm">Subject Code: {customBook.subjectCode}</p>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+                                }
+                                return <p className="theme-text-secondary mb-4">Subject • Semester 5</p>;
+                            })()}
                             <div className="flex flex-wrap gap-2 mb-4">
                                 <div className="bg-green-600 bg-opacity-20 text-green-400 text-xs px-3 py-1 rounded-full">
                                     ✓ Added to Bookshelf
                                 </div>
                                 <div className="theme-accent bg-opacity-20 theme-accent-text text-xs px-3 py-1 rounded-full">
-                                    {isCustomBook ? customChapters.length : syllabus[book]?.length || 0} Chapters
+                                    {(isCustomBook || isImportedBook) ? customChapters.length : syllabus[book]?.length || 0} Chapters
                                 </div>
                             </div>
                             <p className="theme-text-secondary text-sm leading-relaxed">
@@ -206,6 +334,17 @@ const SubjectPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Export Message */}
+                {exportMessage && (
+                    <div className={`mb-6 p-4 rounded-lg ${
+                        exportMessage.includes('Successfully') 
+                            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' 
+                            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                    }`}>
+                        {exportMessage}
+                    </div>
+                )}
 
                 {/* Add Chapter Form */}
                 {isCustomBook && showAddChapter && (
@@ -297,8 +436,8 @@ const SubjectPage: React.FC = () => {
                 <div className="space-y-3">
                     <h2 className="text-lg font-semibold theme-text mb-4">Course Content</h2>
                     
-                    {/* Custom Book Chapters */}
-                    {isCustomBook && customChapters.map((chapter) => {
+                    {/* Custom Book Chapters & Imported Book Chapters */}
+                    {(isCustomBook || isImportedBook) && customChapters.map((chapter) => {
                         // Get book details
                         const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
                         const bookDetails = savedBooks.find((b: any) => b.name === book);

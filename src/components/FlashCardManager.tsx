@@ -268,7 +268,7 @@ What is Docker?|A platform for developing and running applications in containers
                         </button>
                     </div>
                     <div className="p-4 overflow-y-auto max-h-[60vh]">
-                        <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono theme-text whitespace-pre-wrap overflow-x-auto">
+                        <pre className="theme-surface2 p-4 rounded-lg text-sm font-mono theme-text whitespace-pre-wrap overflow-x-auto">
                             {examples[selectedFormat as keyof typeof examples]}
                         </pre>
                         <div className="mt-4 flex gap-2">
@@ -479,81 +479,138 @@ What is Docker?|A platform for developing and running applications in containers
                 </div>
             ) : (
                 <div>
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-6">
-                        <div>
-                            <h2 className="text-2xl font-bold theme-text flex items-center">
-                                <SparklesIcon className="w-6 h-6 mr-2" />
-                                Flash Cards
-                            </h2>
-                            <p className="theme-text-secondary">
-                                {flashCards.length} card{flashCards.length !== 1 ? 's' : ''} • 
-                                Card {currentCardIndex + 1} of {flashCards.length}
-                            </p>
+                    {/* Mobile-First Header */}
+                    <div className="mb-4">
+                        {/* Mobile Header */}
+                        <div className="block sm:hidden">
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <h2 className="text-lg font-bold theme-text flex items-center">
+                                        <SparklesIcon className="w-5 h-5 mr-2" />
+                                        Flash Cards
+                                    </h2>
+                                    <p className="text-sm theme-text-secondary">
+                                        {flashCards.length} cards • Card {currentCardIndex + 1}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setMode('create')}
+                                    className="p-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                                    title="Add Card"
+                                >
+                                    <PlusIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                            
+                            {/* Mobile Action Buttons */}
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                <button
+                                    onClick={() => setMode(mode === 'study' ? 'manage' : 'study')}
+                                    className="flex-shrink-0 px-3 py-2 text-sm theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                >
+                                    {mode === 'study' ? 'Manage' : 'Study'}
+                                </button>
+                                <button
+                                    onClick={() => setMode('import')}
+                                    className="flex-shrink-0 px-3 py-2 text-sm theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                >
+                                    Import
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setMode(mode === 'study' ? 'manage' : 'study')}
-                                className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
-                            >
-                                {mode === 'study' ? 'Manage' : 'Study Mode'}
-                            </button>
-                            <button
-                                onClick={() => setMode('import')}
-                                className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
-                            >
-                                Import
-                            </button>
-                            <button
-                                onClick={() => setMode('create')}
-                                className="px-4 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
-                            >
-                                <PlusIcon className="w-4 h-4 inline mr-1" />
-                                Add Card
-                            </button>
+
+                        {/* Desktop Header */}
+                        <div className="hidden sm:flex justify-between items-center">
+                            <div>
+                                <h2 className="text-2xl font-bold theme-text flex items-center">
+                                    <SparklesIcon className="w-6 h-6 mr-2" />
+                                    Flash Cards
+                                </h2>
+                                <p className="theme-text-secondary">
+                                    {flashCards.length} card{flashCards.length !== 1 ? 's' : ''} • 
+                                    Card {currentCardIndex + 1} of {flashCards.length}
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setMode(mode === 'study' ? 'manage' : 'study')}
+                                    className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                >
+                                    {mode === 'study' ? 'Manage' : 'Study Mode'}
+                                </button>
+                                <button
+                                    onClick={() => setMode('import')}
+                                    className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                >
+                                    Import
+                                </button>
+                                <button
+                                    onClick={() => setMode('create')}
+                                    className="px-4 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                                >
+                                    <PlusIcon className="w-4 h-4 inline mr-1" />
+                                    Add Card
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     {mode === 'study' && (
-                        <div className="space-y-6">
-                            {/* Flash Card Display */}
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-lg min-h-[300px] flex flex-col justify-center border-2 theme-border">
+                        <div className="space-y-4">
+                            {/* Mobile-Optimized Flash Card Display */}
+                            <div className="theme-surface rounded-lg p-3 sm:p-8 shadow-lg min-h-[250px] sm:min-h-[300px] flex flex-col justify-center border-2 theme-border mx-1 sm:mx-0">
                                 <div className="text-center">
-                                    <div className="mb-4">
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
-                                            {showAnswer ? 'Answer' : 'Question'}
-                                        </span>
+                                    {/* Question Section - Always Visible */}
+                                    <div className="mb-4 sm:mb-6">
+                                        <div className="mb-2 sm:mb-3">
+                                            <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                                                Question
+                                            </span>
+                                        </div>
+                                        <div className="text-base sm:text-xl font-medium theme-text leading-relaxed px-2 sm:px-0">
+                                            {currentCard.question}
+                                        </div>
                                     </div>
-                                    
-                                    <div className="text-xl font-medium theme-text mb-6 leading-relaxed">
-                                        {showAnswer ? currentCard.answer : currentCard.question}
-                                    </div>
+
+                                    {/* Answer Section - Shown When Revealed */}
+                                    {showAnswer && (
+                                        <div className="mb-4 sm:mb-6 pt-3 sm:pt-4 border-t theme-border">
+                                            <div className="mb-2 sm:mb-3">
+                                                <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                                                    Answer
+                                                </span>
+                                            </div>
+                                            <div className="text-base sm:text-xl font-medium theme-text leading-relaxed px-2 sm:px-0">
+                                                {currentCard.answer}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {!showAnswer ? (
                                         <button
                                             onClick={() => setShowAnswer(true)}
-                                            className="px-6 py-3 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                                            className="px-4 sm:px-6 py-2 sm:py-3 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition text-sm sm:text-base"
                                         >
                                             Show Answer
                                         </button>
                                     ) : (
-                                        <div className="space-y-4">
+                                        <div className="space-y-3 sm:space-y-4">
                                             <button
                                                 onClick={() => setShowAnswer(false)}
-                                                className="block mx-auto px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                                className="block mx-auto px-3 sm:px-4 py-1 sm:py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition text-sm"
                                             >
                                                 Hide Answer
                                             </button>
-                                            <div className="flex justify-center gap-3">
+                                            <div className="flex justify-center gap-2 sm:gap-3 px-2">
                                                 <button
                                                     onClick={nextCard}
-                                                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 theme-transition"
+                                                    className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 theme-transition text-xs sm:text-sm"
                                                 >
                                                     Got it! ✓
                                                 </button>
                                                 <button
                                                     onClick={nextCard}
-                                                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 theme-transition"
+                                                    className="px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 theme-transition text-xs sm:text-sm"
                                                 >
                                                     Review again
                                                 </button>
@@ -563,22 +620,22 @@ What is Docker?|A platform for developing and running applications in containers
                                 </div>
                             </div>
 
-                            {/* Navigation */}
-                            <div className="flex justify-between items-center">
+                            {/* Mobile-Optimized Navigation */}
+                            <div className="flex justify-between items-center px-2 sm:px-0">
                                 <button
                                     onClick={prevCard}
-                                    className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                    className="px-3 sm:px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition text-sm"
                                 >
                                     ← Previous
                                 </button>
                                 
-                                <div className="text-sm theme-text-secondary">
+                                <div className="text-xs sm:text-sm theme-text-secondary">
                                     Card {currentCardIndex + 1} of {flashCards.length}
                                 </div>
-                                
+
                                 <button
                                     onClick={nextCard}
-                                    className="px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition"
+                                    className="px-3 sm:px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-accent-bg hover:text-white theme-transition text-sm"
                                 >
                                     Next →
                                 </button>

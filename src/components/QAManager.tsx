@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SparklesIcon, PlusIcon, TrashIcon, UploadIcon } from './icons';
 import { processAIImport } from '../utils/aiImportService';
+import { QATest } from './TestComponents';
 
 interface QAQuestion {
     id: string;
@@ -24,7 +25,7 @@ const QAManager: React.FC<QAManagerProps> = ({
     className = ''
 }) => {
     const [qaQuestions, setQaQuestions] = useState<QAQuestion[]>([]);
-    const [mode, setMode] = useState<'practice' | 'manage' | 'add' | 'import'>('practice');
+    const [mode, setMode] = useState<'practice' | 'manage' | 'add' | 'import' | 'test'>('practice');
     const [displayMode, setDisplayMode] = useState<'individual' | 'batch'>('individual');
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedMarks, setSelectedMarks] = useState<number[]>([]);
@@ -42,10 +43,13 @@ const QAManager: React.FC<QAManagerProps> = ({
     const [showFormatModal, setShowFormatModal] = useState(false);
     const [isAIProcessing, setIsAIProcessing] = useState(false);
 
+    // Edit state
+    const [editingQuestion, setEditingQuestion] = useState<QAQuestion | null>(null);
+
     const storageKey = `qa_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
 
     // Base marks options
-    const baseMarksOptions = [1, 2, 5, 10, 20];
+    const baseMarksOptions = [1, 2, 5, 7, 10];
     
     // Get all marks options (base + custom)
     const getAllMarksOptions = () => {
@@ -54,6 +58,9 @@ const QAManager: React.FC<QAManagerProps> = ({
     };
 
     // Get marks that actually have questions
+    // Mobile detection
+    const isMobile = () => window.innerWidth <= 768;
+
     const getAvailableMarks = () => {
         const questionMarks = qaQuestions.map(q => q.marks);
         return getAllMarksOptions().filter(mark => questionMarks.includes(mark));
@@ -80,23 +87,42 @@ const QAManager: React.FC<QAManagerProps> = ({
     // Create new Q&A
     const handleAddQuestion = () => {
         if (newQuestion.trim() && newAnswer.trim()) {
-            const newQA: QAQuestion = {
-                id: Date.now().toString(),
-                question: newQuestion.trim(),
-                answer: newAnswer.trim(),
-                marks: newMarks,
-                category: newCategory.trim() || undefined,
-                timestamp: new Date()
-            };
-            
-            const updatedQuestions = [...qaQuestions, newQA];
-            saveQaQuestions(updatedQuestions);
+            if (editingQuestion) {
+                // Edit existing question
+                const updatedQuestions = qaQuestions.map(q => 
+                    q.id === editingQuestion.id 
+                        ? {
+                            ...q,
+                            question: newQuestion.trim(),
+                            answer: newAnswer.trim(),
+                            marks: newMarks,
+                            category: newCategory.trim() || undefined,
+                        }
+                        : q
+                );
+                saveQaQuestions(updatedQuestions);
+                setEditingQuestion(null);
+            } else {
+                // Add new question
+                const newQA: QAQuestion = {
+                    id: Date.now().toString(),
+                    question: newQuestion.trim(),
+                    answer: newAnswer.trim(),
+                    marks: newMarks,
+                    category: newCategory.trim() || undefined,
+                    timestamp: new Date()
+                };
+                
+                const updatedQuestions = [...qaQuestions, newQA];
+                saveQaQuestions(updatedQuestions);
+            }
             
             // Reset form
             setNewQuestion('');
             setNewAnswer('');
             setNewMarks(2);
             setNewCategory('');
+            setMode('practice');
         }
     };
 
@@ -302,10 +328,17 @@ Code a simple linear regression|Algorithm that models relationship between varia
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
                         <PlusIcon />
-                        Add Q&A Question
+                        {editingQuestion ? 'Edit Q&A Question' : 'Add Q&A Question'}
                     </h2>
                     <button
-                        onClick={() => setMode('practice')}
+                        onClick={() => {
+                            setMode('practice');
+                            setEditingQuestion(null);
+                            setNewQuestion('');
+                            setNewAnswer('');
+                            setNewMarks(2);
+                            setNewCategory('');
+                        }}
                         className="btn-secondary text-sm"
                     >
                         Back to Practice
@@ -403,7 +436,7 @@ Code a simple linear regression|Algorithm that models relationship between varia
                         disabled={!newQuestion.trim() || !newAnswer.trim()}
                         className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Add Question
+                        {editingQuestion ? 'Update Question' : 'Add Question'}
                     </button>
                 </div>
             </div>
@@ -543,56 +576,182 @@ Code a simple linear regression|Algorithm that models relationship between varia
         );
     }
 
+    if (mode === 'manage') {
+        return (
+            <div className={`theme-surface rounded-lg p-2 sm:p-6 ${className}`}>
+                <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 sm:mb-6`}>
+                    <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
+                        ⚙️ Manage Q&A Questions
+                    </h2>
+                    <button
+                        onClick={() => setMode('practice')}
+                        className={`${isMobile() ? 'btn-secondary text-sm w-full py-2' : 'btn-secondary text-sm'}`}
+                    >
+                        Back to Practice
+                    </button>
+                </div>
+
+                {qaQuestions.length === 0 ? (
+                    <div className="text-center py-6 sm:py-8">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 theme-text-secondary">
+                            <SparklesIcon />
+                        </div>
+                        <h3 className="text-base sm:text-lg font-medium theme-text mb-2">No questions to manage</h3>
+                        <p className="theme-text-secondary mb-3 sm:mb-4 text-sm">Add questions to start managing them</p>
+                        <button
+                            onClick={() => setMode('add')}
+                            className={`${isMobile() ? 'btn-primary w-full text-sm py-2 max-w-xs mx-auto' : 'btn-primary'} flex items-center justify-center gap-2`}
+                        >
+                            <PlusIcon />
+                            Add First Question
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-3 sm:space-y-4">
+                        {/* Summary */}
+                        <div className={`flex ${isMobile() ? 'flex-col gap-2' : 'justify-between items-center'} ${isMobile() ? 'p-3' : 'p-4'} theme-surface2 rounded-lg`}>
+                            <div className={`${isMobile() ? 'text-xs' : 'text-sm'} theme-text-secondary ${isMobile() ? 'text-center' : ''}`}>
+                                Total: {qaQuestions.length} questions | Total marks: {qaQuestions.reduce((sum, q) => sum + q.marks, 0)}
+                            </div>
+                        </div>
+
+                        {/* Questions List */}
+                        <div className="space-y-2 sm:space-y-3">
+                            {qaQuestions.map((question) => (
+                                <div key={question.id} className={`border theme-border rounded-lg ${isMobile() ? 'p-3' : 'p-4'}`}>
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                            <div className={`flex ${isMobile() ? 'flex-col gap-1' : 'items-center gap-2'} mb-2`}>
+                                                <h3 className={`${isMobile() ? 'text-sm' : ''} font-medium theme-text`}>
+                                                    {question.question}
+                                                </h3>
+                                                <div className={`flex ${isMobile() ? 'gap-1' : 'gap-2'}`}>
+                                                    <span className={`${isMobile() ? 'text-xs' : 'text-xs'} theme-text-secondary theme-surface2 px-2 py-1 rounded`}>
+                                                        {question.marks} mark{question.marks !== 1 ? 's' : ''}
+                                                    </span>
+                                                    {question.category && (
+                                                        <span className={`${isMobile() ? 'text-xs' : 'text-xs'} theme-text-secondary theme-surface2 px-2 py-1 rounded`}>
+                                                            {question.category}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <p className={`${isMobile() ? 'text-xs' : 'text-sm'} theme-text-secondary mb-2 sm:mb-3`}>
+                                                <strong>Answer:</strong> {question.answer}
+                                            </p>
+                                        </div>
+                                        <div className={`flex ${isMobile() ? 'flex-col gap-1 ml-2' : 'gap-2'}`}>
+                                            <button
+                                                onClick={() => {
+                                                    // Set up edit mode with this question
+                                                    setEditingQuestion(question);
+                                                    setNewQuestion(question.question);
+                                                    setNewAnswer(question.answer);
+                                                    setNewMarks(question.marks);
+                                                    setNewCategory(question.category || '');
+                                                    setMode('add');
+                                                }}
+                                                className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'} flex items-center gap-1`}
+                                            >
+                                                ✏️ Edit
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm('Are you sure you want to delete this question?')) {
+                                                        const updatedQuestions = qaQuestions.filter(q => q.id !== question.id);
+                                                        setQaQuestions(updatedQuestions);
+                                                        // Save to localStorage
+                                                        localStorage.setItem(`qa_${currentBook}_${currentChapter}`, JSON.stringify(updatedQuestions));
+                                                    }
+                                                }}
+                                                className={`${isMobile() ? 'btn-danger text-xs px-2 py-1' : 'btn-danger text-sm'} flex items-center gap-1`}
+                                            >
+                                                🗑️ Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    if (mode === 'test') {
+        return (
+            <QATest
+                questions={qaQuestions}
+                currentBook={currentBook}
+                currentChapter={currentChapter}
+                onBack={() => setMode('practice')}
+            />
+        );
+    }
+
     return (
-        <div className={`theme-surface rounded-lg p-6 ${className}`}>
+        <div className={`theme-surface rounded-lg p-2 sm:p-6 ${className}`}>
             <FormatExampleModal />
-            <div className="flex items-center justify-between mb-6">
+            <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 sm:mb-6`}>
                 <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
                     <SparklesIcon />
                     Q&A Practice
                 </h2>
-                <div className="flex gap-2">
+                <div className={`flex ${isMobile() ? 'flex-wrap gap-1' : 'gap-2'}`}>
                     <button
                         onClick={() => setMode('add')}
-                        className="btn-secondary text-sm flex items-center gap-2"
+                        className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'} flex items-center gap-1`}
                     >
                         <PlusIcon />
                         Add
                     </button>
                     <button
+                        onClick={() => setMode('test')}
+                        className={`${isMobile() ? 'btn-primary text-xs px-2 py-1' : 'btn-primary text-sm'} flex items-center gap-1`}
+                    >
+                        🧪 Test
+                    </button>
+                    <button
                         onClick={() => setMode('import')}
-                        className="btn-secondary text-sm flex items-center gap-2"
+                        className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'} flex items-center gap-1`}
                     >
                         <UploadIcon />
                         Import
+                    </button>
+                    <button
+                        onClick={() => setMode('manage')}
+                        className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'} flex items-center gap-1`}
+                    >
+                        ⚙️ Manage
                     </button>
                 </div>
             </div>
 
             {qaQuestions.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                <div className="text-center py-6 sm:py-8">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 theme-text-secondary">
                         <SparklesIcon />
                     </div>
-                    <h3 className="text-lg font-medium theme-text mb-2">No Q&A questions yet</h3>
-                    <p className="theme-text-secondary mb-4">Add questions to start practicing</p>
+                    <h3 className="text-base sm:text-lg font-medium theme-text mb-2">No Q&A questions yet</h3>
+                    <p className="theme-text-secondary mb-3 sm:mb-4 text-sm">Add questions to start practicing</p>
                     <button
                         onClick={() => setMode('add')}
-                        className="btn-primary flex items-center gap-2 mx-auto"
+                        className={`${isMobile() ? 'btn-primary w-full text-sm py-2 max-w-xs mx-auto' : 'btn-primary'} flex items-center justify-center gap-2`}
                     >
                         <PlusIcon />
                         Add First Question
                     </button>
                 </div>
             ) : (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                     {/* Controls */}
-                    <div className="flex flex-wrap gap-4 items-center">
+                    <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'flex-wrap gap-4 items-center'}`}>
                         {/* Display mode toggle */}
-                        <div className="flex gap-2">
+                        <div className={`flex ${isMobile() ? 'justify-center' : ''} gap-2`}>
                             <button
                                 onClick={() => setDisplayMode('individual')}
-                                className={`px-3 py-1 text-sm rounded ${
+                                className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded ${
                                     displayMode === 'individual' 
                                         ? 'theme-accent text-white' 
                                         : 'btn-secondary'
@@ -602,7 +761,7 @@ Code a simple linear regression|Algorithm that models relationship between varia
                             </button>
                             <button
                                 onClick={() => setDisplayMode('batch')}
-                                className={`px-3 py-1 text-sm rounded ${
+                                className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded ${
                                     displayMode === 'batch' 
                                         ? 'theme-accent text-white' 
                                         : 'btn-secondary'
@@ -613,35 +772,37 @@ Code a simple linear regression|Algorithm that models relationship between varia
                         </div>
 
                         {/* Marks filter */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm theme-text">Filter by marks:</span>
-                            {getAvailableMarks().map(mark => (
-                                <button
-                                    key={mark}
-                                    onClick={() => {
-                                        setSelectedMarks(prev => 
-                                            prev.includes(mark) 
-                                                ? prev.filter(m => m !== mark)
-                                                : [...prev, mark]
-                                        );
-                                    }}
-                                    className={`px-2 py-1 text-xs rounded ${
-                                        selectedMarks.includes(mark)
-                                            ? 'theme-accent text-white'
-                                            : 'btn-secondary'
-                                    }`}
-                                >
-                                    {mark}
-                                </button>
-                            ))}
-                            {selectedMarks.length > 0 && (
-                                <button
-                                    onClick={() => setSelectedMarks([])}
-                                    className="px-2 py-1 text-xs btn-secondary"
-                                >
-                                    Clear
-                                </button>
-                            )}
+                        <div className={`flex ${isMobile() ? 'flex-col gap-2' : 'items-center gap-2'}`}>
+                            <span className={`${isMobile() ? 'text-xs' : 'text-sm'} theme-text`}>Filter by marks:</span>
+                            <div className={`flex ${isMobile() ? 'flex-wrap justify-center' : ''} gap-1`}>
+                                {getAvailableMarks().map(mark => (
+                                    <button
+                                        key={mark}
+                                        onClick={() => {
+                                            setSelectedMarks(prev => 
+                                                prev.includes(mark) 
+                                                    ? prev.filter(m => m !== mark)
+                                                    : [...prev, mark]
+                                            );
+                                        }}
+                                        className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-2 py-1 text-xs'} rounded ${
+                                            selectedMarks.includes(mark)
+                                                ? 'theme-accent text-white'
+                                                : 'btn-secondary'
+                                        }`}
+                                    >
+                                        {mark}
+                                    </button>
+                                ))}
+                                {selectedMarks.length > 0 && (
+                                    <button
+                                        onClick={() => setSelectedMarks([])}
+                                        className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-2 py-1 text-xs'} btn-secondary`}
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -649,21 +810,21 @@ Code a simple linear regression|Algorithm that models relationship between varia
                     {displayMode === 'individual' ? (
                         // Individual question display
                         filteredQuestions.length > 0 && (
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between text-sm theme-text-secondary">
+                            <div className="space-y-3 sm:space-y-4">
+                                <div className={`flex ${isMobile() ? 'flex-col gap-2 text-center' : 'items-center justify-between'} ${isMobile() ? 'text-xs' : 'text-sm'} theme-text-secondary`}>
                                     <span>Question {currentQuestionIndex + 1} of {filteredQuestions.length}</span>
                                     <span>{filteredQuestions[currentQuestionIndex]?.marks} mark{filteredQuestions[currentQuestionIndex]?.marks !== 1 ? 's' : ''}</span>
                                 </div>
 
-                                <div className="border theme-border rounded-lg p-6">
-                                    <h3 className="text-lg font-medium theme-text mb-4">
+                                <div className={`border theme-border rounded-lg ${isMobile() ? 'p-3' : 'p-6'}`}>
+                                    <h3 className={`${isMobile() ? 'text-base' : 'text-lg'} font-medium theme-text mb-3 sm:mb-4`}>
                                         {filteredQuestions[currentQuestionIndex]?.question}
                                     </h3>
                                     
                                     {showAnswers[filteredQuestions[currentQuestionIndex]?.id] && (
-                                        <div className="mt-4 pt-4 border-t theme-border">
-                                            <h4 className="font-medium theme-text mb-2">Answer:</h4>
-                                            <p className="theme-text-secondary leading-relaxed">
+                                        <div className={`${isMobile() ? 'mt-3 pt-3' : 'mt-4 pt-4'} border-t theme-border`}>
+                                            <h4 className={`font-medium theme-text ${isMobile() ? 'text-sm mb-2' : 'mb-2'}`}>Answer:</h4>
+                                            <p className={`theme-text-secondary ${isMobile() ? 'text-sm leading-relaxed' : 'leading-relaxed'}`}>
                                                 {filteredQuestions[currentQuestionIndex]?.answer}
                                             </p>
                                         </div>
@@ -671,7 +832,7 @@ Code a simple linear regression|Algorithm that models relationship between varia
                                 </div>
 
                                 {/* Controls */}
-                                <div className="flex justify-center gap-4">
+                                <div className="flex justify-center gap-3 sm:gap-4">
                                     <button
                                         onClick={() => {
                                             const currentId = filteredQuestions[currentQuestionIndex]?.id;
@@ -680,25 +841,25 @@ Code a simple linear regression|Algorithm that models relationship between varia
                                                 [currentId]: !prev[currentId]
                                             }));
                                         }}
-                                        className="btn-primary"
+                                        className={`${isMobile() ? 'btn-primary text-sm px-4 py-2' : 'btn-primary'}`}
                                     >
                                         {showAnswers[filteredQuestions[currentQuestionIndex]?.id] ? 'Hide Answer' : 'Show Answer'}
                                     </button>
                                 </div>
 
                                 {/* Navigation */}
-                                <div className="flex justify-center gap-4">
+                                <div className="flex justify-center gap-3 sm:gap-4">
                                     <button
                                         onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
                                         disabled={currentQuestionIndex === 0}
-                                        className="btn-secondary disabled:opacity-50"
+                                        className={`${isMobile() ? 'btn-secondary text-sm px-3 py-2' : 'btn-secondary'} disabled:opacity-50`}
                                     >
                                         Previous
                                     </button>
                                     <button
                                         onClick={() => setCurrentQuestionIndex(Math.min(filteredQuestions.length - 1, currentQuestionIndex + 1))}
                                         disabled={currentQuestionIndex === filteredQuestions.length - 1}
-                                        className="btn-secondary disabled:opacity-50"
+                                        className={`${isMobile() ? 'btn-secondary text-sm px-3 py-2' : 'btn-secondary'} disabled:opacity-50`}
                                     >
                                         Next
                                     </button>
@@ -707,28 +868,28 @@ Code a simple linear regression|Algorithm that models relationship between varia
                         )
                     ) : (
                         // Batch view - all questions together
-                        <div className="space-y-6">
+                        <div className={`space-y-4 ${isMobile() ? 'sm:space-y-6' : 'space-y-6'}`}>
                             {filteredQuestions.map((question) => (
-                                <div key={question.id} className="border theme-border rounded-lg p-6">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <h3 className="text-lg font-medium theme-text flex-1">
+                                <div key={question.id} className={`border theme-border rounded-lg ${isMobile() ? 'p-3' : 'p-6'}`}>
+                                    <div className={`flex ${isMobile() ? 'flex-col gap-2' : 'justify-between items-start'} mb-3`}>
+                                        <h3 className={`${isMobile() ? 'text-base' : 'text-lg'} font-medium theme-text flex-1`}>
                                             {question.question}
                                         </h3>
-                                        <span className="text-sm theme-text-secondary bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded ml-4">
+                                        <span className={`${isMobile() ? 'text-xs self-start' : 'text-sm'} theme-text-secondary bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded ${isMobile() ? '' : 'ml-4'}`}>
                                             {question.marks} mark{question.marks !== 1 ? 's' : ''}
                                         </span>
                                     </div>
                                     
                                     {showAnswers[question.id] && (
-                                        <div className="mt-4 pt-4 border-t theme-border">
-                                            <h4 className="font-medium theme-text mb-2">Answer:</h4>
-                                            <p className="theme-text-secondary leading-relaxed">
+                                        <div className={`${isMobile() ? 'mt-3 pt-3' : 'mt-4 pt-4'} border-t theme-border`}>
+                                            <h4 className={`font-medium theme-text ${isMobile() ? 'text-sm mb-2' : 'mb-2'}`}>Answer:</h4>
+                                            <p className={`theme-text-secondary ${isMobile() ? 'text-sm leading-relaxed' : 'leading-relaxed'}`}>
                                                 {question.answer}
                                             </p>
                                         </div>
                                     )}
                                     
-                                    <div className="mt-4">
+                                    <div className="mt-3 sm:mt-4">
                                         <button
                                             onClick={() => {
                                                 setShowAnswers(prev => ({
@@ -736,7 +897,7 @@ Code a simple linear regression|Algorithm that models relationship between varia
                                                     [question.id]: !prev[question.id]
                                                 }));
                                             }}
-                                            className="btn-secondary text-sm"
+                                            className={`${isMobile() ? 'btn-secondary text-xs px-3 py-1' : 'btn-secondary text-sm'}`}
                                         >
                                             {showAnswers[question.id] ? 'Hide Answer' : 'Show Answer'}
                                         </button>
