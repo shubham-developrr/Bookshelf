@@ -1,0 +1,15 @@
+[
+  {
+    "id": "mcq_1",
+    "question": "What is the main purpose of testing?",
+    "options": [
+      { "id": "a", "text": "To find bugs" },
+      { "id": "b", "text": "To ensure quality" },
+      { "id": "c", "text": "To verify functionality" },
+      { "id": "d", "text": "All of the above" }
+    ],
+    "correctAnswer": "d",
+    "explanation": "Testing serves multiple purposes including finding bugs, ensuring quality, and verifying functionality.",
+    "difficulty": "easy"
+  }
+]

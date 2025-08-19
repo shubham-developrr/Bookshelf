@@ -1,23 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpenIcon, MenuIcon, AlertIcon, AIGuruIcon } from '../components/icons';
 import { getBookImage, SearchIcon } from '../assets/images/index';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeSelector from '../components/ThemeSelector';
+import { getSyllabus } from '../constants/constants';
+import { BookImportService } from '../services/importService';
 
 const BookshelfPage: React.FC = () => {
     const navigate = useNavigate();
     const { theme } = useTheme();
     const [isThemeModalOpen, setThemeModalOpen] = useState(false);
+    const [subjects, setSubjects] = useState<string[]>([]);
+    const [isImporting, setIsImporting] = useState(false);
+    const [importMessage, setImportMessage] = useState<string>('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const subjects = [
-        'Object Oriented System Design with C++', 
-        'Application of Soft Computing', 
-        'Database Management System', 
-        'Web Technology', 
-        'Design and Analysis of Algorithm', 
-        'Mechanics of Robots'
-    ];
+    // Load subjects including imported books
+    useEffect(() => {
+        const loadSubjects = () => {
+            const syllabus = getSyllabus();
+            setSubjects(Object.keys(syllabus));
+        };
+        
+        loadSubjects();
+        
+        // Listen for storage changes to refresh when books are imported
+        const handleStorageChange = () => loadSubjects();
+        window.addEventListener('storage', handleStorageChange);
+        
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
+    const handleImportBook = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.name.endsWith('.zip')) {
+            setImportMessage('Please select a valid ZIP file.');
+            return;
+        }
+
+        setIsImporting(true);
+        setImportMessage('');
+
+        try {
+            // Validate file first
+            const validation = await BookImportService.validateImportFile(file);
+            if (!validation.isValid) {
+                throw new Error(validation.error || 'Invalid import file');
+            }
+
+            // Import the book
+            await BookImportService.importBook(file);
+            
+            setImportMessage(`Successfully imported "${validation.bookName}" with ${validation.chapterCount} chapters!`);
+            
+            // Refresh subjects list
+            const syllabus = getSyllabus();
+            setSubjects(Object.keys(syllabus));
+            
+            // Clear file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+            
+        } catch (error) {
+            console.error('Import failed:', error);
+            setImportMessage(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsImporting(false);
+        }
+    };
 
     return (
         <div className="theme-bg min-h-screen theme-transition">
@@ -33,6 +87,14 @@ const BookshelfPage: React.FC = () => {
                         <h1 className="text-lg sm:text-xl font-bold theme-text">Bookshelf</h1>
                     </div>
                     <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                            className="px-3 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                            title="Import Books"
+                        >
+                            📥 Import
+                        </button>
                         <button 
                             onClick={() => setThemeModalOpen(true)}
                             className="p-2 hover:theme-surface2 rounded-lg theme-transition"
@@ -59,6 +121,50 @@ const BookshelfPage: React.FC = () => {
                         >
                             <span className="theme-text-secondary">Search topics, chapters, subjects...</span>
                         </button>
+                    </div>
+                </div>
+
+                {/* Book Import Section */}
+                <div className="mb-8 p-4 theme-surface rounded-lg border-2 border-dashed theme-border">
+                    <div className="text-center">
+                        <h3 className="text-lg font-semibold theme-text mb-2">Import Study Book</h3>
+                        <p className="theme-text-secondary text-sm mb-4">
+                            Import exported study books (.zip) to your library
+                        </p>
+                        
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".zip"
+                            onChange={handleImportBook}
+                            className="hidden"
+                            disabled={isImporting}
+                        />
+                        
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                            className="px-6 py-3 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isImporting ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                    Importing...
+                                </div>
+                            ) : (
+                                '📁 Select ZIP File to Import'
+                            )}
+                        </button>
+                        
+                        {importMessage && (
+                            <div className={`mt-4 p-3 rounded-lg ${
+                                importMessage.includes('Successfully') 
+                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' 
+                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                            }`}>
+                                {importMessage}
+                            </div>
+                        )}
                     </div>
                 </div>
 

@@ -296,3 +296,37 @@ export const chapterSubtopics = {
   }
 };
 
+// Dynamic function to get syllabus including imported books
+export const getSyllabus = () => {
+  const baseSyllabus = { ...syllabus };
+  
+  // Add imported books
+  try {
+    const importedBooks = JSON.parse(localStorage.getItem('importedBooks') || '[]');
+    importedBooks.forEach((book: any) => {
+      if (book.chapters && Array.isArray(book.chapters)) {
+        baseSyllabus[book.name] = book.chapters;
+      }
+    });
+  } catch (error) {
+    console.warn('Failed to load imported books:', error);
+  }
+  
+  return baseSyllabus;
+};
+
+// Dynamic function to get chapter subtopics including imported books
+export const getChapterSubtopics = () => {
+  const baseSubtopics = { ...chapterSubtopics };
+  
+  // Add imported book subtopics
+  try {
+    const importedSubtopics = JSON.parse(localStorage.getItem('importedChapterSubtopics') || '{}');
+    Object.assign(baseSubtopics, importedSubtopics);
+  } catch (error) {
+    console.warn('Failed to load imported chapter subtopics:', error);
+  }
+  
+  return baseSubtopics;
+};
+

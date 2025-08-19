@@ -252,12 +252,12 @@ const VideosManager: React.FC<VideosManagerProps> = ({
                     🎬 YouTube Videos
                 </h2>
                 <div className="flex gap-2">
-                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                    <div className="flex theme-surface2 rounded-lg p-1">
                         <button
                             onClick={() => setViewMode('grid')}
                             className={`px-3 py-1 text-sm rounded ${
                                 viewMode === 'grid' 
-                                    ? 'bg-white dark:bg-gray-700 theme-text shadow-sm' 
+                                    ? 'theme-surface theme-text shadow-sm' 
                                     : 'theme-text-secondary hover:theme-text'
                             }`}
                         >
@@ -267,7 +267,7 @@ const VideosManager: React.FC<VideosManagerProps> = ({
                             onClick={() => setViewMode('list')}
                             className={`px-3 py-1 text-sm rounded ${
                                 viewMode === 'list' 
-                                    ? 'bg-white dark:bg-gray-700 theme-text shadow-sm' 
+                                    ? 'theme-surface theme-text shadow-sm' 
                                     : 'theme-text-secondary hover:theme-text'
                             }`}
                         >

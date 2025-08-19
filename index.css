@@ -54,7 +54,15 @@ body {
 }
 
 .theme-accent-text {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.theme-accent-text-smart {
+  color: var(--color-accent-text-contrast);
+}
+
+.theme-accent-bg-text {
+  color: var(--color-accent-bg-text);
 }
 
 .theme-border {
@@ -169,6 +177,23 @@ body {
 
 .btn-secondary:hover {
   background-color: var(--color-surface2);
+}
+
+/* Theme input styles */
+.theme-input {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.theme-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.theme-input::placeholder {
+  color: var(--color-text-secondary);
 }
 
 /* Card styles */

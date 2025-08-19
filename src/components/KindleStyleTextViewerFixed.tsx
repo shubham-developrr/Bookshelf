@@ -1,4 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { 
+  hapticTextSelection, 
+  hapticHighlight, 
+  hapticSuccess, 
+  hapticSoft, 
+  hapticImpact,
+  requestHapticPermission 
+} from '../utils/haptics';
 
 interface WordElement {
   text: string;
@@ -59,8 +67,9 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
   const isMobile = () => typeof window !== 'undefined' && window.innerWidth <= 768;
   const isSmallMobile = () => typeof window !== 'undefined' && window.innerWidth <= 480;
   
-  const fontSize = isSmallMobile() ? 17 : isMobile() ? 16 : 15;
-  const lineHeight = isSmallMobile() ? 1.8 : isMobile() ? 1.7 : 1.6;
+  // Significantly reduced font sizes for better mobile density
+  const fontSize = isSmallMobile() ? 14 : isMobile() ? 14 : 15;
+  const lineHeight = isSmallMobile() ? 1.4 : isMobile() ? 1.5 : 1.6;
   const fontFamily = 'ui-sans-serif, system-ui, -apple-system, sans-serif';
 
   // State management
@@ -87,6 +96,15 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
 
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Initialize haptic permissions on component mount
+  useEffect(() => {
+    if (isMobile()) {
+      requestHapticPermission().then((granted) => {
+        console.log('Haptic permission granted:', granted);
+      });
+    }
+  }, []);
 
   // Canvas-based text measurement for mobile accuracy
   const createTextMeasurer = useCallback(() => {
@@ -115,8 +133,8 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
     const measurer = createTextMeasurer();
     if (!measurer) return [];
 
-    // Mobile-optimized container calculations
-    const mobilePadding = isSmallMobile() ? 12 : isMobile() ? 16 : 20;
+    // Mobile-optimized container calculations - reduced padding for better space utilization
+    const mobilePadding = isSmallMobile() ? 6 : isMobile() ? 8 : 20;
     const containerWidth = container.clientWidth - (mobilePadding * 2);
     
     console.log('Mobile-First Layout Debug:', {
@@ -130,7 +148,6 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
     const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
     const wordElements: WordElement[] = [];
     
-    let currentX = 0;
     let currentY = mobilePadding;
     let lineIndex = 0;
 
@@ -145,27 +162,69 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
 
       const words = paragraph.split(/\s+/).filter(word => word.length > 0);
       
-      words.forEach((word) => {
+      // Process words in lines for justification
+      let currentLineWords: { word: string; width: number }[] = [];
+      let currentLineWidth = 0;
+      
+      const processLine = (isLastLine = false) => {
+        if (currentLineWords.length === 0) return;
+        
+        const totalWordWidth = currentLineWords.reduce((sum, w) => sum + w.width, 0);
+        const totalSpaces = currentLineWords.length - 1;
+        const availableSpace = containerWidth - (mobilePadding * 2); // Use consistent padding
+        const extraSpace = availableSpace - totalWordWidth - (totalSpaces * spaceWidth);
+        
+        // Calculate justified spacing (only for lines with 2+ words and not last line)
+        let adjustedSpaceWidth = spaceWidth;
+        if (!isLastLine && currentLineWords.length > 1 && extraSpace > 0) {
+          adjustedSpaceWidth = spaceWidth + (extraSpace / totalSpaces);
+        }
+        
+        // Position words in justified line with consistent margins
+        let currentX = mobilePadding;
+        currentLineWords.forEach((wordInfo, wordIndex) => {
+          wordElements.push({
+            text: wordInfo.word,
+            x: currentX,
+            y: currentY - (lineHeightPx * (isMobile() ? 0.05 : 0.1)), // Better mobile text centering
+            width: wordInfo.width,
+            height: lineHeightPx * (isMobile() ? 0.95 : 0.9), // Improved mobile highlight coverage
+            lineIndex: lineIndex
+          });
+
+          currentX += wordInfo.width;
+          if (wordIndex < currentLineWords.length - 1) {
+            currentX += adjustedSpaceWidth;
+          }
+        });
+        
+        // Reset for next line
+        currentLineWords = [];
+        currentLineWidth = 0;
+        currentY += lineHeightPx;
+        lineIndex++;
+      };
+      
+      words.forEach((word, wordIndex) => {
         const measurements = measurer.measureText(word);
         const wordWidth = Math.max(measurements.width, word.length * 6);
-
-        // Smart line wrapping for mobile
-        if (currentX + wordWidth > containerWidth - 10 && currentX > 0) {
-          currentX = 0;
-          currentY += lineHeightPx;
-          lineIndex++;
+        
+        // Check if word fits on current line
+        const wouldFit = currentLineWidth + (currentLineWords.length > 0 ? spaceWidth : 0) + wordWidth <= containerWidth - (mobilePadding * 2);
+        
+        if (!wouldFit && currentLineWords.length > 0) {
+          // Process current line before starting new one
+          processLine(false);
         }
-
-        wordElements.push({
-          text: word,
-          x: currentX,
-          y: currentY - (lineHeightPx * 0.1), // Adjust Y position to center text better
-          width: wordWidth,
-          height: lineHeightPx * 0.9, // Slightly larger highlight area
-          lineIndex: lineIndex
-        });
-
-        currentX += wordWidth + spaceWidth;
+        
+        // Add word to current line
+        currentLineWords.push({ word, width: wordWidth });
+        currentLineWidth += wordWidth + (currentLineWords.length > 1 ? spaceWidth : 0);
+        
+        // If this is the last word, process the line
+        if (wordIndex === words.length - 1) {
+          processLine(true); // Last line, don't justify
+        }
       });
 
       // Add paragraph spacing
@@ -174,7 +233,7 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
       }
     });
 
-    console.log('Generated words for mobile:', wordElements.length);
+    console.log('Generated justified words for mobile:', wordElements.length);
     return wordElements;
   }, [content, fontSize, lineHeight, fontFamily, createTextMeasurer]);
 
@@ -389,6 +448,9 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
           console.log('Touch: Double-tap detected - starting selection');
           e.preventDefault(); // Prevent scrolling only when starting selection
           
+          // Haptic feedback for selection start
+          hapticTextSelection();
+          
           setSelection({
             isSelecting: true,
             startWord: wordIndex,
@@ -397,11 +459,6 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
             isStartingSelection: false
           });
           
-          // Strong haptic feedback for double-tap
-          if ('vibrate' in navigator) {
-            navigator.vibrate([15, 50, 15]);
-          }
-          
           // Store drag start for potential multi-word selections
           setDragStartWord(wordIndex);
         } else {
@@ -409,6 +466,8 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
           // Single tap on mobile: ALWAYS clear any existing selection and allow scrolling
           clearSelection();
           setDragStartWord(null);
+          // Soft haptic for selection clear
+          hapticSoft();
           // Don't prevent default - allow normal scrolling
         }
       } else {
@@ -421,10 +480,8 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
           isStartingSelection: true
         });
         
-        // Immediate visual feedback
-        if ('vibrate' in navigator) {
-          navigator.vibrate([15, 50, 15]);
-        }
+        // Haptic feedback for desktop selection
+        hapticSoft();
         
         // Store drag start for multi-word selections
         setDragStartWord(wordIndex);
@@ -448,7 +505,30 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
           
           if (wordIndex !== null && wordIndex !== dragStartWord) {
             console.log('Mobile: Drag detected during active selection - expanding selection');
-            e.preventDefault(); // Prevent scrolling during active selection drag
+            
+            // More aggressive scroll prevention during text selection
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Check viewport edges and only allow minimal scroll at the very edges
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (rect) {
+              const viewportHeight = window.innerHeight;
+              const fingerDistanceFromTop = touch.clientY;
+              const fingerDistanceFromBottom = viewportHeight - touch.clientY;
+              
+              // Only allow scroll if finger is within 30px of screen edges
+              if (fingerDistanceFromTop > 30 && fingerDistanceFromBottom > 30) {
+                console.log('Selection in safe zone - preventing all scroll');
+                // Additional prevention for middle-screen selections
+                document.body.style.overflow = 'hidden';
+                setTimeout(() => {
+                  document.body.style.overflow = '';
+                }, 100);
+              } else {
+                console.log('Selection near screen edge - allowing minimal scroll');
+              }
+            }
             
             // Expand existing selection
             setSelection(prev => ({
@@ -704,6 +784,8 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
   const applyHighlight = (color: string) => {
     if (selectedText && onHighlight) {
       onHighlight(selectedText, color);
+      // Haptic feedback for successful highlight
+      hapticHighlight();
     }
     setShowMenu(false);
     setSelectedText('');
@@ -722,6 +804,8 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
       const highlightToRemove = getHighlightToRemove(selectedText);
       if (highlightToRemove) {
         onRemoveHighlight(highlightToRemove.id);
+        // Haptic feedback for highlight removal
+        hapticImpact();
       }
     }
     setShowMenu(false);
@@ -753,6 +837,9 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
   // AI Guru explanation (enhanced with educational prompt)
   const handleAIGuruExplanation = () => {
     if (selectedText && onExplainWithAI) {
+      // Haptic feedback for AI Guru activation
+      hapticSuccess();
+      
       // Create enhanced context for AI Guru
       const contextWindow = 200; // characters around the selected text
       const selectedIndex = content.indexOf(selectedText);
@@ -893,7 +980,7 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
           line-height: ${lineHeight};
           color: #f3f4f6;
           background: transparent;
-          padding: 20px;
+          padding: ${isMobile() ? (isSmallMobile() ? '8px' : '10px') : '20px'};
           user-select: none;
           -webkit-user-select: none;
           -moz-user-select: none;
@@ -917,6 +1004,7 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
           white-space: nowrap;
           color: #f3f4f6;
           font-weight: 400;
+          text-align: justify;
         }
 
         .dark .kindle-word {
@@ -1069,9 +1157,9 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
         /* Mobile optimizations */
         @media (max-width: 768px) {
           .kindle-text-viewer {
-            padding: 16px;
-            font-size: 16px;
-            line-height: 1.7;
+            padding: ${isMobile() ? (isSmallMobile() ? '8px' : '10px') : '16px'};
+            font-size: 14px;
+            line-height: 1.4;
             color: #f3f4f6;
           }
 
@@ -1081,41 +1169,45 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
           }
 
           .kindle-menu {
-            padding: 10px 14px;
-            gap: 10px;
-            max-width: calc(100vw - 30px);
+            padding: 8px 12px;
+            gap: 8px;
+            max-width: calc(100vw - 20px);
+            border-radius: 8px;
           }
 
           .kindle-menu-button {
-            min-width: 40px;
-            height: 40px;
+            min-width: 36px;
+            height: 36px;
             font-size: 14px;
+            padding: 6px;
           }
         }
 
         @media (max-width: 480px) {
           .kindle-text-viewer {
-            padding: 12px;
-            font-size: 17px;
-            line-height: 1.8;
+            padding: 8px;
+            font-size: 14px;
+            line-height: 1.4;
             color: #f9fafb;
           }
 
           .kindle-word {
             color: #f9fafb;
-            font-weight: 500;
+            font-weight: 400;
           }
 
           .kindle-menu {
-            padding: 12px 16px;
-            gap: 12px;
-            max-width: calc(100vw - 20px);
+            padding: 10px 14px;
+            gap: 10px;
+            max-width: calc(100vw - 16px);
+            border-radius: 8px;
           }
 
           .kindle-menu-button {
-            min-width: 44px;
-            height: 44px;
-            font-size: 16px;
+            min-width: 38px;
+            height: 38px;
+            font-size: 15px;
+            padding: 7px;
           }
         }
       `}</style>
@@ -1203,7 +1295,8 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
             onClick={() => {
               if (selectedText) {
                 navigator.clipboard.writeText(selectedText).then(() => {
-                  // Optional: Show a brief success indicator
+                  // Haptic feedback for successful copy
+                  hapticSuccess();
                 }).catch(() => {
                   // Fallback for older browsers
                   const textArea = document.createElement('textarea');
@@ -1212,6 +1305,8 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
                   textArea.select();
                   document.execCommand('copy');
                   document.body.removeChild(textArea);
+                  // Haptic feedback for fallback copy
+                  hapticSuccess();
                 });
               }
             }}

@@ -42,8 +42,8 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
         };
 
         return (
-            <div className="w-full max-w-full sm:max-w-md p-3 rounded-2xl theme-accent text-white rounded-br-none">
-                <p className="whitespace-pre-wrap leading-relaxed text-sm">
+            <div className="w-full max-w-[95%] sm:max-w-md p-2.5 sm:p-3 rounded-2xl theme-accent text-white rounded-br-none">
+                <p className="whitespace-pre-wrap leading-snug text-xs sm:text-sm" style={{ lineHeight: '1.3' }}>
                     {isLong && !isExpanded ? message.substring(0, 200) + '...' : message}
                 </p>
                 {isLong && (
@@ -253,25 +253,25 @@ Focus on helping a college student understand both the concept and its applicati
                 )}
                 
                 <main ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-4 min-h-0">
-                    <div className="px-3 py-4 sm:px-4">
+                    <div className="px-2 py-3 sm:px-4">
                         {messages.map((msg, index) => (
-                            <div key={index} className={`mb-4 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div key={index} className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 {msg.role === 'user' ? (
                                     <UserMessage message={msg.text} index={index} />
                                 ) : msg.role === 'error' ? (
-                                    <div className="w-full max-w-full sm:max-w-md p-3 rounded-2xl bg-red-600 text-white rounded-bl-none">
-                                        <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.text}</p>
+                                    <div className="w-full max-w-[95%] sm:max-w-md p-2.5 sm:p-3 rounded-2xl bg-red-600 text-white rounded-bl-none">
+                                        <p className="whitespace-pre-wrap leading-snug text-xs sm:text-sm" style={{ lineHeight: '1.3' }}>{msg.text}</p>
                                     </div>
                                 ) : (
-                                    <div className="w-full max-w-full">
+                                    <div className="w-full max-w-[98%]">
                                         {msg.isEnhanced ? (
                                             <EnhancedAIResponse 
                                                 content={msg.text} 
                                                 isLoading={isLoading && index === messages.length - 1 && msg.text === '...'}
                                             />
                                         ) : (
-                                            <div className="w-full max-w-full p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
-                                                <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.text}</p>
+                                            <div className="w-full max-w-[95%] p-2.5 sm:p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
+                                                <p className="whitespace-pre-wrap leading-snug text-xs sm:text-sm" style={{ lineHeight: '1.3' }}>{msg.text}</p>
                                             </div>
                                         )}
                                     </div>
@@ -280,7 +280,7 @@ Focus on helping a college student understand both the concept and its applicati
                         ))}
                         {isLoading && messages[messages.length - 1]?.role !== 'model' && (
                              <div className="flex justify-start">
-                                 <div className="max-w-full sm:max-w-md p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
+                                 <div className="max-w-[95%] sm:max-w-md p-2.5 sm:p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
                                     <div className="flex gap-1.5 items-center">
                                         <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-0"></span>
                                         <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></span>
@@ -292,36 +292,36 @@ Focus on helping a college student understand both the concept and its applicati
                     </div>
                 </main>
                 
-                <footer className="p-3 sm:p-4 border-t theme-border flex-shrink-0">
-                    <div className="flex items-end gap-3 theme-surface2 rounded-lg p-2">
+                <footer className="p-2 sm:p-4 border-t theme-border flex-shrink-0">
+                    <div className="flex items-end gap-2 sm:gap-3 theme-surface2 rounded-lg p-2">
                         <textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(input); setInput(''); } }}
                             placeholder="Ask me to explain a concept, help with homework, or create a quiz..."
-                            className="flex-1 bg-transparent resize-none focus:outline-none text-sm theme-text min-h-[40px] max-h-[120px] py-2 px-1"
+                            className="flex-1 bg-transparent resize-none focus:outline-none text-xs sm:text-sm theme-text min-h-[36px] max-h-[100px] py-2 px-1"
                             rows={1}
                             style={{ 
                                 overflowY: input.length > 100 ? 'auto' : 'hidden',
-                                lineHeight: '1.4'
+                                lineHeight: '1.3'
                             }}
                             onInput={(e) => {
                                 const target = e.target as HTMLTextAreaElement;
                                 target.style.height = 'auto';
-                                target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                                target.style.height = Math.min(target.scrollHeight, 100) + 'px';
                             }}
                         />
                         <button 
                             onClick={() => {handleSend(input); setInput('');}} 
                             disabled={isLoading || !input.trim()} 
-                            className="p-2 theme-accent text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:hover:bg-opacity-100 theme-transition flex-shrink-0"
+                            className="p-1.5 sm:p-2 theme-accent text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:hover:bg-opacity-100 theme-transition flex-shrink-0"
                         >
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z" />
                             </svg>
                         </button>
                     </div>
-                    <p className="text-xs theme-text-secondary mt-2 text-center px-2">
+                    <p className="text-xs theme-text-secondary mt-2 text-center px-2" style={{ lineHeight: '1.2', fontSize: '10px' }}>
                         💡 Tip: Enhanced responses include LaTeX math, proper formatting, and detailed explanations
                     </p>
                 </footer>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Import/Export Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <h2>Import/Export Test</h2>
+    
+    <div>
+        <h3>Test Import</h3>
+        <input type="file" id="fileInput" accept=".zip">
+        <button onclick="testImport()">Test Import</button>
+        <div id="importResult"></div>
+    </div>
+    
+    <div>
+        <h3>Test Export</h3>
+        <button onclick="testExport()">Test Export</button>
+        <div id="exportResult"></div>
+    </div>
+
+    <script>
+        async function testImport() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            try {
+                // Basic ZIP validation
+                const zip = new JSZip();
+                const zipData = await zip.loadAsync(file);
+                
+                console.log('ZIP contents:', Object.keys(zipData.files));
+                
+                // Check for manifest
+                if (zipData.file('manifest.json')) {
+                    const manifestContent = await zipData.file('manifest.json').async('text');
+                    const manifest = JSON.parse(manifestContent);
+                    
+                    document.getElementById('importResult').innerHTML = `
+                        <div style="color: green;">
+                            ✓ ZIP file is valid!<br>
+                            Book: ${manifest.bookName}<br>
+                            Chapters: ${manifest.chapters.length}<br>
+                            <pre>${JSON.stringify(manifest, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('importResult').innerHTML = '<div style="color: red;">✗ manifest.json not found</div>';
+                }
+                
+            } catch (error) {
+                document.getElementById('importResult').innerHTML = `<div style="color: red;">✗ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testExport() {
+            try {
+                const zip = new JSZip();
+                
+                // Create manifest
+                const manifest = {
+                    bookName: "Test Export Book",
+                    bookId: "test-export-123",
+                    exportDate: new Date().toISOString(),
+                    version: "1.0",
+                    chapters: ["Chapter 1", "Chapter 2"],
+                    description: "Test book for export validation"
+                };
+                
+                zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+                
+                // Create content structure
+                manifest.chapters.forEach(chapter => {
+                    const chapterData = {
+                        subtopics: [`${chapter} - Topic 1`, `${chapter} - Topic 2`]
+                    };
+                    
+                    zip.file(`content/${chapter}/subtopics.json`, JSON.stringify(chapterData.subtopics, null, 2));
+                    zip.file(`content/${chapter}/mcq.json`, JSON.stringify([], null, 2));
+                    zip.file(`content/${chapter}/qa.json`, JSON.stringify([], null, 2));
+                });
+                
+                // Generate ZIP
+                const blob = await zip.generateAsync({ type: 'blob' });
+                
+                // Download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `test-export-${Date.now()}.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                document.getElementById('exportResult').innerHTML = '<div style="color: green;">✓ Export successful! Check downloads.</div>';
+                
+            } catch (error) {
+                document.getElementById('exportResult').innerHTML = `<div style="color: red;">✗ Export failed: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
