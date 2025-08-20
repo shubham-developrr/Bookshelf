@@ -6,19 +6,19 @@ test.describe('Comprehensive Theme and Functionality Tests', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('BookMarketplace modal opens and displays correctly with theme', async ({ page }) => {
-    // Click on marketplace button
-    await page.click('[data-testid="marketplace-button"], button:has-text("Browse Marketplace")');
+  test('BookBookstore modal opens and displays correctly with theme', async ({ page }) => {
+    // Click on bookstore button
+    await page.click('[data-testid="bookstore-button"], button:has-text("Browse Bookstore")');
     
     // Wait for modal to appear
-    await page.waitForSelector('[data-testid="book-marketplace-modal"]', { state: 'visible' });
+    await page.waitForSelector('[data-testid="book-bookstore-modal"]', { state: 'visible' });
     
     // Verify modal styling uses CSS variables
-    const modal = page.locator('[data-testid="book-marketplace-modal"]');
+    const modal = page.locator('[data-testid="book-bookstore-modal"]');
     await expect(modal).toBeVisible();
     
-    // Test search functionality
-    const searchInput = page.locator('input[placeholder*="Search"]');
+    // Test search functionality within the bookstore modal
+    const searchInput = page.locator('[data-testid="book-bookstore-modal"] input[placeholder*="Search"]');
     await searchInput.fill('Mathematics');
     await searchInput.press('Enter');
     
@@ -28,7 +28,7 @@ test.describe('Comprehensive Theme and Functionality Tests', () => {
       await filterToggle.click();
     }
     
-    // Test theme switching in marketplace
+    // Test theme switching in bookstore
     const themeSelector = page.locator('[data-testid="theme-selector"]');
     if (await themeSelector.isVisible()) {
       // Test light theme
@@ -48,7 +48,7 @@ test.describe('Comprehensive Theme and Functionality Tests', () => {
       await page.waitForTimeout(500);
     }
     
-    console.log('✅ BookMarketplace modal theme test passed');
+    console.log('✅ BookBookstore modal theme test passed');
   });
 
   test('Book creation workflow with theme consistency', async ({ page }) => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SearchIconSvg, CloseIcon } from './icons';
-import { getBookImage, SearchIcon } from '../assets/images/index';
+import { getBookImage } from '../assets/images/index';
 
 interface SearchModalProps {
     isOpen: boolean;

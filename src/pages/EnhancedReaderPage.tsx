@@ -198,6 +198,16 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
     const [showRenameInput, setShowRenameInput] = useState<string | null>(null); // Tab being renamed
     const [renameValue, setRenameValue] = useState(''); // Rename input value
     
+    // Manage tab states
+    const [showManageDropdown, setShowManageDropdown] = useState(false);
+    const [managingTab, setManagingTab] = useState<string | null>(null);
+    const [showSvgEditor, setShowSvgEditor] = useState(false);
+    const [customSvgCode, setCustomSvgCode] = useState('');
+    const [tabSvgs, setTabSvgs] = useState<{ [key: string]: string }>(() => {
+        const saved = localStorage.getItem('tabCustomSvgs');
+        return saved ? JSON.parse(saved) : {};
+    });
+    
     // YouTube Player Modal states
     const [showVideoModal, setShowVideoModal] = useState(false);
     const [currentVideoData, setCurrentVideoData] = useState<VideoData | null>(null);
@@ -814,6 +824,92 @@ Make the explanation educational and easy to understand.`;
     const startRename = (tabName: string) => {
         setShowRenameInput(tabName);
         setRenameValue(getTabDisplayName(tabName));
+    };
+
+    // Manage tab functions
+    const handleManageTab = (tabName: string) => {
+        setManagingTab(tabName);
+        setShowManageDropdown(true);
+    };
+
+    const handleSvgEdit = (tabName: string) => {
+        setManagingTab(tabName);
+        setCustomSvgCode(tabSvgs[tabName] || '');
+        setShowSvgEditor(true);
+        setShowManageDropdown(false);
+    };
+
+    // Intelligent SVG processor to standardize size and clean up
+    const processSvgCode = (svgCode: string): string => {
+        let processed = svgCode.trim();
+        
+        // Remove any text nodes outside of SVG elements more aggressively
+        processed = processed.replace(/^[^<]*<svg/, '<svg');
+        processed = processed.replace(/<\/svg>[^>]*$/, '</svg>');
+        
+        // Ensure it starts with <svg and ends with </svg>
+        if (!processed.startsWith('<svg')) {
+            return `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>`; // Return a simple placeholder if not valid SVG
+        }
+        
+        // Remove all existing size-related attributes and classes
+        processed = processed.replace(/class\s*=\s*["'][^"']*["']/g, '');
+        processed = processed.replace(/className\s*=\s*["'][^"']*["']/g, '');
+        processed = processed.replace(/width\s*=\s*["'][^"']*["']/g, '');
+        processed = processed.replace(/height\s*=\s*["'][^"']*["']/g, '');
+        processed = processed.replace(/style\s*=\s*["'][^"']*["']/g, '');
+        
+        // Remove text elements and tspan elements that might contain unwanted text
+        processed = processed.replace(/<text[^>]*>.*?<\/text>/gi, '');
+        processed = processed.replace(/<tspan[^>]*>.*?<\/tspan>/gi, '');
+        
+        // Standardize the opening svg tag with our required attributes
+        processed = processed.replace(/<svg[^>]*>/i, '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">');
+        
+        // Ensure we have the correct viewBox (normalize common variations)
+        processed = processed.replace(/viewBox\s*=\s*["'][^"']*["']/g, 'viewBox="0 0 24 24"');
+        
+        // Clean up multiple spaces and normalize formatting
+        processed = processed.replace(/\s+/g, ' ').trim();
+        
+        // Remove any remaining text content between tags (but preserve path data)
+        processed = processed.replace(/>([^<]+)</g, (match, text) => {
+            // Only remove text that doesn't look like path data or numbers
+            if (/^[\s\d\.\-MmLlHhVvCcSsQqTtAaZz\s,]+$/.test(text)) {
+                return match; // Keep path data
+            }
+            return '><'; // Remove other text
+        });
+        
+        return processed;
+    };
+
+    const handleSaveSvg = () => {
+        if (managingTab && customSvgCode.trim()) {
+            // Process the SVG to standardize it
+            const processedSvg = processSvgCode(customSvgCode);
+            
+            const newTabSvgs = {
+                ...tabSvgs,
+                [managingTab]: processedSvg
+            };
+            setTabSvgs(newTabSvgs);
+            // Save to localStorage for persistence
+            localStorage.setItem('tabCustomSvgs', JSON.stringify(newTabSvgs));
+        }
+        setShowSvgEditor(false);
+        setManagingTab(null);
+        setCustomSvgCode('');
+    };
+
+    const getTabIcon = (tabName: string) => {
+        // Return custom SVG if exists
+        if (tabSvgs[tabName]) {
+            return <div dangerouslySetInnerHTML={{ __html: tabSvgs[tabName] }} />;
+        }
+        
+        // Return default icon
+        return getDesktopTabIcon(tabName);
     };
 
     // Get display name for tabs
@@ -1587,24 +1683,13 @@ Make the explanation educational and easy to understand.`;
             );
         }
         
-        // Handle Custom tab with editor switching functionality (Rich Text <-> HTML Code Editor)
-        if (tabName.toLowerCase().includes('custom')) {
-            return (
-                <CustomTabWithEditorSwitching
-                    tabName={tabName}
-                    currentBook={currentBook}
-                    currentChapter={currentChapter}
-                />
-            );
-        }
-        
-        // Use RichTextEditor for all other custom tabs
+        // Handle all custom tabs with editor switching functionality (Rich Text <-> HTML Code Editor)
+        // This applies to ALL custom tabs created through the custom tab option
         return (
-            <RichTextEditor
+            <CustomTabWithEditorSwitching
                 tabName={tabName}
                 currentBook={currentBook}
                 currentChapter={currentChapter}
-                className="w-full"
             />
         );
     };
@@ -1654,12 +1739,7 @@ Make the explanation educational and easy to understand.`;
                             {currentChapter}
                         </h1>
                     </div>
-                    <button 
-                        className="p-2 rounded-lg hover:theme-surface2 theme-transition touch-manipulation"
-                        style={{ minWidth: '44px', minHeight: '44px' }}
-                    >
-                        <AlertIcon />
-                    </button>
+                    
                 </div>
             </header>
 
@@ -1681,6 +1761,8 @@ Make the explanation educational and easy to understand.`;
                             onRenameValueChange={(value) => setRenameValue(value)}
                             onStartRename={startRename}
                             onHandleRename={handleRenameTab}
+                            onEditSvg={handleSvgEdit}
+                            getTabIcon={getTabIcon}
                         />
                     </div>
 
@@ -1752,7 +1834,7 @@ Make the explanation educational and easy to understand.`;
                                         }`}
                                         title="Double-click to rename, click X to delete"
                                     >
-                                        {getDesktopTabIcon(tab)}
+                                        {getTabIcon(tab)}
                                         {getTabDisplayName(tab)}
                                         <button
                                             onClick={(e) => {
@@ -1852,6 +1934,75 @@ Make the explanation educational and easy to understand.`;
                                 </div>
                             )}
                         </div>
+                        
+                        {/* Manage Tabs Button - Desktop Only */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowManageDropdown(!showManageDropdown)}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg theme-surface2 theme-text hover:theme-accent-bg hover:text-white transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                    <path d="M12 20h9"></path>
+                                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                                </svg>
+                                Manage
+                            </button>
+                            
+                            {/* Manage Dropdown */}
+                            {showManageDropdown && (
+                                <div className="absolute top-full left-0 mt-2 w-48 theme-surface rounded-lg shadow-lg border theme-border z-20">
+                                    <div className="p-2">
+                                        <div className="text-sm font-semibold theme-text mb-2">Manage Tabs:</div>
+                                        {activeTabs.filter(tab => tab !== 'read' && tab !== 'highlights').map((tab) => (
+                                            <div key={tab} className="mb-1">
+                                                <div className="text-xs theme-text-secondary px-3 py-1 font-medium">
+                                                    {getTabDisplayName(tab)}
+                                                </div>
+                                                <div className="flex flex-col gap-1 px-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            startRename(tab);
+                                                            setShowManageDropdown(false);
+                                                        }}
+                                                        className="w-full text-left px-2 py-1 rounded text-xs hover:theme-surface2 theme-transition theme-text"
+                                                    >
+                                                        📝 Rename
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleSvgEdit(tab);
+                                                        }}
+                                                        className="w-full text-left px-2 py-1 rounded text-xs hover:theme-surface2 theme-transition theme-text"
+                                                    >
+                                                        🎨 Edit Icon
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleDeleteTab(tab);
+                                                            setShowManageDropdown(false);
+                                                        }}
+                                                        className="w-full text-left px-2 py-1 rounded text-xs hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 theme-transition theme-text"
+                                                    >
+                                                        🗑️ Delete
+                                                    </button>
+                                                </div>
+                                                <hr className="my-1 theme-border" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Close manage dropdown when clicking outside */}
+                        {showManageDropdown && (
+                            <div 
+                                className="fixed inset-0 z-10" 
+                                onClick={() => {
+                                    setShowManageDropdown(false);
+                                }}
+                            />
+                        )}
                         
                         {/* Close template selector when clicking outside */}
                         {showTemplateSelector && (
@@ -1970,6 +2121,188 @@ Make the explanation educational and easy to understand.`;
                 {renderTabContent()}
                 
             </main>
+            
+            {/* Enhanced SVG Editor Modal with Icon Selection */}
+            {showSvgEditor && (
+                <div className="fixed inset-0 z-30 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="w-full max-w-4xl mx-4 theme-surface rounded-lg shadow-xl border theme-border">
+                        <div className="p-6">
+                            <h3 className="text-lg font-semibold theme-text mb-4">
+                                Choose Icon for "{getTabDisplayName(managingTab || '')}"
+                            </h3>
+                            
+                            {/* Icon Selection Grid */}
+                            <div className="mb-6">
+                                <h4 className="text-sm font-medium theme-text mb-3">Choose from Popular Icons:</h4>
+                                <div className="grid grid-cols-10 gap-2 mb-4">
+                                    {/* 19 Predefined Icons */}
+                                    {[
+                                        {
+                                            name: 'Book',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>`
+                                        },
+                                        {
+                                            name: 'Document',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Pencil',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Heart',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Star',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Lightning Bolt',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Beaker (Lab)',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547A8.014 8.014 0 004 21h16a8.014 8.014 0 00-.244-5.572zM8 3a2 2 0 012-2h4a2 2 0 012 2v5.172a2 2 0 00.586 1.414l2 2c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l2-2A2 2 0 006 9.172V3z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Lightbulb',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Calculator',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Globe',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Chart Bar',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Code',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>`
+                                        },
+                                        {
+                                            name: 'Music Note',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg>`
+                                        },
+                                        {
+                                            name: 'Camera',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9zM15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Map',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>`
+                                        },
+                                        {
+                                            name: 'Clock',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Shield',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016zM9 12l2 2 4-4" /></svg>`
+                                        },
+                                        {
+                                            name: 'Puzzle',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" /></svg>`
+                                        },
+                                        {
+                                            name: 'Fire',
+                                            svg: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 1-4 4-4 1.657 0 3 .5 3 2.5a4 4 0 01-1.464 3.114 3.5 3.5 0 00-.536 4.657 4.5 4.5 0 01-.5.707z" /></svg>`
+                                        }
+                                    ].map((icon, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => setCustomSvgCode(icon.svg)}
+                                            className={`p-3 border-2 rounded-lg hover:border-blue-500 theme-transition flex items-center justify-center min-h-[50px] ${
+                                                customSvgCode === icon.svg ? 'border-blue-500 theme-accent-bg' : 'border-gray-200 dark:border-gray-700 theme-surface2'
+                                            }`}
+                                            title={icon.name}
+                                        >
+                                            <div className="theme-text" dangerouslySetInnerHTML={{ __html: icon.svg }} />
+                                        </button>
+                                    ))}
+                                    
+                                    {/* Custom Code Option */}
+                                    <button
+                                        onClick={() => {
+                                            setCustomSvgCode('');
+                                            // Focus on textarea after modal updates
+                                            setTimeout(() => {
+                                                const textarea = document.querySelector('.svg-custom-textarea') as HTMLTextAreaElement;
+                                                if (textarea) textarea.focus();
+                                            }, 100);
+                                        }}
+                                        className={`p-3 border-2 rounded-lg hover:border-purple-500 theme-transition flex items-center justify-center min-h-[50px] ${
+                                            customSvgCode && ![
+                                                `<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>`,
+                                                // ... (add all other icon SVGs here for comparison)
+                                            ].includes(customSvgCode)
+                                                ? 'border-purple-500 theme-accent-bg' : 'border-gray-200 dark:border-gray-700 theme-surface2'
+                                        }`}
+                                        title="Custom SVG Code"
+                                    >
+                                        <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Custom SVG Code Section */}
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium theme-text mb-2">
+                                    Custom SVG Code (Optional):
+                                </label>
+                                <textarea
+                                    value={customSvgCode}
+                                    onChange={(e) => setCustomSvgCode(e.target.value)}
+                                    placeholder='<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+  <path stroke-linecap="round" stroke-linejoin="round" d="your-path-here"></path>
+</svg>'
+                                    className="svg-custom-textarea w-full h-24 p-3 theme-surface border rounded-lg theme-text font-mono text-sm resize-none"
+                                />
+                                <p className="text-xs theme-text-secondary mt-1">
+                                    Tip: Select an icon above or paste your own SVG code here
+                                </p>
+                            </div>
+                            
+                            {/* Preview */}
+                            {customSvgCode && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium theme-text mb-2">Preview:</label>
+                                    <div className="p-4 border rounded-lg theme-surface2 flex items-center justify-center">
+                                        <div className="theme-text" dangerouslySetInnerHTML={{ __html: customSvgCode }} />
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowSvgEditor(false);
+                                        setManagingTab(null);
+                                        setCustomSvgCode('');
+                                    }}
+                                    className="flex-1 px-4 py-2 theme-surface2 theme-text rounded hover:theme-surface theme-transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSaveSvg}
+                                    disabled={!customSvgCode}
+                                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed theme-transition"
+                                >
+                                    Save Icon
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* Mobile-Optimized AI Guru Button */}
             <button 
