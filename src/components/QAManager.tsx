@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SparklesIcon, PlusIcon, TrashIcon, UploadIcon } from './icons';
 import { processAIImport } from '../utils/aiImportService';
+import { OCRService } from '../utils/ocrService';
 import { QATest } from './TestComponents';
 
 interface QAQuestion {
@@ -126,23 +127,46 @@ const QAManager: React.FC<QAManagerProps> = ({
         }
     };
 
-    // Handle AI-powered smart import
+    // Handle AI-powered smart import with OCR support
     const handleSmartImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        if (!file.type.includes('text')) {
-            alert('Please select a text file (.txt)');
+        const isImageFile = file.type.startsWith('image/');
+        const isTextFile = file.type.includes('text');
+        const isPDFFile = file.type === 'application/pdf';
+
+        if (!isImageFile && !isTextFile && !isPDFFile) {
+            alert('Please select a text file (.txt), image file (.jpg, .png, etc.), or PDF file');
             return;
         }
 
         setIsAIProcessing(true);
         
         try {
-            const text = await file.text();
+            let text = '';
+
+            if (isImageFile || isPDFFile) {
+                // Use OCR for image and PDF files
+                const ocrService = new OCRService();
+                const ocrResult = await ocrService.extractTextFromFile(file, (progress) => {
+                    // Progress can be shown to user if needed
+                    console.log(`OCR Progress: ${Math.round(progress.progress * 100)}%`);
+                });
+
+                if (!ocrResult.success || !ocrResult.text.trim()) {
+                    alert('Could not extract text from the file. Please try a clearer image or different file.');
+                    return;
+                }
+
+                text = ocrResult.text;
+            } else {
+                // Regular text file processing
+                text = await file.text();
+            }
             
             if (!text.trim()) {
-                alert('The selected file is empty.');
+                alert('The selected file is empty or no text could be extracted.');
                 return;
             }
             
@@ -152,10 +176,10 @@ const QAManager: React.FC<QAManagerProps> = ({
             if (result.success && result.data.length > 0) {
                 const updatedQuestions = [...qaQuestions, ...result.data];
                 saveQaQuestions(updatedQuestions);
-                alert(`🤖 AI Import Success! Extracted ${result.data.length} Q&A pairs from your text content.`);
+                alert(`🤖 AI Import Success! Extracted ${result.data.length} Q&A pairs from your ${isImageFile || isPDFFile ? (isPDFFile ? 'PDF' : 'image') : 'text'} content.`);
                 setMode('practice');
             } else {
-                alert(result.message || 'No Q&A pairs could be extracted from the text. Please ensure your text contains questions and answers.');
+                alert(result.message || 'No Q&A pairs could be extracted from the content. Please ensure your content contains questions and answers.');
             }
         } catch (error) {
             console.error('AI import error:', error);
@@ -520,19 +544,19 @@ Code a simple linear regression|Algorithm that models relationship between varia
                     <div className="border theme-border rounded-lg p-4">
                         <h3 className="font-medium theme-text mb-3">🤖 AI Smart Import</h3>
                         <p className="text-sm theme-text-secondary mb-4">
-                            AI-powered intelligent extraction from unstructured text - no formatting required!
+                            AI-powered intelligent extraction from text files or images with OCR - no formatting required!
                         </p>
                         <div className="space-y-3">
                             <input
                                 type="file"
-                                accept=".txt"
+                                accept=".txt,.jpg,.jpeg,.png,.bmp,.webp,.pdf"
                                 onChange={handleSmartImport}
                                 className="w-full p-2 theme-surface border rounded theme-text text-sm"
                                 disabled={isAIProcessing}
                             />
                             <button 
                                 onClick={() => {
-                                    const input = document.querySelector('input[type="file"][accept=".txt"]') as HTMLInputElement;
+                                    const input = document.querySelector('input[type="file"][accept*=".txt"]') as HTMLInputElement;
                                     input?.click();
                                 }}
                                 className="w-full btn-primary text-sm flex items-center justify-center gap-2"

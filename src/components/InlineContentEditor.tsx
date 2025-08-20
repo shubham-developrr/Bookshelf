@@ -181,27 +181,41 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
     if (!isEditingState) {
         // Display mode - render content with text highlighting functionality
         return (
-            <div className={`prose prose-sm sm:prose-base lg:prose-lg max-w-none theme-text ${className}`}>
-                <div className="space-y-4">
+            <div 
+                className={`prose prose-sm sm:prose-base lg:prose-lg max-w-none theme-text ${className}`} 
+                style={{
+                    lineHeight: '1.6'
+                } as React.CSSProperties}
+            >
+                <div 
+                    className="space-y-0" 
+                    style={{
+                        gap: '0', 
+                        display: 'flex', 
+                        flexDirection: 'column'
+                    }}
+                >
                     {/* Render text blocks with highlighting if we have callbacks */}
                     {textBlocks.map((textBlock, textIndex) => (
-                        <div key={`text-${textIndex}`}>
+                        <div key={`text-${textIndex}`} className="mb-0" style={{margin: '0', padding: '0'}}>
                             {/* Render text block if it has content */}
                             {textBlock.trim() && (
                                 onExplainWithAI ? (
                                     // Use KindleStyleTextViewer for highlighting functionality
-                                    <KindleStyleTextViewer
-                                        content={textBlock}
-                                        highlights={highlights || []}
-                                        currentBook={currentBook}
-                                        onHighlight={onHighlight}
-                                        onRemoveHighlight={onRemoveHighlight}
-                                        onExplainWithAI={onExplainWithAI}
-                                        className="subtopic-content-enhanced"
-                                    />
+                                    <div style={{margin: '0', padding: '0'}}>
+                                        <KindleStyleTextViewer
+                                            content={textBlock}
+                                            highlights={highlights || []}
+                                            currentBook={currentBook}
+                                            onHighlight={onHighlight}
+                                            onRemoveHighlight={onRemoveHighlight}
+                                            onExplainWithAI={onExplainWithAI}
+                                            className="subtopic-content-enhanced"
+                                        />
+                                    </div>
                                 ) : (
                                     // Simple text display if no highlighting needed
-                                    <div className="whitespace-pre-wrap mb-4">{textBlock}</div>
+                                    <div className="whitespace-pre-wrap mb-0 leading-relaxed" style={{margin: '0', padding: '0'}}>{textBlock}</div>
                                 )
                             )}
                         </div>

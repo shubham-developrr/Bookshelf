@@ -60,7 +60,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         const newNote: Note = {
             id: Date.now().toString(),
             topic: newTopic.trim(),
-            content: `# ${newTopic.trim()}\n\nAdd your notes here...`,
+            content: '', // Start with empty content for immediate editing
             createdAt: new Date(),
             updatedAt: new Date()
         };
@@ -68,7 +68,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         const updatedNotes = [...notes, newNote];
         saveNotes(updatedNotes);
         setSelectedNoteId(newNote.id);
-        setIsEditing(true);
+        setIsEditing(true); // Start in editing mode
         setNewTopic('');
         setIsAddingNote(false);
     };
@@ -337,32 +337,36 @@ const NotesManager: React.FC<NotesManagerProps> = ({
 
                             {/* Add note form */}
                             {isAddingNote && (
-                                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                    <h3 className="font-semibold mb-2 theme-text">New Note Topic</h3>
-                                    <div className="flex gap-2">
+                                <div className="mb-4 p-4 theme-surface2 rounded-lg border theme-border">
+                                    <h3 className="font-semibold mb-3 theme-text">New Note Topic</h3>
+                                    <div className="space-y-3">
                                         <input
                                             type="text"
                                             value={newTopic}
                                             onChange={(e) => setNewTopic(e.target.value)}
                                             placeholder="Enter topic name..."
-                                            className="flex-1 px-3 py-2 border rounded theme-input"
+                                            className="w-full px-3 py-2 border rounded theme-input"
                                             onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
+                                            autoFocus
                                         />
-                                        <button
-                                            onClick={handleAddNote}
-                                            className="btn-primary"
-                                        >
-                                            Add
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setIsAddingNote(false);
-                                                setNewTopic('');
-                                            }}
-                                            className="btn-secondary"
-                                        >
-                                            Cancel
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleAddNote}
+                                                disabled={!newTopic.trim()}
+                                                className="flex-1 btn-primary disabled:opacity-50"
+                                            >
+                                                Create Note
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setIsAddingNote(false);
+                                                    setNewTopic('');
+                                                }}
+                                                className="flex-1 btn-secondary"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}

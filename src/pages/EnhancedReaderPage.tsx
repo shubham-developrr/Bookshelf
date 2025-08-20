@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BackIcon, AlertIcon, SparklesIcon, PlusIcon, TrashIcon } from '../components/icons';
+import { BackIcon, AlertIcon, SparklesIcon, PlusIcon, TrashIcon, ExamIcon } from '../components/icons';
 import { Highlight } from '../types/types';
 import { chapterSubtopics } from '../constants/constants';
 import { AIGuruIcon } from '../components/icons';
@@ -17,6 +17,8 @@ import NotesManager from '../components/NotesManager';
 import VideosManager from '../components/VideosManager';
 import HTMLCodeEditor from '../components/HTMLCodeEditor';
 import { ResponsiveTabBar } from '../components/ResponsiveTabBar';
+import { generateAIGuruResponse } from '../services/githubModelsService';
+import Groq from 'groq-sdk';
 
 // Template ID Constants - Built-in IDs that cannot be changed
 const TEMPLATE_IDS = {
@@ -950,26 +952,16 @@ Make the explanation educational and easy to understand.`;
 
     const generateAISvg = async (prompt: string): Promise<string> => {
         try {
+            // Use Groq with kimi-k2-instruct model
             const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
             if (!groqApiKey) {
-                throw new Error('GROQ_API_KEY is not configured in .env');
+                throw new Error('Groq API key is not configured');
             }
 
-            console.log(`🤖 Generating SVG with model: ${selectedAiModel}`);
+            console.log(`🤖 Generating SVG with Groq (Kimi K2)`);
             console.log(`📝 User prompt: "${prompt}"`);
 
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${groqApiKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: selectedAiModel,
-                    messages: [
-                        {
-                            role: 'system',
-                            content: `You are an expert SVG icon designer. Generate clean, minimal SVG icons based on user descriptions.
+            const systemPrompt = `You are an expert SVG icon designer. Generate clean, minimal SVG icons based on user descriptions.
 
 CRITICAL REQUIREMENTS:
 1. ONLY output valid SVG code - nothing else
@@ -985,30 +977,35 @@ EXAMPLES OF GOOD SVG FORMAT:
 - Book: <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
 - Calculator: <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
 
-Focus on the CORE VISUAL CONCEPT. Make it instantly recognizable.`
-                        },
-                        {
-                            role: 'user',
-                            content: `Create an SVG icon for: ${prompt}
+Focus on the CORE VISUAL CONCEPT. Make it instantly recognizable.`;
 
-Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and professional.`
-                        }
-                    ],
-                    max_tokens: 1000,
-                    temperature: 0.3,
-                    top_p: 0.9,
-                    presence_penalty: 0.1,
-                    frequency_penalty: 0.1
-                })
+            const userPrompt = `Create an SVG icon for: ${prompt}
+
+Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and professional.`;
+
+            // Use Groq SDK
+            const groq = new Groq({ apiKey: groqApiKey, dangerouslyAllowBrowser: true });
+
+            const response = await groq.chat.completions.create({
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                model: 'moonshotai/kimi-k2-instruct',
+                temperature: 0.3,
+                max_tokens: 500
             });
 
-            if (!response.ok) {
-                const errorData = await response.text();
-                throw new Error(`Groq API error: ${response.status} - ${errorData}`);
-            }
+            const generatedSvg = response.choices[0]?.message?.content || '';
 
-            const data = await response.json();
-            let generatedSvg = data.choices?.[0]?.message?.content?.trim();
+            // Comment out GitHub Models code for fallback
+            /*
+            const githubToken = import.meta.env.VITE_GITHUB_MODELS_TOKEN;
+            if (!githubToken) {
+                throw new Error('GitHub Models API token is not configured');
+            }
+            const generatedSvg = await generateAIGuruResponse(userPrompt, systemPrompt);
+            */
 
             if (!generatedSvg) {
                 throw new Error('No SVG generated by AI');
@@ -1041,6 +1038,51 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
 
             console.log('✅ AI-generated SVG:', cleanSvg);
             return cleanSvg;
+
+            /* GROQ FALLBACK - COMMENTED FOR NOW
+            } catch (githubError) {
+                console.warn('GitHub Models failed, trying Groq fallback:', githubError);
+                
+                const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
+                if (!groqApiKey) {
+                    throw new Error('Both GitHub Models and Groq API keys are not configured');
+                }
+
+                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${groqApiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: selectedAiModel,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: userPrompt }
+                        ],
+                        max_tokens: 1000,
+                        temperature: 0.3,
+                        top_p: 0.9,
+                        presence_penalty: 0.1,
+                        frequency_penalty: 0.1
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    throw new Error(`Groq API error: ${response.status} - ${errorData}`);
+                }
+
+                const data = await response.json();
+                let generatedSvg = data.choices?.[0]?.message?.content?.trim();
+
+                if (!generatedSvg) {
+                    throw new Error('No SVG generated by AI');
+                }
+
+                console.log('🔄 Raw AI response:', generatedSvg);
+                // ... rest of SVG processing
+            */
 
         } catch (error) {
             console.error('❌ AI SVG generation failed:', error);
@@ -1784,18 +1826,112 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
     // Custom Tab with Editor Switching Component
     const CustomTabWithEditorSwitching: React.FC<{ tabName: string; currentBook: string; currentChapter: string }> = ({ tabName, currentBook, currentChapter }) => {
         const [editorMode, setEditorMode] = useState<'rich' | 'html'>('rich');
+        const [htmlEditors, setHtmlEditors] = useState<{ id: string; title: string }[]>([]);
+        const [richTextEditors, setRichTextEditors] = useState<{ id: string; title: string }[]>([]);
         const storageKey = `editor_mode_${currentBook}_${currentChapter}_${tabName}`;
+        const htmlEditorsStorageKey = `html_editors_${currentBook}_${currentChapter}_${tabName}`;
+        const richTextEditorsStorageKey = `rich_text_editors_${currentBook}_${currentChapter}_${tabName}`;
         
         useEffect(() => {
             const savedMode = localStorage.getItem(storageKey);
             if (savedMode === 'html' || savedMode === 'rich') {
                 setEditorMode(savedMode);
             }
-        }, [storageKey]);
+            
+            // Load existing HTML editors
+            const savedHtmlEditors = localStorage.getItem(htmlEditorsStorageKey);
+            if (savedHtmlEditors) {
+                try {
+                    const parsedEditors = JSON.parse(savedHtmlEditors);
+                    setHtmlEditors(parsedEditors);
+                } catch (e) {
+                    console.warn('Failed to parse saved HTML editors:', e);
+                    setHtmlEditors([]);
+                }
+            }
+            
+            // Load existing Rich Text editors
+            const savedRichTextEditors = localStorage.getItem(richTextEditorsStorageKey);
+            if (savedRichTextEditors) {
+                try {
+                    const parsedEditors = JSON.parse(savedRichTextEditors);
+                    setRichTextEditors(parsedEditors);
+                } catch (e) {
+                    console.warn('Failed to parse saved Rich Text editors:', e);
+                    setRichTextEditors([]);
+                }
+            }
+        }, [storageKey, htmlEditorsStorageKey, richTextEditorsStorageKey]);
         
         const handleModeSwitch = (mode: 'rich' | 'html') => {
             setEditorMode(mode);
             localStorage.setItem(storageKey, mode);
+        };
+        
+        const addNewHtmlEditor = () => {
+            const newEditor = {
+                id: Date.now().toString(),
+                title: `HTML Editor ${htmlEditors.length + 1}`
+            };
+            const updatedEditors = [...htmlEditors, newEditor];
+            setHtmlEditors(updatedEditors);
+            localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
+        };
+        
+        const removeHtmlEditor = (editorId: string) => {
+            if (htmlEditors.length <= 1) {
+                alert('Cannot remove the last HTML editor. At least one editor must remain.');
+                return;
+            }
+            
+            const updatedEditors = htmlEditors.filter(editor => editor.id !== editorId);
+            setHtmlEditors(updatedEditors);
+            localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
+            
+            // Also remove the content from localStorage
+            const contentKey = `html_editor_content_${currentBook}_${currentChapter}_${tabName}_${editorId}`;
+            localStorage.removeItem(contentKey);
+        };
+        
+        const updateHtmlEditorTitle = (editorId: string, newTitle: string) => {
+            const updatedEditors = htmlEditors.map(editor => 
+                editor.id === editorId ? { ...editor, title: newTitle } : editor
+            );
+            setHtmlEditors(updatedEditors);
+            localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
+        };
+        
+        const addNewRichTextEditor = () => {
+            const newEditor = {
+                id: Date.now().toString(),
+                title: `Rich Text Editor ${richTextEditors.length + 1}`
+            };
+            const updatedEditors = [...richTextEditors, newEditor];
+            setRichTextEditors(updatedEditors);
+            localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
+        };
+        
+        const removeRichTextEditor = (editorId: string) => {
+            if (richTextEditors.length <= 1) {
+                alert('Cannot remove the last Rich Text editor. At least one editor must remain.');
+                return;
+            }
+            
+            const updatedEditors = richTextEditors.filter(editor => editor.id !== editorId);
+            setRichTextEditors(updatedEditors);
+            localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
+            
+            // Also remove the content from localStorage
+            const contentKey = `rich_text_editor_content_${currentBook}_${currentChapter}_${tabName}_${editorId}`;
+            localStorage.removeItem(contentKey);
+        };
+        
+        const updateRichTextEditorTitle = (editorId: string, newTitle: string) => {
+            const updatedEditors = richTextEditors.map(editor => 
+                editor.id === editorId ? { ...editor, title: newTitle } : editor
+            );
+            setRichTextEditors(updatedEditors);
+            localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
         };
         
         const isMobile = () => window.innerWidth <= 768;
@@ -1848,19 +1984,198 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
                 
                 {/* Editor Content */}
                 {editorMode === 'rich' ? (
-                    <RichTextEditor
-                        tabName={tabName}
-                        currentBook={currentBook}
-                        currentChapter={currentChapter}
-                        className="w-full"
-                    />
+                    <div className="w-full space-y-6">
+                        {/* Rich Text Editors Management Header */}
+                        <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} p-4 theme-surface2 rounded-lg`}>
+                            <div className="flex items-center gap-2">
+                                <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14,2 14,8 20,8"/>
+                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                    <polyline points="10,9 9,9 8,9"/>
+                                </svg>
+                                <span className="font-medium theme-text">Rich Text Editors</span>
+                                <span className="text-sm theme-text-secondary px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
+                                    {richTextEditors.length}
+                                </span>
+                            </div>
+                            
+                            <button
+                                onClick={addNewRichTextEditor}
+                                className={`flex items-center gap-2 ${isMobile() ? 'w-full justify-center' : ''} px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition font-medium text-sm`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add Rich Text Editor
+                            </button>
+                        </div>
+                        
+                        {/* Rich Text Editors List */}
+                        <div className="space-y-6">
+                            {richTextEditors.map((editor, index) => (
+                                <div key={editor.id} className="theme-surface rounded-lg p-4 border theme-border">
+                                    {/* Editor Header */}
+                                    <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-3 border-b theme-border`}>
+                                        <div className="flex items-center gap-3">
+                                            <span className="w-8 h-8 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center text-sm font-medium">
+                                                {index + 1}
+                                            </span>
+                                            <input
+                                                type="text"
+                                                value={editor.title}
+                                                onChange={(e) => updateRichTextEditorTitle(editor.id, e.target.value)}
+                                                className="font-medium theme-text bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-green-500 rounded px-2 py-1"
+                                                placeholder="Editor title..."
+                                            />
+                                        </div>
+                                        
+                                        {richTextEditors.length > 1 && (
+                                            <button
+                                                onClick={() => removeRichTextEditor(editor.id)}
+                                                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg theme-transition text-sm"
+                                                title="Remove this editor"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                                    <polyline points="3,6 5,6 21,6"/>
+                                                    <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/>
+                                                    <line x1="10" y1="11" x2="10" y2="17"/>
+                                                    <line x1="14" y1="11" x2="14" y2="17"/>
+                                                </svg>
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Rich Text Editor Component */}
+                                    <RichTextEditor
+                                        tabName={`${tabName}_richtext_${editor.id}`}
+                                        currentBook={currentBook}
+                                        currentChapter={currentChapter}
+                                        className="w-full"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        
+                        {richTextEditors.length === 0 && (
+                            <div className="text-center py-8">
+                                <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                                    <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                        <polyline points="14,2 14,8 20,8"/>
+                                        <line x1="16" y1="13" x2="8" y2="13"/>
+                                        <line x1="16" y1="17" x2="8" y2="17"/>
+                                        <polyline points="10,9 9,9 8,9"/>
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-medium theme-text mb-2">No Rich Text editors</h3>
+                                <p className="theme-text-secondary mb-4">Click "Add Rich Text Editor" to create your first editor</p>
+                                <button
+                                    onClick={addNewRichTextEditor}
+                                    className="px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
+                                >
+                                    Add Rich Text Editor
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 ) : (
-                    <HTMLCodeEditor
-                        tabName={tabName}
-                        currentBook={currentBook}
-                        currentChapter={currentChapter}
-                        className="w-full"
-                    />
+                    <div className="w-full space-y-6">
+                        {/* HTML Editors Management Header */}
+                        <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} p-4 theme-surface2 rounded-lg`}>
+                            <div className="flex items-center gap-2">
+                                <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                    <polyline points="16,18 22,12 16,6"/>
+                                    <polyline points="8,6 2,12 8,18"/>
+                                </svg>
+                                <span className="font-medium theme-text">HTML Code Editors</span>
+                                <span className="text-sm theme-text-secondary px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
+                                    {htmlEditors.length}
+                                </span>
+                            </div>
+                            
+                            <button
+                                onClick={addNewHtmlEditor}
+                                className={`flex items-center gap-2 ${isMobile() ? 'w-full justify-center' : ''} px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition font-medium text-sm`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add HTML Editor
+                            </button>
+                        </div>
+                        
+                        {/* HTML Editors List */}
+                        <div className="space-y-6">
+                            {htmlEditors.map((editor, index) => (
+                                <div key={editor.id} className="theme-surface rounded-lg p-4 border theme-border">
+                                    {/* Editor Header */}
+                                    <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-3 border-b theme-border`}>
+                                        <div className="flex items-center gap-3">
+                                            <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-sm font-medium">
+                                                {index + 1}
+                                            </span>
+                                            <input
+                                                type="text"
+                                                value={editor.title}
+                                                onChange={(e) => updateHtmlEditorTitle(editor.id, e.target.value)}
+                                                className="font-medium theme-text bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+                                                placeholder="Editor title..."
+                                            />
+                                        </div>
+                                        
+                                        {htmlEditors.length > 1 && (
+                                            <button
+                                                onClick={() => removeHtmlEditor(editor.id)}
+                                                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg theme-transition text-sm"
+                                                title="Remove this editor"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                                    <polyline points="3,6 5,6 21,6"/>
+                                                    <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/>
+                                                    <line x1="10" y1="11" x2="10" y2="17"/>
+                                                    <line x1="14" y1="11" x2="14" y2="17"/>
+                                                </svg>
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                    
+                                    {/* HTML Editor Component */}
+                                    <HTMLCodeEditor
+                                        tabName={`${tabName}_${editor.id}`}
+                                        currentBook={currentBook}
+                                        currentChapter={currentChapter}
+                                        className="w-full"
+                                        customStorageKey={`html_editor_content_${currentBook}_${currentChapter}_${tabName}_${editor.id}`}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        
+                        {htmlEditors.length === 0 && (
+                            <div className="text-center py-8">
+                                <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                                    <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                        <polyline points="16,18 22,12 16,6"/>
+                                        <polyline points="8,6 2,12 8,18"/>
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-medium theme-text mb-2">No HTML editors</h3>
+                                <p className="theme-text-secondary mb-4">Click "Add HTML Editor" to create your first editor</p>
+                                <button
+                                    onClick={addNewHtmlEditor}
+                                    className="px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
+                                >
+                                    Add HTML Editor
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
         );
@@ -1998,6 +2313,15 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
                         </h1>
                     </div>
                     
+                    {/* Exam Mode Button - Theme Adaptive */}
+                    <button
+                        onClick={() => navigate(`/exam/${encodeURIComponent(currentBook)}/${encodeURIComponent(currentChapter)}`)}
+                        className="flex items-center gap-2 px-3 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition touch-manipulation font-medium text-sm"
+                        style={{ minHeight: '44px' }}
+                    >
+                        <ExamIcon />
+                        <span className="hidden sm:inline">Exam Mode</span>
+                    </button>
                 </div>
             </header>
 

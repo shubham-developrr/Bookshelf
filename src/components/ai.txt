@@ -1,0 +1,100 @@
+I'll search for all places where AI APIs are being called in your codebase. Let me do a comprehensive search across all files. Now let me search for any other AI-related files or services: Based on my comprehensive search, here's a complete list of **every place where AI APIs are being called** in your codebase:
+
+## 🤖 **Complete AI API Usage List**
+
+### **1. Groq API Integrations (Primary AI Service)**
+
+#### **A. AI Guru Modal** - EnhancedAIGuruModal.tsx
+- **API**: Groq SDK
+- **Model**: `moonshotai/kimi-k2-instruct`
+- **Usage**: Educational chat assistant with streaming responses
+- **Key Function**: `groq.chat.completions.create()` with streaming
+- **Environment**: `VITE_GROQ_API_KEY`
+
+#### **B. Exam Evaluation** - ExamModePage.tsx
+- **API**: Groq SDK
+- **Model**: `moonshotai/kimi-k2-instruct`
+- **Usage**: Long answer evaluation with scoring and feedback
+- **Key Function**: `groq.chat.completions.create()` for answer assessment
+- **Environment**: `VITE_GROQ_API_KEY`
+
+#### **C. SVG Generation** - EnhancedReaderPage.tsx
+- **API**: Groq SDK 
+- **Model**: `moonshotai/kimi-k2-instruct`
+- **Usage**: AI-powered SVG icon generation from text descriptions
+- **Key Functions**: 
+  - `groq.chat.completions.create()` for SVG generation
+  - `fetch('https://api.groq.com/openai/v1/models')` for model listing
+  - `fetch('https://api.groq.com/openai/v1/chat/completions')` (fallback method)
+- **Environment**: `VITE_GROQ_API_KEY`
+
+#### **D. Content Import AI Processing** - aiImportService.ts
+- **API**: Groq SDK
+- **Model**: `moonshotai/kimi-k2-instruct`
+- **Usage**: Text processing for MCQ, Q&A, and flashcard generation
+- **Key Function**: `groq.chat.completions.create()` for content extraction
+- **Environment**: `VITE_GROQ_API_KEY`
+
+#### **E. Legacy App Component** - AppNew.tsx
+- **API**: Groq SDK
+- **Usage**: Legacy implementation (likely unused)
+- **Environment**: `VITE_GROQ_API_KEY`
+
+### **2. GitHub Models API Integration (Commented/Fallback)**
+
+#### **A. GitHub Models Service** - githubModelsService.ts
+- **API**: GitHub Models API
+- **Model**: `mistral-ai/mistral-medium-2505`
+- **Endpoint**: `https://models.github.ai/inference/chat/completions`
+- **Usage**: Alternative AI service (currently commented out in most places)
+- **Environment**: `VITE_GITHUB_MODELS_TOKEN`
+
+### **3. YouTube API Integration (Non-AI but API)**
+
+#### **A. Video Metadata Fetching** - VideoManager.tsx
+- **API**: YouTube oEmbed API
+- **Endpoint**: `https://www.youtube.com/oembed`
+- **Usage**: Fetching video titles and metadata
+- **No API Key Required**: Uses public oEmbed endpoint
+
+### **4. API Keys and Environment Variables**
+
+#### **Required Environment Variables:**
+```bash
+# Primary AI Service
+VITE_GROQ_API_KEY=your_groq_api_key
+
+# Alternative AI Service (commented out)
+VITE_GITHUB_MODELS_TOKEN=your_github_token
+```
+
+#### **Environment Configuration Files:**
+- .env.local - Contains API keys
+- vite-env.d.ts - TypeScript environment definitions
+
+### **5. AI Usage Summary by Feature**
+
+| **Feature** | **File** | **API** | **Model** | **Purpose** |
+|-------------|----------|---------|-----------|-------------|
+| AI Chat Assistant | EnhancedAIGuruModal.tsx | Groq | kimi-k2-instruct | Educational Q&A |
+| Exam Evaluation | ExamModePage.tsx | Groq | kimi-k2-instruct | Answer scoring |
+| SVG Generation | EnhancedReaderPage.tsx | Groq | kimi-k2-instruct | Icon creation |
+| Content Import | aiImportService.ts | Groq | kimi-k2-instruct | Text processing |
+| Model Listing | EnhancedReaderPage.tsx | Groq API | N/A | Available models |
+| Alternative Service | githubModelsService.ts | GitHub Models | mistral-medium-2505 | Backup AI |
+
+### **6. Key API Endpoints Used**
+
+1. **Groq Chat Completions**: `https://api.groq.com/openai/v1/chat/completions`
+2. **Groq Models List**: `https://api.groq.com/openai/v1/models`
+3. **GitHub Models**: `https://models.github.ai/inference/chat/completions`
+4. **YouTube oEmbed**: `https://www.youtube.com/oembed`
+
+### **7. Current Status**
+
+- ✅ **Active**: All Groq API integrations are currently active
+- 💤 **Commented**: GitHub Models API code is preserved but commented out
+- 🔧 **Configured**: Environment variables are properly set up
+- 📊 **Usage**: 4 main AI features + 1 backup service + 1 video API
+
+This represents the complete AI API usage across your entire application. The primary AI service is Groq with the kimi-k2-instruct model, used for educational features, content generation, and evaluation.

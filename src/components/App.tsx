@@ -10,6 +10,7 @@ import SubjectPage from '../pages/SubjectPage';
 import EnhancedReaderPage from '../pages/EnhancedReaderPage';
 import HighlightsPage from '../pages/HighlightsPage';
 import BookContentPage from '../pages/BookContentPage';
+import ExamModePage from '../pages/ExamModePage';
 
 function AppContent() {
     // For now, maintain backward compatibility with local highlight state
@@ -47,6 +48,9 @@ function AppContent() {
                     <Route path="/search" element={<SearchPage />} />
                     <Route path="/subject/:subjectName" element={<SubjectPage />} />
                     <Route path="/book/:bookId/content" element={<BookContentPage />} />
+                    
+                    {/* Exam Mode Page */}
+                    <Route path="/exam/:subjectName/:chapterName" element={<ExamModePage />} />
                     
                     {/* Reading Mode - Enhanced ReaderPage with template system */}
                     <Route 

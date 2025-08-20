@@ -3,8 +3,11 @@ import Groq from 'groq-sdk';
 import { AIGuruIcon, CloseIcon, PaperAirplaneIcon } from './icons';
 import { ENHANCED_AI_GURU_PROMPT, AI_GURU_SYSTEM_CONTEXT } from '../utils/aiGuruPrompt';
 import EnhancedAIResponse from './EnhancedAIResponse';
+// import { generateAIGuruResponse } from '../services/githubModelsService';
 
-const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+// Use Groq with kimi-k2-instruct model
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+// const GITHUB_MODELS_TOKEN = import.meta.env.VITE_GITHUB_MODELS_TOKEN;
 
 interface Message {
     role: 'user' | 'model' | 'error';
@@ -144,15 +147,19 @@ Focus on helping a college student understand both the concept and its applicati
         setIsLoading(true);
 
         try {
-            if (!API_KEY) {
-                throw new Error("API key is not configured.");
+            // Check if Groq API key is available
+            if (!GROQ_API_KEY) {
+                throw new Error("Groq API key is not configured. Please add VITE_GROQ_API_KEY to your .env.local file.");
             }
-            const groq = new Groq({ apiKey: API_KEY, dangerouslyAllowBrowser: true });
-            
-            // Build conversation context with appropriate system prompt
+
+            const groq = new Groq({ 
+                apiKey: GROQ_API_KEY, 
+                dangerouslyAllowBrowser: true 
+            });
+
+            // Build conversation messages for Groq
             const conversationMessages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
                 { role: 'system', content: getSystemPrompt(isEnhancedRequest) },
-                // Include previous context for continuity
                 ...messagesRef.current.map(msg => ({
                     role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
                     content: msg.text
@@ -162,26 +169,34 @@ Focus on helping a college student understand both the concept and its applicati
 
             const resultStream = await groq.chat.completions.create({
                 messages: conversationMessages,
-                model: 'moonshotai/kimi-k2-instruct', // Kimmy K2 instructor model for educational content
+                model: 'moonshotai/kimi-k2-instruct',
                 stream: true,
                 temperature: 0.7,
-                max_tokens: isEnhancedRequest ? 1500 : 1000, // More tokens for enhanced responses
+                max_tokens: isEnhancedRequest ? 1500 : 1000,
             });
 
             let fullText = '';
             setMessages(prev => [...prev, { role: 'model', text: '...', isEnhanced: isEnhancedRequest }]);
 
             for await (const chunk of resultStream) {
-                fullText += chunk.choices[0]?.delta?.content || '';
-                setMessages(prev => {
-                    const newMessages = [...prev];
-                    newMessages[newMessages.length - 1].text = fullText;
-                    return newMessages;
-                });
+                const content = chunk.choices[0]?.delta?.content || '';
+                if (content) {
+                    fullText += content;
+                    setMessages(prev => prev.map((msg, index) => 
+                        index === prev.length - 1 
+                            ? { ...msg, text: fullText }
+                            : msg
+                    ));
+                }
             }
+
         } catch (error) {
-            console.error(error);
-            setMessages(prev => [...prev, { role: 'error', text: 'Sorry, I encountered an error. Please try again.', isEnhanced: false }]);
+            console.error('AI Guru error:', error);
+            setMessages(prev => [...prev, { 
+                role: 'error', 
+                text: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.',
+                isEnhanced: isEnhancedRequest 
+            }]);
         } finally {
             setIsLoading(false);
         }

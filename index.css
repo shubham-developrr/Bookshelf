@@ -322,3 +322,70 @@ body {
 .theme-transition {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
+
+/* Prose content styling adjustments - Force override with !important */
+.prose p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.6 !important;
+}
+
+.prose p + p {
+  margin-top: 0.1em !important;
+}
+
+/* Better paragraph spacing for long text content - reduce spacing between text blocks */
+.subtopic-content-enhanced .prose p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.6 !important;
+}
+
+.subtopic-content-enhanced .prose p + p {
+  margin-top: 0.1em !important;
+}
+
+/* Reduce spacing between separate text blocks in display mode */
+.subtopic-content-enhanced {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.subtopic-content-enhanced:last-child {
+  margin: 0 !important;
+}
+
+/* Force override for any scattered text spacing */
+.prose .subtopic-content-enhanced {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.prose .subtopic-content-enhanced p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Override tailwind prose spacing completely */
+.prose.prose-sm p, .prose.prose-base p, .prose.prose-lg p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Remove ALL spacing from prose containers */
+.prose > * {
+  margin: 0 !important;
+}
+
+.prose > * + * {
+  margin-top: 0.1em !important;
+}
+
+/* Force zero spacing on all text containers */
+.space-y-0 > * {
+  margin: 0 !important;
+}
+
+.space-y-0 > * + * {
+  margin-top: 0.1em !important;
+}

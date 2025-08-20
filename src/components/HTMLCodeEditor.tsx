@@ -5,20 +5,22 @@ interface HTMLCodeEditorProps {
     currentBook: string;
     currentChapter: string;
     className?: string;
+    customStorageKey?: string;
 }
 
 const HTMLCodeEditor: React.FC<HTMLCodeEditorProps> = ({
     tabName,
     currentBook,
     currentChapter,
-    className = ''
+    className = '',
+    customStorageKey
 }) => {
     const [htmlCode, setHtmlCode] = useState('');
     const [isPreviewMode, setIsPreviewMode] = useState(false);
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [savedContent, setSavedContent] = useState('');
     
-    const storageKey = `html_editor_${currentBook}_${currentChapter}_${tabName}`;
+    const storageKey = customStorageKey || `html_editor_${currentBook}_${currentChapter}_${tabName}`;
     
     // Default HTML template
     const defaultTemplate = `<!DOCTYPE html>
@@ -102,7 +104,8 @@ const HTMLCodeEditor: React.FC<HTMLCodeEditorProps> = ({
             setHtmlCode(saved);
             setSavedContent(saved);
         } else {
-            setHtmlCode(defaultTemplate);
+            // Start with empty content for new editors
+            setHtmlCode('');
         }
     }, [storageKey]);
 

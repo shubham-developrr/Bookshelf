@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SparklesIcon, PlusIcon, TrashIcon } from './icons';
 import { processAIImport } from '../utils/aiImportService';
+import { OCRService } from '../utils/ocrService';
 
 interface FlashCard {
     id: string;
@@ -45,23 +46,46 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         }
     }, [storageKey]);
 
-    // Handle AI-powered smart import
+    // Handle AI-powered smart import with OCR support
     const handleSmartImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        if (!file.type.includes('text')) {
-            alert('Please select a text file (.txt)');
+        const isImageFile = file.type.startsWith('image/');
+        const isTextFile = file.type.includes('text');
+        const isPDFFile = file.type === 'application/pdf';
+
+        if (!isImageFile && !isTextFile && !isPDFFile) {
+            alert('Please select a text file (.txt), image file (.jpg, .png, etc.), or PDF file');
             return;
         }
 
         setIsAIProcessing(true);
         
         try {
-            const text = await file.text();
+            let text = '';
+
+            if (isImageFile) {
+                // Use OCR for image files
+                const ocrService = new OCRService();
+                const ocrResult = await ocrService.extractTextFromFile(file, (progress) => {
+                    // Progress can be shown to user if needed
+                    console.log(`OCR Progress: ${Math.round(progress.progress * 100)}%`);
+                });
+
+                if (!ocrResult.success || !ocrResult.text.trim()) {
+                    alert('Could not extract text from the image. Please try a clearer image or different file.');
+                    return;
+                }
+
+                text = ocrResult.text;
+            } else {
+                // Regular text file processing
+                text = await file.text();
+            }
             
             if (!text.trim()) {
-                alert('The selected file is empty.');
+                alert('The selected file is empty or no text could be extracted.');
                 return;
             }
             
@@ -71,10 +95,10 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
             if (result.success && result.data.length > 0) {
                 const updatedCards = [...flashCards, ...result.data];
                 saveFlashCards(updatedCards);
-                alert(`🤖 AI Import Success! Extracted ${result.data.length} flash cards from your text content.`);
+                alert(`🤖 AI Import Success! Extracted ${result.data.length} flash cards from your ${isImageFile || isPDFFile ? (isPDFFile ? 'PDF' : 'image') : 'text'} content.`);
                 setMode('study');
             } else {
-                alert(result.message || 'No flash cards could be extracted from the text. Please ensure your text contains questions and answers or term-definition pairs.');
+                alert(result.message || 'No flash cards could be extracted from the content. Please ensure your content contains questions and answers or term-definition pairs.');
             }
         } catch (error) {
             console.error('AI import error:', error);
@@ -369,7 +393,7 @@ What is Docker?|A platform for developing and running applications in containers
                     <div className="border theme-border rounded-lg p-4">
                         <h3 className="font-medium theme-text mb-3">🤖 ANKI-Style AI Import</h3>
                         <p className="text-sm theme-text-secondary mb-4">
-                            Best-in-class flash card generator using ANKI principles for maximum learning effectiveness!
+                            Best-in-class flash card generator using ANKI principles with OCR support for maximum learning effectiveness!
                         </p>
                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
                             <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">✨ ANKI Best Practices Applied:</h4>
@@ -383,7 +407,7 @@ What is Docker?|A platform for developing and running applications in containers
                         <div className="space-y-3">
                             <input
                                 type="file"
-                                accept=".txt"
+                                accept=".txt,.jpg,.jpeg,.png,.bmp,.webp,.pdf"
                                 onChange={handleSmartImport}
                                 className="hidden"
                                 disabled={isAIProcessing}

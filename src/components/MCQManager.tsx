@@ -556,6 +556,110 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                 </div>
             </div>
 
+            {/* Add Question Form - Show regardless of existing questions */}
+            {mode === 'add' && (
+                <div className="space-y-4 max-w-2xl">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-semibold theme-text">
+                            {editingQuestion ? 'Edit MCQ Question' : 'Add New MCQ Question'}
+                        </h3>
+                        <button
+                            onClick={() => {
+                                setMode('practice');
+                                setEditingQuestion(null);
+                                setNewQuestion('');
+                                setNewOptions(['', '', '', '']);
+                                setCorrectOption(0);
+                                setNewExplanation('');
+                                setNewCategory('');
+                            }}
+                            className="btn-secondary text-sm"
+                        >
+                            Back to Practice
+                        </button>
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Question:
+                        </label>
+                        <textarea
+                            value={newQuestion}
+                            onChange={(e) => setNewQuestion(e.target.value)}
+                            placeholder="Enter your question here..."
+                            className="w-full h-24 p-3 theme-surface border rounded-lg theme-text resize-none"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Options:
+                        </label>
+                        <div className="space-y-2">
+                            {['A', 'B', 'C', 'D'].map((letter, index) => (
+                                <div key={letter} className="flex items-center gap-3">
+                                    <span className="font-medium theme-text">{letter}.</span>
+                                    <input
+                                        type="text"
+                                        value={newOptions[index]}
+                                        onChange={(e) => {
+                                            const updated = [...newOptions];
+                                            updated[index] = e.target.value;
+                                            setNewOptions(updated);
+                                        }}
+                                        placeholder={`Option ${letter}`}
+                                        className="flex-1 p-2 theme-surface border rounded theme-text"
+                                    />
+                                    <label className="flex items-center">
+                                        <input
+                                            type="radio"
+                                            name="correct-answer"
+                                            checked={correctOption === index}
+                                            onChange={() => setCorrectOption(index)}
+                                            className="mr-1"
+                                        />
+                                        <span className="text-sm theme-text-secondary">Correct</span>
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Explanation (optional):
+                        </label>
+                        <textarea
+                            value={newExplanation}
+                            onChange={(e) => setNewExplanation(e.target.value)}
+                            placeholder="Explain why this is the correct answer..."
+                            className="w-full h-20 p-3 theme-surface border rounded-lg theme-text resize-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium theme-text mb-2">
+                            Category (optional):
+                        </label>
+                        <input
+                            type="text"
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value)}
+                            placeholder="e.g., Physics, Chemistry, Math..."
+                            className="w-full p-2 theme-surface border rounded theme-text"
+                        />
+                    </div>
+                    
+                    <button 
+                        onClick={handleAddMCQ}
+                        disabled={!newQuestion.trim() || newOptions.some(opt => !opt.trim())}
+                        className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {editingQuestion ? 'Update Question' : 'Add Question'}
+                    </button>
+                </div>
+            )}
+
             {mcqQuestions.length === 0 ? (
                 <div className="text-center py-6 sm:py-8">
                     <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 theme-text-secondary">
@@ -582,110 +686,7 @@ What is React?;A JavaScript library;A database;A web server;A programming langua
                 </div>
             ) : (
                 <div className="space-y-6">
-                    {mode === 'add' && (
-                        <div className="space-y-4 max-w-2xl">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg font-semibold theme-text">
-                                    {editingQuestion ? 'Edit MCQ Question' : 'Add New MCQ Question'}
-                                </h3>
-                                <button
-                                    onClick={() => {
-                                        setMode('practice');
-                                        setEditingQuestion(null);
-                                        setNewQuestion('');
-                                        setNewOptions(['', '', '', '']);
-                                        setCorrectOption(0);
-                                        setNewExplanation('');
-                                        setNewCategory('');
-                                    }}
-                                    className="btn-secondary text-sm"
-                                >
-                                    Back to Practice
-                                </button>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium theme-text mb-2">
-                                    Question:
-                                </label>
-                                <textarea
-                                    value={newQuestion}
-                                    onChange={(e) => setNewQuestion(e.target.value)}
-                                    placeholder="Enter your question here..."
-                                    className="w-full h-24 p-3 theme-surface border rounded-lg theme-text resize-none"
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium theme-text mb-2">
-                                    Options:
-                                </label>
-                                <div className="space-y-2">
-                                    {['A', 'B', 'C', 'D'].map((letter, index) => (
-                                        <div key={letter} className="flex items-center gap-3">
-                                            <span className="font-medium theme-text">{letter}.</span>
-                                            <input
-                                                type="text"
-                                                value={newOptions[index]}
-                                                onChange={(e) => {
-                                                    const updated = [...newOptions];
-                                                    updated[index] = e.target.value;
-                                                    setNewOptions(updated);
-                                                }}
-                                                placeholder={`Option ${letter}`}
-                                                className="flex-1 p-2 theme-surface border rounded theme-text"
-                                            />
-                                            <label className="flex items-center">
-                                                <input
-                                                    type="radio"
-                                                    name="correct-answer"
-                                                    checked={correctOption === index}
-                                                    onChange={() => setCorrectOption(index)}
-                                                    className="mr-1"
-                                                />
-                                                <span className="text-sm theme-text-secondary">Correct</span>
-                                            </label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium theme-text mb-2">
-                                    Explanation (optional):
-                                </label>
-                                <textarea
-                                    value={newExplanation}
-                                    onChange={(e) => setNewExplanation(e.target.value)}
-                                    placeholder="Explain why this is the correct answer..."
-                                    className="w-full h-20 p-3 theme-surface border rounded-lg theme-text resize-none"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium theme-text mb-2">
-                                    Category (optional):
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newCategory}
-                                    onChange={(e) => setNewCategory(e.target.value)}
-                                    placeholder="e.g., Physics, Chemistry, Math..."
-                                    className="w-full p-2 theme-surface border rounded theme-text"
-                                />
-                            </div>
-                            
-                            <button 
-                                onClick={handleAddMCQ}
-                                disabled={!newQuestion.trim() || newOptions.some(opt => !opt.trim())}
-                                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {editingQuestion ? 'Update Question' : 'Add Question'}
-                            </button>
-                        </div>
-                    )}
-                    
-                    {mode === 'practice' && (
+                    {mode === 'practice' && mcqQuestions.length > 0 && (
                         <div>
                             {/* Question Display */}
                             <div className={`theme-surface rounded-lg ${isMobile() ? 'p-3' : 'p-6'} mb-4 sm:mb-6 border theme-border`}>
