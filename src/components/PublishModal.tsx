@@ -58,7 +58,7 @@ const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, completedB
                             <PaperAirplaneIcon className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-semibold theme-text">Publish to Marketplace</h2>
+                            <h2 className="text-xl font-semibold theme-text">Publish to Bookstore</h2>
                             <p className="text-sm theme-text-secondary">Select completed books to publish</p>
                         </div>
                     </div>
@@ -77,7 +77,7 @@ const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, completedB
                             <BookOpenIcon className="w-16 h-16 theme-text-secondary mx-auto mb-4" />
                             <h3 className="text-lg font-medium theme-text mb-2">No Completed Books</h3>
                             <p className="theme-text-secondary mb-4">
-                                Complete your books to publish them to the marketplace.
+                                Complete your books to publish them to the bookstore.
                             </p>
                             <p className="text-sm theme-text-secondary italic">
                                 Note: Book completion tracking will be implemented in future updates.

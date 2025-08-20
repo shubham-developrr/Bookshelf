@@ -24,6 +24,7 @@ const SubjectPage: React.FC = () => {
     const [isCustomBook, setIsCustomBook] = useState(false);
     const [isImportedBook, setIsImportedBook] = useState(false);
     const [customChapters, setCustomChapters] = useState<Chapter[]>([]);
+    const [customBookData, setCustomBookData] = useState<any>(null); // Store custom book data including image
     const [showAddChapter, setShowAddChapter] = useState(false);
     const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
     const [newChapterNumber, setNewChapterNumber] = useState(1);
@@ -33,6 +34,17 @@ const SubjectPage: React.FC = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [exportMessage, setExportMessage] = useState('');
 
+    // Function to get the correct book image
+    const getCorrectBookImage = (): string => {
+        // If it's a custom book with an image, use that
+        if (customBookData && customBookData.image) {
+            return customBookData.image;
+        }
+        
+        // Otherwise use the default placeholder
+        return getBookImage(book);
+    };
+
     useEffect(() => {
         // Check if this is a custom book created by user
         const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
@@ -40,6 +52,7 @@ const SubjectPage: React.FC = () => {
         
         if (customBook) {
             setIsCustomBook(true);
+            setCustomBookData(customBook); // Store the full custom book data
             loadCustomChapters(customBook.id);
             return;
         }
@@ -251,7 +264,7 @@ const SubjectPage: React.FC = () => {
                         <div className="flex gap-4 mb-4">
                             <div className="w-20 h-28 theme-surface rounded-lg flex-shrink-0 overflow-hidden shadow-lg">
                                 <img 
-                                    src={getBookImage(book)} 
+                                    src={getCorrectBookImage()} 
                                     alt={book} 
                                     className="w-full h-full object-cover" 
                                 />
@@ -295,7 +308,7 @@ const SubjectPage: React.FC = () => {
                     <div className="hidden sm:flex items-start gap-6">
                         <div className="w-32 h-48 lg:w-40 lg:h-60 theme-surface rounded-xl flex-shrink-0 overflow-hidden shadow-lg">
                             <img 
-                                src={getBookImage(book)} 
+                                src={getCorrectBookImage()} 
                                 alt={book} 
                                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" 
                             />

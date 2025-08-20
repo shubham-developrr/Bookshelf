@@ -11,11 +11,11 @@ import {
   TagIcon 
 } from './icons';
 
-interface MarketplaceProps {
+interface BookstoreProps {
   onDownloadBook: (bookId: string) => void;
 }
 
-interface MarketplaceBook extends BookModule {
+interface BookstoreBook extends BookModule {
   rating: number;
   downloadCount: number;
   previewUrl?: string;
@@ -30,12 +30,12 @@ interface SearchFilters {
   sortBy: 'newest' | 'popular' | 'rating' | 'downloads';
 }
 
-export function BookMarketplace({ onDownloadBook }: MarketplaceProps) {
-  const [books, setBooks] = useState<MarketplaceBook[]>([]);
-  const [filteredBooks, setFilteredBooks] = useState<MarketplaceBook[]>([]);
+export function BookBookstore({ onDownloadBook }: BookstoreProps) {
+  const [books, setBooks] = useState<BookstoreBook[]>([]);
+  const [filteredBooks, setFilteredBooks] = useState<BookstoreBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBook, setSelectedBook] = useState<MarketplaceBook | null>(null);
+  const [selectedBook, setSelectedBook] = useState<BookstoreBook | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>({
     curriculum: '',
@@ -75,7 +75,7 @@ export function BookMarketplace({ onDownloadBook }: MarketplaceProps) {
     } catch (error) {
       console.error('Failed to fetch marketplace books:', error);
       // Mock data for development
-      setBooks(getMockMarketplaceBooks());
+      setBooks(getMockBookstoreBooks());
     } finally {
       setLoading(false);
     }
@@ -133,7 +133,7 @@ export function BookMarketplace({ onDownloadBook }: MarketplaceProps) {
     setFilteredBooks(filtered);
   };
 
-  const handleDownload = async (book: MarketplaceBook) => {
+  const handleDownload = async (book: BookstoreBook) => {
     try {
       // Track download
       await fetch(`/api/marketplace/${book.id}/download`, { method: 'POST' });
@@ -151,7 +151,7 @@ export function BookMarketplace({ onDownloadBook }: MarketplaceProps) {
     }
   };
 
-  const BookCard = ({ book }: { book: MarketplaceBook }) => (
+  const BookCard = ({ book }: { book: BookstoreBook }) => (
     <div style={{
       backgroundColor: 'var(--color-modal-bg)',
       border: '1px solid var(--color-border)',
@@ -528,7 +528,7 @@ export function BookMarketplace({ onDownloadBook }: MarketplaceProps) {
     </div>
   );
 
-  const BookPreviewModal = ({ book }: { book: MarketplaceBook }) => (
+  const BookPreviewModal = ({ book }: { book: BookstoreBook }) => (
     <div style={{
       position: 'fixed',
       top: '0',
@@ -911,7 +911,7 @@ export function BookMarketplace({ onDownloadBook }: MarketplaceProps) {
 }
 
 // Mock data for development
-function getMockMarketplaceBooks(): MarketplaceBook[] {
+function getMockBookstoreBooks(): BookstoreBook[] {
   return [
     {
       id: 'advanced-algorithms-mit',

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpenIcon, MenuIcon, AlertIcon, AIGuruIcon, PlusIcon, SearchIconSvg, PaperAirplaneIcon } from '../components/icons';
+import { BookOpenIcon, AlertIcon, AIGuruIcon, PlusIcon, SearchIconSvg, PaperAirplaneIcon } from '../components/icons';
 import { getBookImage } from '../assets/images/index';
 import { useTheme } from '../contexts/ThemeContext';
 import { bookLoader } from '../utils/bookModuleLoader';
 import { BookModule } from '../types/bookModule';
 import ThemeSelector from '../components/ThemeSelector';
-import { BookMarketplace } from '../components/BookMarketplace';
+import { BookBookstore } from '../components/BookBookstore';
 import CreateBookModal, { BookData } from '../components/CreateBookModal';
 import EditBookModal from '../components/EditBookModal';
 import SearchModal from '../components/SearchModal';
@@ -15,11 +15,20 @@ import PublishModal from '../components/PublishModal';
 import EnhancedAIGuruModal from '../components/EnhancedAIGuruModal';
 import { BookImportService } from '../services/importService';
 
+// Gear icon component
+const GearIcon: React.FC = () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+);
+
 const EnhancedBookshelfPage: React.FC = () => {
     const navigate = useNavigate();
     const { theme } = useTheme();
     const [isThemeModalOpen, setThemeModalOpen] = useState(false);
-    const [isMarketplaceOpen, setMarketplaceOpen] = useState(false);
+    const [isSettingsDropdownOpen, setSettingsDropdownOpen] = useState(false);
+    const [isBookstoreOpen, setBookstoreOpen] = useState(false);
     const [isCreateBookOpen, setCreateBookOpen] = useState(false);
     const [isEditBookOpen, setIsEditBookOpen] = useState(false);
     const [isSearchOpen, setSearchOpen] = useState(false);
@@ -37,15 +46,10 @@ const EnhancedBookshelfPage: React.FC = () => {
     const [isImporting, setIsImporting] = useState(false);
     const [importMessage, setImportMessage] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const settingsDropdownRef = useRef<HTMLDivElement>(null);
 
-    // Legacy subjects for backward compatibility + imported books
+    // Legacy subjects for backward compatibility + imported books (default books removed)
     const legacySubjects = [
-        'Object Oriented System Design with C++', 
-        'Application of Soft Computing', 
-        'Database Management System', 
-        'Web Technology', 
-        'Design and Analysis of Algorithm', 
-        'Mechanics of Robots',
         // Add imported books to legacy subjects
         ...importedBooks.map(book => book.name)
     ];
@@ -64,6 +68,23 @@ const EnhancedBookshelfPage: React.FC = () => {
             setImportedBooks(JSON.parse(savedImportedBooks));
         }
     }, []);
+
+    // Close settings dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target as Node)) {
+                setSettingsDropdownOpen(false);
+            }
+        };
+
+        if (isSettingsDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isSettingsDropdownOpen]);
 
     const loadInitialBooks = async () => {
         try {
@@ -225,7 +246,7 @@ const EnhancedBookshelfPage: React.FC = () => {
     const handlePublishBooks = (bookIds: string[]) => {
         console.log('Publishing books:', bookIds);
         // TODO: Implement actual publishing logic
-        alert(`Published ${bookIds.length} book(s) to marketplace!`);
+        alert(`Published ${bookIds.length} book(s) to bookstore!`);
     };
 
     const handleAIGuruClick = () => {
@@ -361,52 +382,91 @@ const EnhancedBookshelfPage: React.FC = () => {
 
     return (
         <div className="theme-bg min-h-screen theme-transition">
-            {/* Header */}
-            <header className="theme-surface sticky top-0 z-10 px-4 py-3 sm:px-6 theme-transition backdrop-blur-sm bg-opacity-80">
-                <div className="max-w-7xl mx-auto flex justify-between items-center">
+            {/* Simplified Header with Title and Controls */}
+            <header className="theme-surface px-4 py-4 sm:px-6 theme-transition border-b theme-border">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    {/* Logo and Title */}
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 theme-accent rounded-lg flex items-center justify-center">
                             <span className="w-5 h-5 text-white flex items-center justify-center">
                                 <BookOpenIcon />
                             </span>
                         </div>
-                        <h1 className="text-lg sm:text-xl font-bold theme-text">Book Creator</h1>
+                        <h1 className="text-xl sm:text-2xl font-bold theme-text">Book Creator</h1>
                     </div>
-                    <div className="flex items-center gap-3">
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-4">
                         <button 
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isImporting}
-                            className="px-3 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
-                            title="Import Books"
-                        >
-                            📥 Import
-                        </button>
-                        <button 
-                            onClick={() => setMarketplaceOpen(true)}
-                            className="p-2 hover:theme-surface2 rounded-lg theme-transition"
-                            title="Browse Book Marketplace"
+                            onClick={() => setBookstoreOpen(true)}
+                            className="px-3 py-2 hover:theme-surface2 rounded-lg theme-transition text-sm font-medium flex items-center gap-2"
+                            title="Browse Book Bookstore"
+                            data-testid="bookstore-button"
                         >
                             <BookOpenIcon />
+                            Bookstore
                         </button>
-                        <button 
-                            onClick={() => setSearchOpen(true)}
-                            className="p-2 hover:theme-surface2 rounded-lg theme-transition"
-                            title="Search"
-                        >
-                            <SearchIconSvg />
-                        </button>
-                        <button 
-                            onClick={() => setThemeModalOpen(true)}
-                            className="p-2 hover:theme-surface2 rounded-lg theme-transition"
-                        >
-                            <MenuIcon />
-                        </button>
-                        <AlertIcon />
+                        
+                        {/* Settings Gear Button with Dropdown */}
+                        <div className="relative" ref={settingsDropdownRef}>
+                            <button 
+                                onClick={() => setSettingsDropdownOpen(!isSettingsDropdownOpen)}
+                                className="p-2 hover:theme-surface2 rounded-lg theme-transition"
+                            >
+                                <GearIcon />
+                            </button>
+                            
+                            {/* Settings Dropdown */}
+                            {isSettingsDropdownOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-48 theme-surface rounded-lg shadow-lg border theme-border z-50">
+                                    <div className="py-2">
+                                        <button
+                                            onClick={() => {
+                                                setSettingsDropdownOpen(false);
+                                                setThemeModalOpen(true);
+                                            }}
+                                            className="w-full text-left px-4 py-2 hover:theme-surface2 theme-transition theme-text flex items-center gap-2"
+                                        >
+                                            🎨 Theme Settings
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        
                     </div>
                 </div>
             </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+                {/* Google-style Search Section in Main Area */}
+                <div className="mb-8 text-center">
+                    {/* Search Image */}
+                    <div className="mb-4">
+                        <img 
+                            src="/src/assets/images/search.png" 
+                            alt="Search" 
+                            className="w-16 h-16 mx-auto"
+                        />
+                    </div>
+                    
+                    {/* Search Bar */}
+                    <div className="relative max-w-2xl mx-auto mb-6">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search your books, chapters, and content..."
+                                onClick={() => setSearchOpen(true)}
+                                readOnly
+                                className="w-full px-4 py-4 pr-12 text-lg border border-gray-300 rounded-full theme-bg theme-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm hover:shadow-md theme-transition cursor-pointer"
+                            />
+                            <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                                <SearchIconSvg />
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {/* Hidden Import File Input */}
                 <input
                     ref={fileInputRef}
@@ -436,7 +496,7 @@ const EnhancedBookshelfPage: React.FC = () => {
                             className="btn-primary flex items-center gap-2"
                         >
                             <PaperAirplaneIcon className="w-4 h-4" />
-                            Publish in Marketplace
+                            Browse Bookstore
                         </button>
                         
                         <button
@@ -447,16 +507,14 @@ const EnhancedBookshelfPage: React.FC = () => {
                             Create Book
                         </button>
                         
-                        <label className="btn-secondary flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="file"
-                                accept=".json"
-                                onChange={handleFileUpload}
-                                className="hidden"
-                            />
-                            <PlusIcon className="w-4 h-4" />
-                            Upload Book
-                        </label>
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                            className="btn-secondary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Import Books"
+                        >
+                            📥 Import
+                        </button>
                     </div>
                 </div>
 
@@ -466,21 +524,11 @@ const EnhancedBookshelfPage: React.FC = () => {
                     </div>
                 ) : (
                     <div>
-                        {/* Created Books */}
-                        {createdBooks.length > 0 && (
-                            <div className="mb-8">
-                                <h2 className="text-xl font-semibold theme-text mb-4">Your Books</h2>
-                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                                    {createdBooks.map(renderCreatedBookCard)}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Dynamic Book Modules */}
+                        {/* Your Shelf Section - Only Imported and Downloaded Books from Bookstore */}
                         {loadedBooks.length > 0 && (
                             <div className="mb-8">
-                                <h2 className="text-xl font-semibold theme-text mb-4">
-                                    {createdBooks.length > 0 ? 'Downloaded Books' : 'Your Books'}
+                                <h2 className="text-xl font-bold theme-text mb-4 flex items-center gap-2">
+                                    📚 Your Shelf
                                 </h2>
                                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                                     {loadedBooks.map(renderBookCard)}
@@ -488,13 +536,30 @@ const EnhancedBookshelfPage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Legacy Subjects */}
+                        {/* Creator Section - Created Books + Create Button */}
                         <div>
-                            <h2 className="text-xl font-semibold theme-text mb-4">
-                                {(loadedBooks.length > 0 || createdBooks.length > 0) ? 'Legacy Subjects' : 'Subjects'}
-                            </h2>
+                            <h2 className="text-xl font-bold theme-text mb-4">Creator Section</h2>
                             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                                {legacySubjects.map(renderLegacySubjectCard)}
+                                {/* Created Books */}
+                                {createdBooks.map(renderCreatedBookCard)}
+                                
+                                {/* Create Your Own Books Button */}
+                                <button
+                                    onClick={() => setCreateBookOpen(true)}
+                                    className="aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-500 theme-transition flex flex-col items-center justify-center p-4 theme-surface hover:theme-surface2 group"
+                                >
+                                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 theme-transition">
+                                        <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-sm sm:text-base font-medium theme-text text-center leading-tight">
+                                        Create Your Own Books
+                                    </h3>
+                                    <p className="text-xs theme-text-secondary text-center mt-1">
+                                        Start building
+                                    </p>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -552,21 +617,21 @@ const EnhancedBookshelfPage: React.FC = () => {
                 initialPrompt={aiGuruPrompt}
             />
 
-            {/* Book Marketplace Modal */}
-            {isMarketplaceOpen && (
+            {/* Book Bookstore Modal */}
+            {isBookstoreOpen && (
                 <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden" data-testid="book-bookstore-modal">
                         <div className="flex justify-between items-center p-4 border-b">
-                            <h2 className="text-xl font-semibold theme-text">Book Marketplace</h2>
+                            <h2 className="text-xl font-semibold theme-text">Book Bookstore</h2>
                             <button
-                                onClick={() => setMarketplaceOpen(false)}
+                                onClick={() => setBookstoreOpen(false)}
                                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                             >
                                 ✕
                             </button>
                         </div>
                         <div className="overflow-auto max-h-[80vh]">
-                            <BookMarketplace onDownloadBook={handleBookDownload} />
+                            <BookBookstore onDownloadBook={handleBookDownload} />
                         </div>
                     </div>
                 </div>

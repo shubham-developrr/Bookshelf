@@ -140,6 +140,8 @@ interface ResponsiveTabBarProps {
   onRenameValueChange: (value: string) => void;
   onStartRename: (tab: string) => void;
   onHandleRename: (tab: string) => void;
+  onEditSvg?: (tab: string) => void;
+  getTabIcon?: (tab: string) => JSX.Element;
 }
 
 export const ResponsiveTabBar: React.FC<ResponsiveTabBarProps> = ({
@@ -154,7 +156,9 @@ export const ResponsiveTabBar: React.FC<ResponsiveTabBarProps> = ({
   renameValue,
   onRenameValueChange,
   onStartRename,
-  onHandleRename
+  onHandleRename,
+  onEditSvg,
+  getTabIcon: customGetTabIcon
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -298,24 +302,33 @@ export const ResponsiveTabBar: React.FC<ResponsiveTabBarProps> = ({
             {dynamicTabs.map((tab) => (
               <div key={tab} className="flex items-center justify-between p-2 rounded theme-surface hover:theme-surface2">
                 <span className="font-medium theme-text flex items-center gap-2">
-                  {getTabIcon(tab)}
+                  {customGetTabIcon ? customGetTabIcon(tab) : getTabIcon(tab)}
                   {getTabDisplayName(tab)}
                 </span>
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   <button
                     onClick={() => onStartRename(tab)}
                     className="text-xs px-2 py-1 rounded theme-accent text-white"
                     title="Rename"
                   >
-                    Rename
+                    📝
                   </button>
+                  {onEditSvg && (
+                    <button
+                      onClick={() => onEditSvg(tab)}
+                      className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600"
+                      title="Edit Icon"
+                    >
+                      🎨
+                    </button>
+                  )}
                   {onDeleteTab && (
                     <button
                       onClick={() => onDeleteTab(tab)}
                       className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600"
                       title="Delete"
                     >
-                      Delete
+                      🗑️
                     </button>
                   )}
                 </div>

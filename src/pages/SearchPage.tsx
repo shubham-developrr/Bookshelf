@@ -4,7 +4,7 @@ import { BackIcon, SearchIconSvg, BookOpenIcon, AcademicCapIcon, LightbulbIcon }
 import { SearchResult } from '../types/types';
 import { syllabus, chapterSubtopics } from '../constants/constants';
 import { useTheme } from '../contexts/ThemeContext';
-import { SearchIcon } from '../assets/images/index';
+import { getBookImage } from '../assets/images/index';
 
 const SearchPage: React.FC = () => {
     const navigate = useNavigate();
@@ -106,12 +106,8 @@ const SearchPage: React.FC = () => {
             <main className="max-w-7xl mx-auto px-3 sm:px-6 py-6 overflow-hidden">
                 {/* Search Section with Image Above - Mobile Optimized */}
                 <div className="flex flex-col items-center mb-8 space-y-4">
-                    <div className="w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 flex-shrink-0">
-                        <img 
-                            src={SearchIcon} 
-                            alt="Search" 
-                            className="w-full h-full object-contain"
-                        />
+                    <div className="w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 flex-shrink-0 flex items-center justify-center">
+                        <SearchIconSvg className="w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 theme-text-secondary" />
                     </div>
                     <div className="w-full max-w-lg">
                         <input
