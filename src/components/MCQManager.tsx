@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SparklesIcon, PlusIcon, TrashIcon, UploadIcon } from './icons';
 import { processAIImport } from '../utils/aiImportService';
 import { MCQTest } from './TestComponents';
+import AILoadingAnimation from './AILoadingAnimation';
 
 interface MCQOption {
     id: string;
@@ -374,10 +375,21 @@ const MCQManager: React.FC<MCQManagerProps> = ({
                         </div>
                     </div>                        {/* AI Smart Import */}
                         <div className="border theme-border rounded-lg p-4">
-                            <h3 className="font-medium theme-text mb-3">� AI Smart Import</h3>
+                            <h3 className="font-medium theme-text mb-3">🤖 AI Smart Import</h3>
                             <p className="text-sm theme-text-secondary mb-4">
                                 AI-powered intelligent extraction from unstructured text - no formatting required!
                             </p>
+                            
+                            {/* Performance and Limitation Notes */}
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-4">
+                                <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">⚡ Performance Tips:</h4>
+                                <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                                    <li>• <strong>Text files (.txt)</strong> process instantly and are recommended</li>
+                                    <li>• <strong>PDF and Image files</strong> may take 1-2 minutes for OCR processing</li>
+                                    <li>• <strong>Large PDFs not supported</strong> - PDF should contain less than 10,000 characters</li>
+                                    <li>• For best results, use clear, high-quality images with readable text</li>
+                                </ul>
+                            </div>
                             <div className="space-y-3">
                                 <input
                                     type="file"
@@ -395,10 +407,11 @@ const MCQManager: React.FC<MCQManagerProps> = ({
                                     disabled={isAIProcessing}
                                 >
                                     {isAIProcessing ? (
-                                        <>
-                                            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                                            Processing with AI...
-                                        </>
+                                        <AILoadingAnimation 
+                                            message="AI is thinking..." 
+                                            emoji="�"
+                                            size="md"
+                                        />
                                     ) : (
                                         <>
                                             🤖 AI Smart Import

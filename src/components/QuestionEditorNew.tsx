@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { extractTextFromFile, extractTextFromMultipleFiles, OCRProgress } from '../utils/ocrService';
 import { processAIImport } from '../utils/aiImportService';
+import AILoadingAnimation from './AILoadingAnimation';
 
 interface QuestionEditorProps {
     paper: {
@@ -93,7 +94,6 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
     const [explanation, setExplanation] = useState('');
     
     // Section Settings States
-    const [sectionTotalQuestions, setSectionTotalQuestions] = useState(0);
     const [sectionRequiredAnswers, setSectionRequiredAnswers] = useState(0);
     
     // Import States
@@ -133,10 +133,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
     const handleSectionSettings = () => {
         const section = getCurrentSection();
         if (section) {
-            // Auto-calculate total questions based on actual questions
-            const totalQuestions = section.questions.length;
-            setSectionTotalQuestions(totalQuestions);
-            setSectionRequiredAnswers(section.requiredAnswers || totalQuestions);
+            // Set required answers from section data, defaulting to actual question count
+            const actualQuestionCount = section.questions.length;
+            setSectionRequiredAnswers(section.requiredAnswers || actualQuestionCount);
             setShowSectionSettings(true);
         }
     };
@@ -162,15 +161,33 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
     };
 
     const saveSectionSettings = () => {
-        setSections(prev => prev.map(section => 
+        // Get the actual number of questions in the current section
+        const currentSection = sections.find(section => section.id === activeSection);
+        const actualQuestionCount = currentSection ? currentSection.questions.length : 0;
+        
+        // Validate that required answers doesn't exceed actual number of questions
+        const validatedRequiredAnswers = Math.min(sectionRequiredAnswers, actualQuestionCount);
+        
+        if (sectionRequiredAnswers > actualQuestionCount) {
+            alert(`Required answers (${sectionRequiredAnswers}) cannot be greater than actual questions in section (${actualQuestionCount}). Setting required answers to ${validatedRequiredAnswers}.`);
+        }
+        
+        // Update sections with auto-calculated total questions and validated required answers
+        const updatedSections = sections.map(section => 
             section.id === activeSection 
                 ? { 
                     ...section, 
-                    totalQuestions: sectionTotalQuestions, 
-                    requiredAnswers: sectionRequiredAnswers 
+                    totalQuestions: actualQuestionCount, // Auto-calculated from actual questions
+                    requiredAnswers: validatedRequiredAnswers 
                 }
                 : section
-        ));
+        );
+        
+        // Use direct state update to ensure persistence
+        setSections(updatedSections);
+        
+        // Update the local state to reflect the validated value
+        setSectionRequiredAnswers(validatedRequiredAnswers);
         setShowSectionSettings(false);
     };
 
@@ -692,6 +709,11 @@ Recursion is a programming technique where a function calls itself to solve smal
                                     <p className="text-xs theme-text-secondary mt-2">
                                         Support: PDF, PNG, JPG, JPEG
                                     </p>
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-2 mt-2">
+                                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                                            <strong>⚡ Note:</strong> Text files process instantly. PDF and Image files may take 1-2 minutes for OCR processing. Large PDFs not supported - should contain less than 10,000 characters.
+                                        </p>
+                                    </div>
                                 </div>
                                 
                                 {uploadedFiles.length > 0 && (
@@ -706,7 +728,15 @@ Recursion is a programming technique where a function calls itself to solve smal
                                             disabled={isProcessing}
                                             className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 theme-transition"
                                         >
-                                            {isProcessing ? 'Processing...' : 'Extract Text with OCR'}
+                                            {isProcessing ? (
+                                                <AILoadingAnimation 
+                                                    message="Extracting text..." 
+                                                    emoji="📖"
+                                                    size="sm"
+                                                />
+                                            ) : (
+                                                'Extract Text with OCR'
+                                            )}
                                         </button>
                                     </div>
                                 )}
@@ -728,9 +758,18 @@ Recursion is a programming technique where a function calls itself to solve smal
                                 <div className="mb-4">
                                     <button
                                         onClick={handleAutoGenerateQuestions}
-                                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded theme-transition"
+                                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded theme-transition disabled:opacity-50"
+                                        disabled={isProcessing}
                                     >
-                                        Auto Generate Questions
+                                        {isProcessing ? (
+                                            <AILoadingAnimation 
+                                                message="Generating questions..." 
+                                                emoji="🤖"
+                                                size="md"
+                                            />
+                                        ) : (
+                                            'Auto Generate Questions'
+                                        )}
                                     </button>
                                     <p className="text-xs theme-text-secondary mt-2">
                                         This will parse the text above and create questions automatically.
@@ -1139,30 +1178,53 @@ Recursion is a programming technique where a function calls itself to solve smal
                 {/* Section Settings Modal */}
                 {showSectionSettings && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
-                        <div className="theme-bg rounded-lg shadow-2xl w-full max-w-sm">
-                            <div className="p-4">
+                        <div className="modal-responsive theme-bg rounded-lg shadow-2xl">
+                            <div className="modal-content-responsive">
                                 <h4 className="text-base font-medium theme-text mb-3">Section Settings</h4>
                                 <div className="space-y-3">
                                     <div>
                                         <label className="block text-xs font-medium theme-text mb-1">Total Questions</label>
-                                        <input
-                                            type="number"
-                                            value={sectionTotalQuestions}
-                                            onChange={(e) => setSectionTotalQuestions(Number(e.target.value))}
-                                            min="0"
-                                            className="w-full px-2 py-1 text-sm theme-surface border theme-border rounded theme-text"
-                                        />
+                                        <div className="w-full px-3 py-2 text-sm theme-surface border theme-border rounded theme-text bg-opacity-50 backdrop-blur-sm">
+                                            <span className="font-semibold text-base">
+                                                {(() => {
+                                                    const currentSection = sections.find(section => section.id === activeSection);
+                                                    return currentSection ? currentSection.questions.length : 0;
+                                                })()}
+                                            </span>
+                                            <span className="ml-2 text-xs theme-text-secondary">(auto-calculated)</span>
+                                        </div>
+                                        <p className="text-xs theme-text-secondary mt-1">
+                                            Automatically calculated from the number of questions in this section
+                                        </p>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium theme-text mb-1">Required Answers</label>
                                         <input
                                             type="number"
                                             value={sectionRequiredAnswers}
-                                            onChange={(e) => setSectionRequiredAnswers(Number(e.target.value))}
+                                            onChange={(e) => {
+                                                const newRequired = Number(e.target.value);
+                                                // Get actual question count for validation
+                                                const currentSection = sections.find(section => section.id === activeSection);
+                                                const actualQuestionCount = currentSection ? currentSection.questions.length : 0;
+                                                // Ensure required answers doesn't exceed actual question count
+                                                const validatedRequired = Math.min(newRequired, actualQuestionCount);
+                                                setSectionRequiredAnswers(validatedRequired);
+                                            }}
                                             min="0"
-                                            max={sectionTotalQuestions}
+                                            max={(() => {
+                                                const currentSection = sections.find(section => section.id === activeSection);
+                                                return currentSection ? currentSection.questions.length : 0;
+                                            })()}
                                             className="w-full px-2 py-1 text-sm theme-surface border theme-border rounded theme-text"
                                         />
+                                        <p className="text-xs theme-text-secondary mt-1">
+                                            Maximum: {(() => {
+                                                const currentSection = sections.find(section => section.id === activeSection);
+                                                const actualQuestionCount = currentSection ? currentSection.questions.length : 0;
+                                                return actualQuestionCount;
+                                            })()} (cannot exceed actual questions in section)
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex gap-2 mt-4">

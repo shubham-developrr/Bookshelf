@@ -216,6 +216,34 @@ const ExamModePage: React.FC = () => {
         }
     }, [evaluationReports, currentBook, currentChapter]);
 
+    // Load question papers from localStorage on mount
+    useEffect(() => {
+        const savedPapers = localStorage.getItem(`questionPapers_${currentBook}_${currentChapter}`);
+        if (savedPapers) {
+            try {
+                const parsedPapers = JSON.parse(savedPapers);
+                // Convert date strings back to Date objects
+                const papersWithDates = parsedPapers.map((paper: any) => ({
+                    ...paper,
+                    createdAt: new Date(paper.createdAt)
+                }));
+                setQuestionPapers(papersWithDates);
+            } catch (error) {
+                console.error('Error loading question papers:', error);
+            }
+        }
+    }, [currentBook, currentChapter]);
+
+    // Save question papers to localStorage whenever they change
+    useEffect(() => {
+        if (questionPapers.length > 0) {
+            localStorage.setItem(
+                `questionPapers_${currentBook}_${currentChapter}`,
+                JSON.stringify(questionPapers)
+            );
+        }
+    }, [questionPapers, currentBook, currentChapter]);
+
     // Background evaluation checker
     useEffect(() => {
         const checkBackgroundEvaluations = () => {
@@ -749,13 +777,13 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                     {/* Exit Button - Top Left */}
                     <button
                         onClick={() => setShowExitConfirm(true)}
-                        className="flex items-center gap-2 p-2 rounded-lg hover:theme-surface2 theme-transition"
+                        className="btn-responsive flex items-center gap-2 p-2 rounded-lg hover:theme-surface2 theme-transition"
                         title="Exit Exam Mode"
                     >
-                        <svg className="w-6 h-6 theme-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-6 h-6 theme-text btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                        <span className="hidden sm:inline theme-text">Exit Exam Mode</span>
+                        <span className="btn-text theme-text">Exit Exam Mode</span>
                     </button>
 
                     {/* Title */}
@@ -769,12 +797,12 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                         {/* Previous Reports Button */}
                         <button
                             onClick={() => setShowReports(true)}
-                            className="flex items-center gap-2 px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-surface3 theme-transition border theme-border"
+                            className="btn-responsive flex items-center gap-2 px-4 py-2 theme-surface2 theme-text rounded-lg hover:theme-surface3 theme-transition border theme-border"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <span className="hidden sm:inline">Previous Reports</span>
+                            <span className="btn-text">Previous Reports</span>
                             {evaluationReports.filter(r => r.status === 'processing').length > 0 && (
                                 <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
                             )}
@@ -783,10 +811,10 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                         {/* Add Question Paper Button */}
                         <button
                             onClick={() => setShowAddPaper(true)}
-                            className="flex items-center gap-2 px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
+                            className="btn-responsive flex items-center gap-2 px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
                         >
-                            <PlusIcon />
-                            <span className="hidden sm:inline">Add Paper</span>
+                            <PlusIcon className="btn-icon" />
+                            <span className="btn-text">Add Paper</span>
                         </button>
                     </div>
                 </div>
