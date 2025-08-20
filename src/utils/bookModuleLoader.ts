@@ -2,6 +2,42 @@ import { BookModule } from '../types/bookModule';
 
 export class BookModuleLoader {
   private loadedBooks: Map<string, BookModule> = new Map();
+  private storageKey = 'importedBookModules';
+
+  constructor() {
+    this.loadFromLocalStorage();
+  }
+
+  /**
+   * Load books from localStorage on initialization
+   */
+  private loadFromLocalStorage(): void {
+    try {
+      const stored = localStorage.getItem(this.storageKey);
+      if (stored) {
+        const booksArray: BookModule[] = JSON.parse(stored);
+        booksArray.forEach(book => {
+          this.loadedBooks.set(book.id, book);
+        });
+        console.log(`Loaded ${booksArray.length} books from localStorage`);
+      }
+    } catch (error) {
+      console.error('Error loading books from localStorage:', error);
+    }
+  }
+
+  /**
+   * Save current books to localStorage
+   */
+  private saveToLocalStorage(): void {
+    try {
+      const booksArray = Array.from(this.loadedBooks.values());
+      localStorage.setItem(this.storageKey, JSON.stringify(booksArray));
+      console.log(`Saved ${booksArray.length} books to localStorage`);
+    } catch (error) {
+      console.error('Error saving books to localStorage:', error);
+    }
+  }
 
   /**
    * Load a book module from various sources
@@ -64,6 +100,7 @@ export class BookModuleLoader {
     }
     
     this.loadedBooks.set(bookData.id, bookData);
+    this.saveToLocalStorage(); // Persist to localStorage
     return bookData;
   }
 
@@ -102,7 +139,11 @@ export class BookModuleLoader {
    * Unload a book module
    */
   unloadBook(id: string): boolean {
-    return this.loadedBooks.delete(id);
+    const result = this.loadedBooks.delete(id);
+    if (result) {
+      this.saveToLocalStorage(); // Update localStorage
+    }
+    return result;
   }
 
   /**

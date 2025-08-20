@@ -8,7 +8,7 @@ import SearchPage from '../pages/SearchPage';
 import SubjectPage from '../pages/SubjectPage';
 import ReaderPage from '../pages/ReaderPage';
 
-const API_KEY = process.env.GROQ_API_KEY;
+const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
 // --- AI Guru Modal ---
 const AIGuruModal = ({ isOpen, onClose, initialPrompt }: { isOpen: boolean, onClose: () => void, initialPrompt: string }) => {

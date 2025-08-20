@@ -4,7 +4,7 @@ import { AIGuruIcon, CloseIcon, PaperAirplaneIcon } from './icons';
 import { ENHANCED_AI_GURU_PROMPT, AI_GURU_SYSTEM_CONTEXT } from '../utils/aiGuruPrompt';
 import EnhancedAIResponse from './EnhancedAIResponse';
 
-const API_KEY = process.env.GROQ_API_KEY;
+const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
 interface Message {
     role: 'user' | 'model' | 'error';

@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
 import { MCQ_IMPORT_PROMPT, QA_IMPORT_PROMPT, FLASHCARD_IMPORT_PROMPT } from './aiImportPrompts';
 
-const API_KEY = process.env.GROQ_API_KEY;
+const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
 export type ImportFormat = 'mcq' | 'qa' | 'flashcard';
 

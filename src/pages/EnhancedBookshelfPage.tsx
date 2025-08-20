@@ -447,7 +447,7 @@ const EnhancedBookshelfPage: React.FC = () => {
                         <img 
                             src="/src/assets/images/search.png" 
                             alt="Search" 
-                            className="w-16 h-16 mx-auto"
+                            className="w-64 h-64 mx-auto"
                         />
                     </div>
                     
@@ -525,16 +525,34 @@ const EnhancedBookshelfPage: React.FC = () => {
                 ) : (
                     <div>
                         {/* Your Shelf Section - Only Imported and Downloaded Books from Bookstore */}
-                        {loadedBooks.length > 0 && (
-                            <div className="mb-8">
-                                <h2 className="text-xl font-bold theme-text mb-4 flex items-center gap-2">
-                                    📚 Your Shelf
-                                </h2>
-                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                                    {loadedBooks.map(renderBookCard)}
-                                </div>
+                        <div className="mb-8">
+                            <h2 className="text-xl font-bold theme-text mb-4 flex items-center gap-2">
+                                📚 Your Shelf
+                            </h2>
+                            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                                {loadedBooks.map(renderBookCard)}
+                                
+                                {/* Download from Bookstore Button */}
+                                <button
+                                    onClick={() => setBookstoreOpen(true)}
+                                    className="card theme-transition group text-left flex flex-col h-full"
+                                >
+                                    <div className="aspect-[3/4] mb-3 sm:mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex-shrink-0 flex items-center justify-center">
+                                        <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex-grow flex flex-col justify-center">
+                                        <h3 className="font-semibold theme-text mb-2 group-hover:theme-accent-text theme-transition text-xs sm:text-sm lg:text-base leading-tight text-center">
+                                            Download from Bookstore
+                                        </h3>
+                                        <p className="text-xs theme-text-secondary text-center">
+                                            Browse & download
+                                        </p>
+                                    </div>
+                                </button>
                             </div>
-                        )}
+                        </div>
 
                         {/* Creator Section - Created Books + Create Button */}
                         <div>
@@ -546,19 +564,21 @@ const EnhancedBookshelfPage: React.FC = () => {
                                 {/* Create Your Own Books Button */}
                                 <button
                                     onClick={() => setCreateBookOpen(true)}
-                                    className="aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-500 theme-transition flex flex-col items-center justify-center p-4 theme-surface hover:theme-surface2 group"
+                                    className="card theme-transition group text-left flex flex-col h-full"
                                 >
-                                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 theme-transition">
-                                        <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <div className="aspect-[3/4] mb-3 sm:mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-blue-100 to-blue-200 flex-shrink-0 flex items-center justify-center">
+                                        <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                                         </svg>
                                     </div>
-                                    <h3 className="text-sm sm:text-base font-medium theme-text text-center leading-tight">
-                                        Create Your Own Books
-                                    </h3>
-                                    <p className="text-xs theme-text-secondary text-center mt-1">
-                                        Start building
-                                    </p>
+                                    <div className="flex-grow flex flex-col justify-center">
+                                        <h3 className="font-semibold theme-text mb-2 group-hover:theme-accent-text theme-transition text-xs sm:text-sm lg:text-base leading-tight text-center">
+                                            Create Your Own Books
+                                        </h3>
+                                        <p className="text-xs theme-text-secondary text-center">
+                                            Start building
+                                        </p>
+                                    </div>
                                 </button>
                             </div>
                         </div>

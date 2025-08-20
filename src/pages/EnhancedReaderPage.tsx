@@ -202,7 +202,21 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
     const [showManageDropdown, setShowManageDropdown] = useState(false);
     const [managingTab, setManagingTab] = useState<string | null>(null);
     const [showSvgEditor, setShowSvgEditor] = useState(false);
+    // State for SVG AI generation
     const [customSvgCode, setCustomSvgCode] = useState('');
+    const [aiSvgPreview, setAiSvgPreview] = useState('');
+    const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+    const [svgGenerationStep, setSvgGenerationStep] = useState<'input' | 'preview' | 'saved'>('input');
+    const [isSaving, setIsSaving] = useState(false);
+    const [selectedAiModel, setSelectedAiModel] = useState('llama3-groq-70b-8192-tool-use-preview');
+    const [availableModels, setAvailableModels] = useState<string[]>([
+        'llama3-groq-70b-8192-tool-use-preview',
+        'llama-3.3-70b-versatile', 
+        'mixtral-8x7b-32768',
+        'gemma2-9b-it',
+        'llama3-8b-8192',
+        'llama-3.1-70b-versatile'
+    ]);
     const [tabSvgs, setTabSvgs] = useState<{ [key: string]: string }>(() => {
         const saved = localStorage.getItem('tabCustomSvgs');
         return saved ? JSON.parse(saved) : {};
@@ -884,22 +898,266 @@ Make the explanation educational and easy to understand.`;
         return processed;
     };
 
-    const handleSaveSvg = () => {
-        if (managingTab && customSvgCode.trim()) {
-            // Process the SVG to standardize it
-            const processedSvg = processSvgCode(customSvgCode);
+    // AI-powered SVG generation function with better model
+    // Fetch available models from Groq
+    const fetchAvailableModels = async () => {
+        try {
+            const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
+            if (!groqApiKey) {
+                console.warn('⚠️ VITE_GROQ_API_KEY not found in environment variables');
+                return;
+            }
+
+            const response = await fetch('https://api.groq.com/openai/v1/models', {
+                headers: {
+                    'Authorization': `Bearer ${groqApiKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             
-            const newTabSvgs = {
-                ...tabSvgs,
-                [managingTab]: processedSvg
-            };
-            setTabSvgs(newTabSvgs);
-            // Save to localStorage for persistence
-            localStorage.setItem('tabCustomSvgs', JSON.stringify(newTabSvgs));
+            if (response.ok) {
+                const data = await response.json();
+                const models = data.data
+                    .map((model: any) => model.id)
+                    .filter((id: string) => 
+                        id.includes('llama') || 
+                        id.includes('mixtral') || 
+                        id.includes('gemma') ||
+                        id.includes('groq')
+                    )
+                    .sort();
+                
+                setAvailableModels(models);
+                console.log('📋 Available Groq models:', models);
+            } else {
+                console.warn('⚠️ Failed to fetch models:', response.status, response.statusText);
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not fetch Groq models, using defaults:', error);
         }
-        setShowSvgEditor(false);
-        setManagingTab(null);
-        setCustomSvgCode('');
+    };
+
+    // Load available models on mount
+    useEffect(() => {
+        console.log('🔑 Environment check:', {
+            hasGroqKey: !!import.meta.env.VITE_GROQ_API_KEY,
+            keyPreview: import.meta.env.VITE_GROQ_API_KEY ? 
+                `${import.meta.env.VITE_GROQ_API_KEY.substring(0, 8)}...${import.meta.env.VITE_GROQ_API_KEY.substring(-8)}` : 
+                'Not found'
+        });
+        fetchAvailableModels();
+    }, []);
+
+    const generateAISvg = async (prompt: string): Promise<string> => {
+        try {
+            const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
+            if (!groqApiKey) {
+                throw new Error('GROQ_API_KEY is not configured in .env');
+            }
+
+            console.log(`🤖 Generating SVG with model: ${selectedAiModel}`);
+            console.log(`📝 User prompt: "${prompt}"`);
+
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${groqApiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: selectedAiModel,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `You are an expert SVG icon designer. Generate clean, minimal SVG icons based on user descriptions.
+
+CRITICAL REQUIREMENTS:
+1. ONLY output valid SVG code - nothing else
+2. Use class="w-5 h-5" for size (exactly this format)
+3. Use stroke="currentColor" and fill="none" for theme compatibility
+4. Set stroke-width="2" for consistency
+5. Use viewBox="0 0 24 24" for proper scaling
+6. Create simple, recognizable icons with clean lines
+7. Avoid complex details - keep it minimal and scalable
+8. Use stroke-linecap="round" stroke-linejoin="round" for smooth lines
+
+EXAMPLES OF GOOD SVG FORMAT:
+- Book: <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+- Calculator: <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+
+Focus on the CORE VISUAL CONCEPT. Make it instantly recognizable.`
+                        },
+                        {
+                            role: 'user',
+                            content: `Create an SVG icon for: ${prompt}
+
+Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and professional.`
+                        }
+                    ],
+                    max_tokens: 1000,
+                    temperature: 0.3,
+                    top_p: 0.9,
+                    presence_penalty: 0.1,
+                    frequency_penalty: 0.1
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Groq API error: ${response.status} - ${errorData}`);
+            }
+
+            const data = await response.json();
+            let generatedSvg = data.choices?.[0]?.message?.content?.trim();
+
+            if (!generatedSvg) {
+                throw new Error('No SVG generated by AI');
+            }
+
+            console.log('🔄 Raw AI response:', generatedSvg);
+
+            // Clean and validate the generated SVG
+            let cleanSvg = generatedSvg;
+            
+            // Remove any markdown code blocks
+            cleanSvg = cleanSvg.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '');
+            
+            // Remove extra text before and after SVG
+            const svgStart = cleanSvg.indexOf('<svg');
+            const svgEnd = cleanSvg.lastIndexOf('</svg>') + 6;
+            if (svgStart >= 0 && svgEnd > svgStart) {
+                cleanSvg = cleanSvg.substring(svgStart, svgEnd);
+            }
+            
+            // Ensure it has proper SVG structure
+            if (!cleanSvg.includes('<svg') || !cleanSvg.includes('</svg>')) {
+                throw new Error('Generated content is not a valid SVG');
+            }
+
+            // Ensure proper attributes
+            if (!cleanSvg.includes('class="w-5 h-5"')) {
+                cleanSvg = cleanSvg.replace(/<svg[^>]*>/, '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">');
+            }
+
+            console.log('✅ AI-generated SVG:', cleanSvg);
+            return cleanSvg;
+
+        } catch (error) {
+            console.error('❌ AI SVG generation failed:', error);
+            throw error; // Re-throw to handle in UI
+        }
+    };
+
+    // Handle AI SVG generation with preview
+    const handleGenerateAISvg = async () => {
+        if (!customSvgCode.trim()) return;
+        
+        setIsGeneratingAI(true);
+        setSvgGenerationStep('preview');
+        
+        try {
+            const generatedSvg = await generateAISvg(customSvgCode);
+            setAiSvgPreview(generatedSvg);
+        } catch (error) {
+            console.error('❌ AI SVG generation failed:', error);
+            
+            // Show fallback based on prompt keywords
+            const prompt_lower = customSvgCode.toLowerCase();
+            let fallbackSvg = '';
+            
+            if (prompt_lower.includes('book') || prompt_lower.includes('read')) {
+                fallbackSvg = '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>';
+            } else if (prompt_lower.includes('note') || prompt_lower.includes('write')) {
+                fallbackSvg = '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>';
+            } else if (prompt_lower.includes('graduation') || prompt_lower.includes('education') || prompt_lower.includes('cap')) {
+                fallbackSvg = '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 14V8" /></svg>';
+            } else {
+                fallbackSvg = '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>';
+            }
+            
+            setAiSvgPreview(fallbackSvg);
+        } finally {
+            setIsGeneratingAI(false);
+        }
+    };
+
+    // Handle saving the AI generated SVG
+    const handleSaveAISvg = async () => {
+        if (managingTab && aiSvgPreview) {
+            try {
+                // Update the tab SVG
+                setTabSvgs(prev => ({
+                    ...prev,
+                    [managingTab]: aiSvgPreview
+                }));
+                
+                // Save to localStorage
+                localStorage.setItem('tabCustomSvgs', JSON.stringify({
+                    ...tabSvgs,
+                    [managingTab]: aiSvgPreview
+                }));
+                
+                console.log('✅ SVG icon updated successfully!');
+                
+                // Reset and close editor
+                setSvgGenerationStep('saved');
+                setTimeout(() => {
+                    setShowSvgEditor(false);
+                    setManagingTab(null);
+                    setCustomSvgCode('');
+                    setAiSvgPreview('');
+                    setSvgGenerationStep('input');
+                }, 1000);
+                
+            } catch (error) {
+                console.error('❌ Failed to save SVG:', error);
+                alert('Failed to save SVG. Please try again.');
+            }
+        }
+    };
+
+    const handleSaveSvg = async () => {
+        if (managingTab && customSvgCode.trim()) {
+            setIsSaving(true);
+            try {
+                let processedSvg: string;
+                
+                // If the input looks like a natural language description, use AI generation
+                if (!customSvgCode.trim().startsWith('<svg') && !customSvgCode.trim().includes('</svg>')) {
+                    console.log('🤖 Generating AI SVG for prompt:', customSvgCode);
+                    processedSvg = await generateAISvg(customSvgCode);
+                } else {
+                    // Process existing SVG code
+                    processedSvg = processSvgCode(customSvgCode);
+                }
+                
+                // Update the tab SVG
+                setTabSvgs(prev => ({
+                    ...prev,
+                    [managingTab]: processedSvg
+                }));
+                
+                // Save to localStorage
+                localStorage.setItem('tabCustomSvgs', JSON.stringify({
+                    ...tabSvgs,
+                    [managingTab]: processedSvg
+                }));
+                
+                // Clear the editor state
+                setShowSvgEditor(false);
+                setManagingTab(null);
+                setCustomSvgCode('');
+                setSvgGenerationStep('input');
+                setAiSvgPreview('');
+                
+                console.log('✅ SVG icon updated successfully!');
+            } catch (error) {
+                console.error('Error saving SVG:', error);
+                alert('Failed to generate or save SVG. Please try again.');
+            } finally {
+                setIsSaving(false);
+            }
+        }
     };
 
     const getTabIcon = (tabName: string) => {
@@ -2252,53 +2510,178 @@ Make the explanation educational and easy to understand.`;
                                 </div>
                             </div>
                             
-                            {/* Custom SVG Code Section */}
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium theme-text mb-2">
-                                    Custom SVG Code (Optional):
-                                </label>
-                                <textarea
-                                    value={customSvgCode}
-                                    onChange={(e) => setCustomSvgCode(e.target.value)}
-                                    placeholder='<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-  <path stroke-linecap="round" stroke-linejoin="round" d="your-path-here"></path>
-</svg>'
-                                    className="svg-custom-textarea w-full h-24 p-3 theme-surface border rounded-lg theme-text font-mono text-sm resize-none"
+            {/* AI-Powered SVG Generator Section */}
+            <div className="mb-4">
+                <label className="block text-sm font-medium theme-text mb-2">
+                    🤖 Describe Your Icon or Paste SVG Code:
+                </label>
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={customSvgCode}
+                        onChange={(e) => setCustomSvgCode(e.target.value)}
+                        placeholder='Try: "calculator icon", "music note", "graduation cap" or paste SVG code...'
+                        className="w-full h-12 pl-10 pr-4 theme-surface border rounded-lg theme-text text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 svg-custom-textarea"
+                        autoFocus
+                    />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                        <svg className="w-4 h-4 theme-text-secondary" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+                <div className="text-xs theme-text-secondary mt-2 space-y-1">
+                    <p>💡 <strong>Natural Language:</strong> Describe what icon you want (e.g., "book", "lightbulb", "calculator")</p>
+                    <p>🔧 <strong>SVG Code:</strong> Paste existing SVG code to standardize it for our design system</p>
+                </div>
+            </div>
+
+            {/* AI Model Selection */}
+            <div className="mb-4">
+                <label className="block text-sm font-medium theme-text mb-2">
+                    🧠 AI Model Selection:
+                </label>
+                <select
+                    value={selectedAiModel}
+                    onChange={(e) => setSelectedAiModel(e.target.value)}
+                    className="w-full px-3 py-2 theme-surface border theme-border rounded-lg theme-text text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                    {availableModels.map((model) => (
+                        <option key={model} value={model}>
+                            {model.includes('llama-3.3') ? '🦙 Llama 3.3 70B (Latest & Best)' :
+                             model.includes('llama3-groq-70b') ? '🦙 Llama 3 70B (Tool Use)' :
+                             model.includes('llama-3.1-70b') ? '🦙 Llama 3.1 70B (Versatile)' :
+                             model.includes('mixtral') ? '🌀 Mixtral 8x7B (Creative)' :
+                             model.includes('gemma2') ? '💎 Gemma 2 9B (Fast)' :
+                             model.includes('llama3-8b') ? '🦙 Llama 3 8B (Quick)' :
+                             model}
+                        </option>
+                    ))}
+                </select>
+                <p className="text-xs theme-text-secondary mt-1">
+                    💡 Different models have different strengths. Llama 3.3 is most capable, Gemma 2 is fastest.
+                </p>
+            </div>
+
+            {/* AI Generation Workflow */}
+            <div className="space-y-4">
+                {/* Generate Preview Step */}
+                {svgGenerationStep === 'input' && customSvgCode.trim() && !customSvgCode.startsWith('<svg') && (
+                    <button
+                        onClick={handleGenerateAISvg}
+                        disabled={isGeneratingAI}
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2"
+                    >
+                        {isGeneratingAI ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Generating Preview...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Generate Preview with AI
+                            </>
+                        )}
+                    </button>
+                )}
+
+                {/* Preview Step */}
+                {svgGenerationStep === 'preview' && aiSvgPreview && (
+                    <div className="space-y-4 p-4 theme-surface-secondary rounded-lg border theme-border">
+                        <div className="text-center">
+                            <p className="text-sm font-medium theme-text mb-3">🎨 AI Generated Preview:</p>
+                            <div className="inline-flex items-center justify-center w-16 h-16 theme-surface rounded-lg border-2 theme-border shadow-sm">
+                                <div 
+                                    className="theme-text"
+                                    dangerouslySetInnerHTML={{ __html: aiSvgPreview }} 
                                 />
-                                <p className="text-xs theme-text-secondary mt-1">
-                                    Tip: Select an icon above or paste your own SVG code here
-                                </p>
                             </div>
-                            
-                            {/* Preview */}
-                            {customSvgCode && (
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium theme-text mb-2">Preview:</label>
-                                    <div className="p-4 border rounded-lg theme-surface2 flex items-center justify-center">
-                                        <div className="theme-text" dangerouslySetInnerHTML={{ __html: customSvgCode }} />
-                                    </div>
-                                </div>
-                            )}
-                            
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowSvgEditor(false);
-                                        setManagingTab(null);
-                                        setCustomSvgCode('');
-                                    }}
-                                    className="flex-1 px-4 py-2 theme-surface2 theme-text rounded hover:theme-surface theme-transition"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSaveSvg}
-                                    disabled={!customSvgCode}
-                                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed theme-transition"
-                                >
-                                    Save Icon
-                                </button>
-                            </div>
+                            <p className="text-xs theme-text-secondary mt-2">Preview of your custom icon</p>
+                        </div>
+                        
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleSaveAISvg}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Save This Icon
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSvgGenerationStep('input');
+                                    setAiSvgPreview('');
+                                }}
+                                className="flex-1 theme-surface theme-text border theme-border hover:theme-surface-hover px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Regenerate
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Success Step */}
+                {svgGenerationStep === 'saved' && (
+                    <div className="text-center py-6 space-y-3">
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full">
+                            <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">✅ Icon Saved Successfully!</p>
+                            <p className="text-xs theme-text-secondary">The editor will close automatically...</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Regular Preview (for SVG code) */}
+                {customSvgCode && customSvgCode.startsWith('<svg') && svgGenerationStep === 'input' && (
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium theme-text mb-2">Preview:</label>
+                        <div className="p-4 border rounded-lg theme-surface2 flex items-center justify-center">
+                            <div className="theme-text" dangerouslySetInnerHTML={{ __html: customSvgCode }} />
+                        </div>
+                    </div>
+                )}
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-3 mt-6">
+                <button
+                    onClick={() => {
+                        setShowSvgEditor(false);
+                        setManagingTab(null);
+                        setCustomSvgCode('');
+                        setSvgGenerationStep('input');
+                        setAiSvgPreview('');
+                    }}
+                    className="flex-1 px-4 py-2 theme-surface2 theme-text rounded hover:theme-surface theme-transition"
+                >
+                    Cancel
+                </button>
+                {/* Only show Save button for direct SVG code */}
+                {customSvgCode && customSvgCode.startsWith('<svg') && svgGenerationStep === 'input' && (
+                    <button
+                        onClick={handleSaveSvg}
+                        disabled={isSaving}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed theme-transition flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        {isSaving ? 'Saving...' : 'Save Icon'}
+                    </button>
+                )}
+            </div>
                         </div>
                     </div>
                 </div>

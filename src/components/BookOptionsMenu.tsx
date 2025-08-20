@@ -54,10 +54,13 @@ const BookOptionsMenu: React.FC<BookOptionsMenuProps> = ({ bookId, bookName, onE
                     e.stopPropagation();
                     setIsOpen(!isOpen);
                 }}
-                className="p-2 hover:theme-surface2 rounded-lg theme-transition opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-2 hover:theme-surface2 rounded-lg theme-transition 
+                    sm:opacity-0 sm:group-hover:opacity-100 
+                    opacity-100 bg-black/30 backdrop-blur-sm border border-white/20 
+                    hover:bg-black/50 transition-all duration-200"
                 title="More options"
             >
-                <DotsVerticalIcon className="w-4 h-4 theme-text-secondary" />
+                <DotsVerticalIcon className="w-4 h-4 text-white" />
             </button>
 
             {isOpen && (

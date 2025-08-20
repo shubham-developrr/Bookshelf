@@ -35,8 +35,9 @@ const SearchPage: React.FC = () => {
             }
             
             // Search chapters
-            chapters.forEach(chapter => {
-                if (chapter.toLowerCase().includes(queryLower)) {
+            const chapterArray = Array.isArray(chapters) ? chapters : [];
+            chapterArray.forEach(chapter => {
+                if (typeof chapter === 'string' && chapter.toLowerCase().includes(queryLower)) {
                     results.push({
                         type: 'chapter',
                         title: chapter,
