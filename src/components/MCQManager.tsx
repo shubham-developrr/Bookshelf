@@ -22,12 +22,14 @@ interface MCQQuestion {
 interface MCQManagerProps {
     currentBook: string;
     currentChapter: string;
+    tabId?: string; // Unique tab identifier for isolation
     className?: string;
 }
 
 const MCQManager: React.FC<MCQManagerProps> = ({
     currentBook,
     currentChapter,
+    tabId,
     className = ''
 }) => {
     const [mcqQuestions, setMcqQuestions] = useState<MCQQuestion[]>([]);
@@ -49,7 +51,9 @@ const MCQManager: React.FC<MCQManagerProps> = ({
     const [newExplanation, setNewExplanation] = useState('');
     const [newCategory, setNewCategory] = useState('');
 
-    const storageKey = `mcq_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    // Create unique storage key that includes tab ID for isolation
+    const baseKey = `mcq_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
 
     // Load MCQs from localStorage
     React.useEffect(() => {

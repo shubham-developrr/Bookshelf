@@ -4,7 +4,7 @@ import { BackIcon, BookOpenIcon, PlusIcon, TrashIcon } from '../components/icons
 import { getBookImage } from '../assets/images/index';
 import { syllabus, chapterSubtopics } from '../constants/constants';
 import { useTheme } from '../contexts/ThemeContext';
-import { BookExportService } from '../services/exportService';
+import { MarketplaceBookExportService } from '../services/marketplaceExportService';
 
 interface Chapter {
     id: string;
@@ -186,7 +186,7 @@ const SubjectPage: React.FC = () => {
                 };
             }
             
-            await BookExportService.exportBook(bookData.bookName, bookData.bookId);
+            await MarketplaceBookExportService.exportBookModule(bookData.bookName, bookData.bookId);
             setExportMessage(`Successfully exported "${book}"!`);
             
         } catch (error) {

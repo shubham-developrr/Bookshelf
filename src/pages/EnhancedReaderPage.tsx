@@ -5,6 +5,7 @@ import { Highlight } from '../types/types';
 import { chapterSubtopics } from '../constants/constants';
 import { AIGuruIcon } from '../components/icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useUser } from '../contexts/UserContext';
 import KindleStyleTextViewer from '../components/KindleStyleTextViewerFixed';
 import YouTubePlayerModal from '../components/YouTubePlayerModal';
 import InlineContentEditor from '../components/InlineContentEditor';
@@ -18,6 +19,7 @@ import VideosManager from '../components/VideosManager';
 import HTMLCodeEditor from '../components/HTMLCodeEditor';
 import { ResponsiveTabBar } from '../components/ResponsiveTabBar';
 import { generateAIGuruResponse } from '../services/githubModelsService';
+import { tabPersistenceManager } from '../services/TabPersistenceManager';
 import Groq from 'groq-sdk';
 
 // Template ID Constants - Built-in IDs that cannot be changed
@@ -182,6 +184,7 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
     const { subjectName, chapterName } = useParams<{ subjectName: string; chapterName: string }>();
     const navigate = useNavigate();
     const { theme } = useTheme();
+    const { state: userState } = useUser();
     
     const [expandedSubtopics, setExpandedSubtopics] = useState<Set<string>>(new Set());
     const [customSubtopics, setCustomSubtopics] = useState<SubtopicData[]>([]);
@@ -199,6 +202,9 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
     const [tabNames, setTabNames] = useState<{ [key: string]: string }>({}); // Custom names for tabs
     const [showRenameInput, setShowRenameInput] = useState<string | null>(null); // Tab being renamed
     const [renameValue, setRenameValue] = useState(''); // Rename input value
+
+    // Tab persistence state
+    const [isTabsLoaded, setIsTabsLoaded] = useState(false);
     
     // Manage tab states
     const [showManageDropdown, setShowManageDropdown] = useState(false);
@@ -340,6 +346,109 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
             setActiveTabs(existingTemplateTabs);
         }
     }, [currentBook, currentChapter]);
+
+    // Tab persistence integration
+    useEffect(() => {
+        if (!currentBook || !currentChapter || !userState.isAuthenticated || isTabsLoaded) return;
+
+        const loadPersistedTabs = async () => {
+            try {
+                const chapterTabs = tabPersistenceManager.getChapterTabs(currentChapter, currentBook);
+                
+                if (chapterTabs && chapterTabs.tabs.length > 0) {
+                    // Convert persisted tabs to current format
+                    const tabIds = chapterTabs.tabs.map(tab => tab.id);
+                    const tabNamesMap: { [key: string]: string } = {};
+                    
+                    chapterTabs.tabs.forEach(tab => {
+                        tabNamesMap[tab.id] = tab.title;
+                    });
+
+                    setActiveTabs(tabIds);
+                    setTabNames(tabNamesMap);
+                    setActiveTab(chapterTabs.activeTabId || tabIds[0]);
+                    console.log('Loaded persisted tabs:', chapterTabs);
+                }
+                setIsTabsLoaded(true);
+            } catch (error) {
+                console.error('Failed to load persisted tabs:', error);
+                setIsTabsLoaded(true);
+            }
+        };
+
+        loadPersistedTabs();
+    }, [currentBook, currentChapter, userState.isAuthenticated, isTabsLoaded]);
+
+    // Save tabs when they change (debounced)
+    useEffect(() => {
+        if (!currentBook || !currentChapter || !userState.isAuthenticated || !isTabsLoaded) return;
+
+        const saveTabsState = () => {
+            try {
+                // Convert current tab state to persistence format
+                const tabsToSave = activeTabs.map(tabId => ({
+                    id: tabId,
+                    title: tabNames[tabId] || tabId,
+                    type: getTabType(tabId),
+                    content: getTabContent(tabId),
+                    isActive: tabId === activeTab,
+                    lastModified: new Date().toISOString(),
+                    chapterId: currentChapter,
+                    bookId: currentBook
+                }));
+
+                const chapterTabsState = {
+                    chapterId: currentChapter,
+                    bookId: currentBook,
+                    tabs: tabsToSave,
+                    activeTabId: activeTab,
+                    lastAccessed: new Date().toISOString()
+                };
+
+                tabPersistenceManager.saveChapterTabs(chapterTabsState);
+                console.log('Saved tabs state:', chapterTabsState);
+            } catch (error) {
+                console.error('Failed to save tabs state:', error);
+            }
+        };
+
+        const timeoutId = setTimeout(saveTabsState, 500); // Debounce saves
+        return () => clearTimeout(timeoutId);
+    }, [activeTabs, activeTab, tabNames, currentBook, currentChapter, userState.isAuthenticated, isTabsLoaded]);
+
+    // Helper functions for tab persistence
+    const getTabType = (tabId: string): 'text' | 'mcq' | 'qna' | 'notes' | 'mindmap' | 'flashcards' | 'videos' => {
+        if (tabId.startsWith('MCQ_')) return 'mcq';
+        if (tabId.startsWith('QA_')) return 'qna';
+        if (tabId.startsWith('NOTES_')) return 'notes';
+        if (tabId.startsWith('MINDMAP_')) return 'mindmap';
+        if (tabId.startsWith('FLASHCARD_')) return 'flashcards';
+        if (tabId.startsWith('VIDEOS_')) return 'videos';
+        return 'text';
+    };
+
+    const getTabContent = (tabId: string): any => {
+        // Get content from localStorage based on tab type
+        const chapterKey = currentChapter.replace(/\s+/g, '_');
+        const type = getTabType(tabId);
+        
+        switch (type) {
+            case 'mcq':
+                return JSON.parse(localStorage.getItem(`mcq_${currentBook}_${chapterKey}`) || '[]');
+            case 'qna':
+                return JSON.parse(localStorage.getItem(`qa_${currentBook}_${chapterKey}`) || '[]');
+            case 'notes':
+                return localStorage.getItem(`notes_${currentBook}_${chapterKey}`) || '';
+            case 'mindmap':
+                return JSON.parse(localStorage.getItem(`mindmaps_${currentBook}_${chapterKey}`) || '{}');
+            case 'flashcards':
+                return JSON.parse(localStorage.getItem(`flashcards_${currentBook}_${chapterKey}`) || '[]');
+            case 'videos':
+                return JSON.parse(localStorage.getItem(`videos_${currentBook}_${chapterKey}`) || '[]');
+            default:
+                return localStorage.getItem(`customtab_${currentBook}_${chapterKey}_${tabNames[tabId] || tabId}`) || '';
+        }
+    };
 
     const loadCustomSubtopics = async (bookId: string, chapter: string) => {
         // Add a small delay to simulate loading if needed for UX
@@ -789,34 +898,47 @@ Make the explanation educational and easy to understand.`;
             delete newTabNames[tabName];
             setTabNames(newTabNames);
             
-            // Clear localStorage data for this template
+            // Clear localStorage data for this specific tab instance
             if (currentBook && currentChapter) {
                 const chapterKey = currentChapter.replace(/\s+/g, '_');
                 
-                // Define template to storage key mapping
-                const templateStorageMappings: { [key: string]: string[] } = {
-                    'flashcard': [`flashcards_${currentBook}_${chapterKey}`],
-                    'mcq': [`mcq_${currentBook}_${chapterKey}`],
-                    'q&a': [`qa_${currentBook}_${chapterKey}`],
-                    'videos': [`videos_${currentBook}_${chapterKey}`],
-                    'ankiflashcard': [`anki_cards_${currentBook}_${chapterKey}`],
-                    'notes': [`notes_${currentBook}_${chapterKey}`],
-                    'mindmap': [`mindmaps_${currentBook}_${chapterKey}`]
+                // Get the template ID from the tab name
+                const getTemplateIdFromTab = (tabName: string): string | null => {
+                    // Handle template IDs with numbers (e.g., "FLASHCARD_1", "MCQ_2")
+                    if (tabName.includes('_')) {
+                        const baseId = tabName.split('_')[0];
+                        return baseId;
+                    }
+                    return null;
                 };
                 
-                // Check if it's a known template type
-                if (templateStorageMappings[tabName]) {
-                    templateStorageMappings[tabName].forEach(key => {
-                        localStorage.removeItem(key);
-                    });
-                } else {
-                    // Check if it's a custom tab
-                    const customTabKey = `customtab_${currentBook}_${chapterKey}_${getTabDisplayName(tabName)}`;
-                    localStorage.removeItem(customTabKey);
+                const templateId = getTemplateIdFromTab(tabName);
+                
+                // Clear tab-specific data using the new tab ID isolation system
+                if (templateId) {
+                    const templateStorageMappings: { [key: string]: string } = {
+                        'FLASHCARD': `flashcards_${currentBook}_${chapterKey}_${tabName}`,
+                        'MCQ': `mcq_${currentBook}_${chapterKey}_${tabName}`,
+                        'QA': `qa_${currentBook}_${chapterKey}_${tabName}`,
+                        'VIDEOS': `videos_${currentBook}_${chapterKey}_${tabName}`,
+                        'NOTES': `notes_${currentBook}_${chapterKey}_${tabName}`,
+                        'MINDMAP': `mindmaps_${currentBook}_${chapterKey}_${tabName}`
+                    };
                     
-                    // Also try the original tab name in case of renamed tabs
+                    const storageKey = templateStorageMappings[templateId];
+                    if (storageKey) {
+                        localStorage.removeItem(storageKey);
+                        console.log(`Cleared tab-specific localStorage key: ${storageKey}`);
+                    }
+                } else {
+                    // Handle custom tabs
+                    const displayName = getTabDisplayName(tabName);
+                    const customTabKey = `customtab_${currentBook}_${chapterKey}_${displayName}`;
                     const originalCustomTabKey = `customtab_${currentBook}_${chapterKey}_${tabName}`;
+                    
+                    localStorage.removeItem(customTabKey);
                     localStorage.removeItem(originalCustomTabKey);
+                    console.log(`Cleared custom tab keys: ${customTabKey}, ${originalCustomTabKey}`);
                 }
             }
             
@@ -1249,6 +1371,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
             <FlashCardManager 
                 currentBook={currentBook}
                 currentChapter={currentChapter}
+                tabId={activeTab}
                 className="w-full"
             />
         );
@@ -1260,6 +1383,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
             <MCQManager 
                 currentBook={currentBook}
                 currentChapter={currentChapter}
+                tabId={activeTab}
                 className="w-full"
             />
         );
@@ -1271,6 +1395,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
             <QAManager 
                 currentBook={currentBook}
                 currentChapter={currentChapter}
+                tabId={activeTab}
                 className="w-full"
             />
         );
@@ -1293,6 +1418,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
             <MindMapManager 
                 currentBook={currentBook}
                 currentChapter={currentChapter}
+                tabId={activeTab}
                 className="w-full"
             />
         );
@@ -1304,6 +1430,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
             <VideosManager 
                 currentBook={currentBook}
                 currentChapter={currentChapter}
+                tabId={activeTab}
                 className="w-full"
             />
         );
@@ -1818,6 +1945,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
             <NotesManager
                 currentBook={currentBook}
                 currentChapter={currentChapter}
+                tabId={activeTab}
                 className="h-full"
             />
         );

@@ -156,169 +156,11 @@ function userReducer(state: UserState, action: UserAction): UserState {
   }
 }
 
-// API service
-class UserService {
-  private baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+// API service - Updated to use Supabase
+import { supabaseUserService } from '../services/SupabaseUserService';
+import { realtimeManager } from '../services/RealtimeManager';
 
-  async login(email: string, password: string): Promise<User> {
-    const response = await fetch(`${this.baseUrl}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password })
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    return response.json();
-  }
-
-  async register(userData: {
-    email: string;
-    password: string;
-    username: string;
-    fullName: string;
-  }): Promise<User> {
-    const response = await fetch(`${this.baseUrl}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    return response.json();
-  }
-
-  async logout(): Promise<void> {
-    await fetch(`${this.baseUrl}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include'
-    });
-  }
-
-  async getCurrentUser(): Promise<User | null> {
-    try {
-      const response = await fetch(`${this.baseUrl}/auth/profile`, {
-        credentials: 'include'
-      });
-
-      if (response.status === 401) {
-        return null;
-      }
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      return response.json();
-    } catch (error) {
-      console.error('Failed to get current user:', error);
-      return null;
-    }
-  }
-
-  async updateProfile(updates: Partial<User>): Promise<User> {
-    const response = await fetch(`${this.baseUrl}/auth/profile`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(updates)
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    return response.json();
-  }
-
-  async getProgress(): Promise<UserProgress[]> {
-    const response = await fetch(`${this.baseUrl}/progress`, {
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    return response.json();
-  }
-
-  async updateProgress(progress: Omit<UserProgress, 'lastAccessed'>): Promise<UserProgress> {
-    const response = await fetch(`${this.baseUrl}/progress/${progress.bookId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(progress)
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    return response.json();
-  }
-
-  async getHighlights(): Promise<UserHighlight[]> {
-    const response = await fetch(`${this.baseUrl}/highlights`, {
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    return response.json();
-  }
-
-  async addHighlight(highlight: Omit<UserHighlight, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserHighlight> {
-    const response = await fetch(`${this.baseUrl}/highlights`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(highlight)
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    return response.json();
-  }
-
-  async updateHighlight(id: string, updates: Partial<UserHighlight>): Promise<UserHighlight> {
-    const response = await fetch(`${this.baseUrl}/highlights/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(updates)
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    return response.json();
-  }
-
-  async removeHighlight(id: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/highlights/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-  }
-}
-
-const userService = new UserService();
+const userService = supabaseUserService;
 
 // Context
 interface UserContextType {
@@ -351,8 +193,19 @@ export function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state.isAuthenticated && state.user) {
       syncUserData();
+      setupRealtimeSubscriptions();
+    } else {
+      // Clean up subscriptions when user logs out
+      realtimeManager.cleanup();
     }
   }, [state.isAuthenticated]);
+
+  // Cleanup subscriptions on unmount
+  useEffect(() => {
+    return () => {
+      realtimeManager.cleanup();
+    };
+  }, []);
 
   const initializeUser = async () => {
     try {
@@ -375,6 +228,32 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to sync user data:', error);
     }
+  };
+
+  const setupRealtimeSubscriptions = () => {
+    if (!state.user?.id) return;
+
+    // Initialize real-time subscriptions for the user
+    realtimeManager.initializeForUser(state.user.id);
+
+    // Subscribe to progress updates
+    realtimeManager.onProgressUpdate((progress, event) => {
+      dispatch({ type: 'UPDATE_PROGRESS', payload: progress });
+    });
+
+    // Subscribe to highlight updates
+    realtimeManager.onHighlightUpdate((highlight, event) => {
+      if (event === 'INSERT') {
+        dispatch({ type: 'ADD_HIGHLIGHT', payload: highlight });
+      } else if (event === 'UPDATE') {
+        dispatch({ type: 'UPDATE_HIGHLIGHT', payload: { id: highlight.id, updates: highlight } });
+      }
+    });
+
+    // Subscribe to highlight deletions
+    realtimeManager.onHighlightDelete((highlightId) => {
+      dispatch({ type: 'REMOVE_HIGHLIGHT', payload: highlightId });
+    });
   };
 
   const actions = {
@@ -401,10 +280,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
     logout: async () => {
       try {
         await userService.logout();
+        realtimeManager.cleanup(); // Clean up real-time subscriptions
         dispatch({ type: 'SET_USER', payload: null });
       } catch (error) {
         console.error('Logout failed:', error);
-        // Still clear local state even if API call fails
+        // Still clear local state and subscriptions even if API call fails
+        realtimeManager.cleanup();
         dispatch({ type: 'SET_USER', payload: null });
       }
     },

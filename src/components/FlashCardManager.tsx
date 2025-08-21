@@ -15,12 +15,14 @@ interface FlashCard {
 interface FlashCardManagerProps {
     currentBook: string;
     currentChapter: string;
+    tabId?: string; // Unique tab identifier for isolation
     className?: string;
 }
 
 const FlashCardManager: React.FC<FlashCardManagerProps> = ({
     currentBook,
     currentChapter,
+    tabId,
     className = ''
 }) => {
     const [flashCards, setFlashCards] = useState<FlashCard[]>([]);
@@ -33,7 +35,9 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
     const [showFormatModal, setShowFormatModal] = useState(false);
     const [isAIProcessing, setIsAIProcessing] = useState(false);
 
-    const storageKey = `flashcards_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    // Create unique storage key that includes tab ID for isolation
+    const baseKey = `flashcards_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
 
     // Load flashcards from localStorage
     useEffect(() => {

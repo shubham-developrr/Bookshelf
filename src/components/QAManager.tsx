@@ -18,12 +18,14 @@ interface QAQuestion {
 interface QAManagerProps {
     currentBook: string;
     currentChapter: string;
+    tabId?: string; // Unique tab identifier for isolation
     className?: string;
 }
 
 const QAManager: React.FC<QAManagerProps> = ({
     currentBook,
     currentChapter,
+    tabId,
     className = ''
 }) => {
     const [qaQuestions, setQaQuestions] = useState<QAQuestion[]>([]);
@@ -49,7 +51,9 @@ const QAManager: React.FC<QAManagerProps> = ({
     // Edit state
     const [editingQuestion, setEditingQuestion] = useState<QAQuestion | null>(null);
 
-    const storageKey = `qa_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    // Create unique storage key that includes tab ID for isolation
+    const baseKey = `qa_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
 
     // Base marks options
     const baseMarksOptions = [1, 2, 5, 7, 10];

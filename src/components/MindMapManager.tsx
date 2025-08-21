@@ -14,12 +14,14 @@ interface MindMapItem {
 interface MindMapManagerProps {
     currentBook: string;
     currentChapter: string;
+    tabId?: string; // Unique tab identifier for isolation
     className?: string;
 }
 
 const MindMapManager: React.FC<MindMapManagerProps> = ({
     currentBook,
     currentChapter,
+    tabId,
     className = ''
 }) => {
     const [mindMaps, setMindMaps] = useState<MindMapItem[]>([]);
@@ -30,7 +32,9 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const storageKey = `mindmaps_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    // Create unique storage key that includes tab ID for isolation
+    const baseKey = `mindmaps_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
 
     // Mobile detection
     const isMobile = () => window.innerWidth <= 768;

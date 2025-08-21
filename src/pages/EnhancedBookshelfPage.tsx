@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { BookOpenIcon, AlertIcon, AIGuruIcon, PlusIcon, SearchIconSvg, PaperAirplaneIcon } from '../components/icons';
 import { getBookImage } from '../assets/images/index';
 import { useTheme } from '../contexts/ThemeContext';
+import { useUser } from '../contexts/UserContext';
 import { bookLoader } from '../utils/bookModuleLoader';
 import { BookModule } from '../types/bookModule';
 import ThemeSelector from '../components/ThemeSelector';
+import UserProfileDropdown from '../components/UserProfileDropdown';
 import { BookBookstore } from '../components/BookBookstore';
 import CreateBookModal, { BookData } from '../components/CreateBookModal';
 import EditBookModal from '../components/EditBookModal';
@@ -13,7 +15,8 @@ import SearchModal from '../components/SearchModal';
 import BookOptionsMenu from '../components/BookOptionsMenu';
 import PublishModal from '../components/PublishModal';
 import EnhancedAIGuruModal from '../components/EnhancedAIGuruModal';
-import { BookImportService } from '../services/importService';
+import { MarketplaceBookImportService } from '../services/marketplaceImportService';
+import MarketplaceBookManager from '../components/MarketplaceBookManager';
 
 // Gear icon component
 const GearIcon: React.FC = () => (
@@ -23,17 +26,27 @@ const GearIcon: React.FC = () => (
     </svg>
 );
 
-const EnhancedBookshelfPage: React.FC = () => {
+interface EnhancedBookshelfPageProps {
+    showAuthModal?: boolean;
+    setShowAuthModal?: (show: boolean) => void;
+}
+
+const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({ 
+    showAuthModal, 
+    setShowAuthModal 
+}) => {
     const navigate = useNavigate();
     const { theme } = useTheme();
+    const { state } = useUser();
     const [isThemeModalOpen, setThemeModalOpen] = useState(false);
-    const [isSettingsDropdownOpen, setSettingsDropdownOpen] = useState(false);
     const [isBookstoreOpen, setBookstoreOpen] = useState(false);
     const [isCreateBookOpen, setCreateBookOpen] = useState(false);
     const [isEditBookOpen, setIsEditBookOpen] = useState(false);
     const [isSearchOpen, setSearchOpen] = useState(false);
     const [isPublishModalOpen, setPublishModalOpen] = useState(false);
     const [isAIGuruOpen, setAIGuruOpen] = useState(false);
+    const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
+    const [marketplaceInitialTab, setMarketplaceInitialTab] = useState<'export' | 'import'>('export');
     const [aiGuruPrompt, setAIGuruPrompt] = useState('');
     const [loadedBooks, setLoadedBooks] = useState<BookModule[]>([]);
     const [createdBooks, setCreatedBooks] = useState<Array<BookData & { id: string }>>([]);
@@ -46,7 +59,6 @@ const EnhancedBookshelfPage: React.FC = () => {
     const [isImporting, setIsImporting] = useState(false);
     const [importMessage, setImportMessage] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const settingsDropdownRef = useRef<HTMLDivElement>(null);
 
     // Legacy subjects for backward compatibility + imported books (default books removed)
     const legacySubjects = [
@@ -68,23 +80,6 @@ const EnhancedBookshelfPage: React.FC = () => {
             setImportedBooks(JSON.parse(savedImportedBooks));
         }
     }, []);
-
-    // Close settings dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target as Node)) {
-                setSettingsDropdownOpen(false);
-            }
-        };
-
-        if (isSettingsDropdownOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isSettingsDropdownOpen]);
 
     const loadInitialBooks = async () => {
         try {
@@ -206,16 +201,18 @@ const EnhancedBookshelfPage: React.FC = () => {
         setImportMessage('');
 
         try {
-            // Validate file first
-            const validation = await BookImportService.validateImportFile(file);
-            if (!validation.isValid) {
-                throw new Error(validation.error || 'Invalid import file');
-            }
-
-            // Import the book
-            await BookImportService.importBook(file);
+            // Get preview first
+            const preview = await MarketplaceBookImportService.getImportPreview(file);
             
-            setImportMessage(`Successfully imported "${validation.bookName}" with ${validation.chapterCount} chapters!`);
+            // Import the book module
+            const result = await MarketplaceBookImportService.importBookModule(file, {
+                conflictResolution: 'overwrite',
+                preserveExisting: false,
+                generateNewIds: false,
+                validateIntegrity: true
+            });
+            
+            setImportMessage(`Successfully imported "${result.bookName}" with ${result.imported.chapters} chapters!`);
             
             // Refresh the books
             await loadInitialBooks();
@@ -393,34 +390,20 @@ const EnhancedBookshelfPage: React.FC = () => {
                         <h1 className="text-xl sm:text-2xl font-bold theme-text flex items-center">Bookshelf</h1>
                     </div>
                     
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-4">
-                        {/* Settings Gear Button with Dropdown */}
-                        <div className="relative" ref={settingsDropdownRef}>
-                            <button 
-                                onClick={() => setSettingsDropdownOpen(!isSettingsDropdownOpen)}
-                                className="p-2 hover:theme-surface2 rounded-lg theme-transition"
+                    {/* Action Buttons - Profile moved to the right */}
+                    <div className="flex items-center">
+                        {/* Authentication Area */}
+                        {state.isAuthenticated ? (
+                            <UserProfileDropdown />
+                        ) : (
+                            <button
+                                onClick={() => setShowAuthModal?.(true)}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg
+                                         transition-colors duration-200"
                             >
-                                <GearIcon />
+                                Sign In
                             </button>
-                            
-                            {/* Settings Dropdown */}
-                            {isSettingsDropdownOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-48 theme-surface rounded-lg shadow-lg border theme-border z-50">
-                                    <div className="py-2">
-                                        <button
-                                            onClick={() => {
-                                                setSettingsDropdownOpen(false);
-                                                setThemeModalOpen(true);
-                                            }}
-                                            className="w-full text-left px-4 py-2 hover:theme-surface2 theme-transition theme-text flex items-center gap-2"
-                                        >
-                                            🎨 Theme Settings
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        )}
                         
                         
                     </div>
@@ -511,10 +494,32 @@ const EnhancedBookshelfPage: React.FC = () => {
                         </button>
                         
                         <button 
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => {
+                                // Create a file input element
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = '.zip,.json';
+                                input.multiple = false;
+                                input.onchange = (e) => {
+                                    const files = (e.target as HTMLInputElement).files;
+                                    if (files && files.length > 0) {
+                                        const file = files[0];
+                                        if (file.name.endsWith('.zip')) {
+                                            // Handle marketplace import - open marketplace modal with import tab
+                                            setMarketplaceInitialTab('import');
+                                            setIsMarketplaceOpen(true);
+                                            // The MarketplaceBookManager will handle the file processing
+                                        } else {
+                                            // Handle regular JSON import
+                                            handleImportBook({ target: { files } } as any);
+                                        }
+                                    }
+                                };
+                                input.click();
+                            }}
                             disabled={isImporting}
                             className="btn-secondary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Import Books"
+                            title="Import Books (JSON/ZIP files)"
                         >
                             📥 Import
                         </button>
@@ -641,6 +646,29 @@ const EnhancedBookshelfPage: React.FC = () => {
                 onClose={() => setAIGuruOpen(false)}
                 initialPrompt={aiGuruPrompt}
             />
+
+            {/* Marketplace Modal */}
+            {isMarketplaceOpen && (
+                <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden" data-testid="marketplace-modal">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h2 className="text-xl font-semibold theme-text">Marketplace - Export/Import Book Modules</h2>
+                            <button
+                                onClick={() => {
+                                    setIsMarketplaceOpen(false);
+                                    setMarketplaceInitialTab('export');
+                                }}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="overflow-auto max-h-[80vh]">
+                            <MarketplaceBookManager initialTab={marketplaceInitialTab} />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Book Bookstore Modal */}
             {isBookstoreOpen && (

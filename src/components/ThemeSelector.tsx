@@ -35,6 +35,16 @@ const ThemeSelector: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
     onClose();
   };
 
+  // Helper function to determine if accent color is light
+  const isLightAccent = (color: string): boolean => {
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return brightness > 128;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="theme-surface rounded-2xl w-full max-w-md shadow-2xl theme-transition">
@@ -139,8 +149,11 @@ const ThemeSelector: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                       </div>
                     </div>
                     <button 
-                      className="px-3 py-2 rounded text-white text-sm"
-                      style={{ backgroundColor: customThemeColors.accent }}
+                      className="px-3 py-2 rounded text-sm"
+                      style={{ 
+                        backgroundColor: customThemeColors.accent,
+                        color: isLightAccent(customThemeColors.accent) ? '#1e293b' : '#ffffff'
+                      }}
                     >
                       Sample Button
                     </button>
@@ -151,7 +164,8 @@ const ThemeSelector: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
               <div className="flex gap-3">
                 <button
                   onClick={handleCustomThemeSubmit}
-                  className="flex-1 py-3 px-4 rounded-xl font-semibold theme-accent text-white hover:bg-opacity-90 theme-transition"
+                  className="flex-1 py-3 px-4 rounded-xl font-semibold theme-accent hover:bg-opacity-90 theme-transition"
+                  style={{ color: 'var(--color-accent-text-contrast)' }}
                 >
                   Apply Custom Theme
                 </button>
@@ -175,14 +189,16 @@ const ThemeSelector: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                   }}
                   className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
                     themeMode === theme
-                      ? 'theme-accent text-white border-transparent'
+                      ? 'theme-accent border-transparent'
                       : 'theme-surface2 theme-text theme-border hover:theme-surface'
                   }`}
+                  style={themeMode === theme ? { color: 'var(--color-accent-text-contrast)' } : {}}
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-lg">{themeLabels[theme]}</h3>
-                      <p className={`text-sm ${themeMode === theme ? 'text-white opacity-90' : 'theme-text-secondary'}`}>
+                      <p className={`text-sm ${themeMode === theme ? 'opacity-90' : 'theme-text-secondary'}`} 
+                         style={themeMode === theme ? { color: 'var(--color-accent-text-contrast)' } : {}}>
                         {themeDescriptions[theme]}
                       </p>
                     </div>
@@ -232,14 +248,16 @@ const ThemeSelector: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                 }}
                 className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
                   themeMode === 'custom'
-                    ? 'theme-accent text-white border-transparent'
+                    ? 'theme-accent border-transparent'
                     : 'theme-surface2 theme-text theme-border hover:theme-surface'
                 }`}
+                style={themeMode === 'custom' ? { color: 'var(--color-accent-text-contrast)' } : {}}
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-lg">{themeLabels.custom}</h3>
-                    <p className={`text-sm ${themeMode === 'custom' ? 'text-white opacity-90' : 'theme-text-secondary'}`}>
+                    <p className={`text-sm ${themeMode === 'custom' ? 'opacity-90' : 'theme-text-secondary'}`}
+                       style={themeMode === 'custom' ? { color: 'var(--color-accent-text-contrast)' } : {}}>
                       {themeDescriptions.custom}
                     </p>
                   </div>

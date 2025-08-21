@@ -5,7 +5,7 @@ import { getBookImage } from '../assets/images/index';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeSelector from '../components/ThemeSelector';
 import { getSyllabus } from '../constants/constants';
-import { BookImportService } from '../services/importService';
+import { MarketplaceBookImportService } from '../services/marketplaceImportService';
 
 // Gear icon component
 const GearIcon: React.FC = () => (
@@ -81,16 +81,18 @@ const BookshelfPage: React.FC = () => {
         setImportMessage('');
 
         try {
-            // Validate file first
-            const validation = await BookImportService.validateImportFile(file);
-            if (!validation.isValid) {
-                throw new Error(validation.error || 'Invalid import file');
-            }
-
-            // Import the book
-            await BookImportService.importBook(file);
+            // Get preview first
+            const preview = await MarketplaceBookImportService.getImportPreview(file);
             
-            setImportMessage(`Successfully imported "${validation.bookName}" with ${validation.chapterCount} chapters!`);
+            // Import the book module
+            const result = await MarketplaceBookImportService.importBookModule(file, {
+                conflictResolution: 'overwrite',
+                preserveExisting: false,
+                generateNewIds: false,
+                validateIntegrity: true
+            });
+            
+            setImportMessage(`Successfully imported "${result.bookName}" with ${result.imported.chapters} chapters!`);
             
             // Refresh subjects list
             const syllabus = getSyllabus();

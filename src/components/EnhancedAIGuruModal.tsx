@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import Groq from 'groq-sdk';
 import { AIGuruIcon, CloseIcon, PaperAirplaneIcon } from './icons';
-import { ENHANCED_AI_GURU_PROMPT, AI_GURU_SYSTEM_CONTEXT } from '../utils/aiGuruPrompt';
+import { enhancedAIService } from '../services/EnhancedAIService';
+import { geminiAPIService } from '../services/GeminiAPIService';
 import EnhancedAIResponse from './EnhancedAIResponse';
-// import { generateAIGuruResponse } from '../services/githubModelsService';
 
-// Use Groq with kimi-k2-instruct model
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-// const GITHUB_MODELS_TOKEN = import.meta.env.VITE_GITHUB_MODELS_TOKEN;
+// Use Groq with kimi-k2-instruct model - Keep for fallback reference
+// const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
 interface Message {
     role: 'user' | 'model' | 'error';
@@ -25,9 +23,191 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [streamingText, setStreamingText] = useState('');
+    const [isStreaming, setIsStreaming] = useState(false);
     const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set());
+    const [fastResponseMode, setFastResponseMode] = useState(false); // New state for toggle
+    const [isStopRequested, setIsStopRequested] = useState(false); // New state for stop functionality
+    const [currentStreamTimer, setCurrentStreamTimer] = useState<NodeJS.Timeout | null>(null); // Track streaming timer
     const chatContainerRef = React.useRef<HTMLDivElement>(null);
     const messagesRef = React.useRef<Message[]>([]);
+    const fastResponseModeRef = React.useRef(false); // Ref to track current state
+    const pendingResponseRef = React.useRef<string>(''); // Store complete response during streaming
+
+    // Persistent chat history management
+    const CHAT_HISTORY_KEY = 'ai_guru_chat_history';
+    const MAX_MEMORY_TOKENS = 1000;
+
+    // Load chat history from localStorage on mount
+    React.useEffect(() => {
+        const savedHistory = localStorage.getItem(CHAT_HISTORY_KEY);
+        if (savedHistory && !initialPrompt) {
+            try {
+                const parsedHistory = JSON.parse(savedHistory);
+                if (Array.isArray(parsedHistory) && parsedHistory.length > 0) {
+                    setMessages(parsedHistory);
+                }
+            } catch (error) {
+                console.warn('Failed to load chat history:', error);
+            }
+        }
+    }, []);
+
+    // Save chat history to localStorage whenever messages change
+    React.useEffect(() => {
+        if (messages.length > 0) {
+            // Create memory summary for context (max 1000 tokens ~750 words)
+            const memorySummary = createMemorySummary(messages);
+            localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
+            localStorage.setItem('ai_guru_memory_summary', memorySummary);
+        }
+    }, [messages]);
+
+    // Create memory summary for context window
+    const createMemorySummary = (chatMessages: Message[]): string => {
+        if (chatMessages.length === 0) return '';
+        
+        // Take last 6 messages (3 exchanges) for context
+        const recentMessages = chatMessages.slice(-6);
+        let summary = 'Previous conversation context:\n';
+        
+        recentMessages.forEach((msg, index) => {
+            const role = msg.role === 'user' ? 'Student' : 'AI Guru';
+            const text = msg.text.length > 200 ? msg.text.substring(0, 200) + '...' : msg.text;
+            summary += `${role}: ${text}\n`;
+        });
+
+        // Ensure summary stays under 1000 tokens (~750 words)
+        if (summary.length > 750) {
+            summary = summary.substring(0, 750) + '...';
+        }
+
+        return summary;
+    };
+
+    // Handle modal close with streaming completion
+    const handleClose = () => {
+        if (isStreaming && pendingResponseRef.current) {
+            // Complete the streaming immediately
+            setIsStreaming(false);
+            setStreamingText('');
+            if (currentStreamTimer) {
+                clearInterval(currentStreamTimer);
+                setCurrentStreamTimer(null);
+            }
+            
+            // Add the complete response to messages
+            setMessages(prev => [...prev, { 
+                role: 'model', 
+                text: pendingResponseRef.current, 
+                isEnhanced: true 
+            }]);
+            
+            pendingResponseRef.current = '';
+            setIsLoading(false);
+        }
+        
+        onClose();
+    };
+
+    // Check if Premium AI is available
+    const isPremiumAIActive = geminiAPIService.isAvailable();
+
+    // Detect when complex reasoning is needed for thinking config
+    const detectComplexReasoningNeeded = (prompt: string): boolean => {
+        const complexityIndicators = [
+            // Mathematical and analytical
+            'explain the theory', 'theoretical framework', 'analyze', 'compare and contrast',
+            'derive', 'prove', 'demonstrate', 'mathematical proof', 'formula derivation',
+            
+            // Deep reasoning keywords
+            'why does', 'how does', 'what would happen if', 'critically evaluate',
+            'philosophical', 'conceptual framework', 'underlying principles',
+            
+            // Multi-step problems
+            'step by step', 'solve this problem', 'break down', 'detailed explanation',
+            'comprehensive analysis', 'in-depth', 'thorough examination',
+            
+            // Complex academic topics
+            'research methodology', 'literature review', 'hypothesis', 'thesis',
+            'argumentation', 'epistemology', 'ontology', 'paradigm'
+        ];
+        
+        const promptLower = prompt.toLowerCase();
+        const hasComplexityIndicators = complexityIndicators.some(indicator => 
+            promptLower.includes(indicator)
+        );
+        
+        // Also consider prompt length as an indicator of complexity
+        const isLongPrompt = prompt.length > 200;
+        
+        // Enable thinking for mathematical content (contains equations, formulas)
+        const hasMathContent = /\b(equation|formula|calculate|solve|derivative|integral|theorem|lemma|proof)\b/i.test(prompt);
+        
+        return hasComplexityIndicators || isLongPrompt || hasMathContent;
+    };
+
+    // Streaming text effect with stop functionality
+    const streamText = (text: string, onComplete: () => void) => {
+        setStreamingText('');
+        setIsStreaming(true);
+        setIsStopRequested(false);
+        pendingResponseRef.current = text; // Store complete response
+        
+        let currentIndex = 0;
+        const streamingSpeed = 2; // Doubled speed from 5ms to 2ms for faster streaming
+        
+        const timer = setInterval(() => {
+            if (isStopRequested || currentIndex >= text.length) {
+                clearInterval(timer);
+                setCurrentStreamTimer(null);
+                setIsStreaming(false);
+                
+                if (isStopRequested) {
+                    // If stopped, keep current progress and complete the message
+                    const currentText = text.substring(0, currentIndex);
+                    setStreamingText('');
+                    onComplete();
+                } else {
+                    // Normal completion
+                    setStreamingText('');
+                    onComplete();
+                }
+                return;
+            }
+            
+            setStreamingText(text.substring(0, currentIndex + 1));
+            currentIndex++;
+        }, streamingSpeed);
+        
+        setCurrentStreamTimer(timer);
+        return () => {
+            clearInterval(timer);
+            setCurrentStreamTimer(null);
+        };
+    };
+
+    // Stop streaming function
+    const stopStreaming = () => {
+        setIsStopRequested(true);
+        if (currentStreamTimer) {
+            clearInterval(currentStreamTimer);
+            setCurrentStreamTimer(null);
+        }
+        setIsStreaming(false);
+        
+        // Complete the message with current streaming progress
+        if (pendingResponseRef.current) {
+            setMessages(prev => [...prev, { 
+                role: 'model', 
+                text: pendingResponseRef.current, 
+                isEnhanced: true 
+            }]);
+        }
+        setStreamingText('');
+        setIsLoading(false);
+        pendingResponseRef.current = '';
+    };
 
     // Component for user messages with collapse functionality
     const UserMessage: React.FC<{ message: string; index: number }> = ({ message, index }) => {
@@ -59,43 +239,6 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
                 )}
             </div>
         );
-    };
-
-    // Enhanced Educational AI tutor system prompt
-    const getSystemPrompt = (isEnhanced: boolean = false) => {
-        if (isEnhanced) {
-            return ENHANCED_AI_GURU_PROMPT + '\n\n' + AI_GURU_SYSTEM_CONTEXT;
-        }
-        return `You are an expert AI tutor and educational companion, designed specifically for Honor Education Platform. You excel at making complex concepts accessible, engaging, and memorable through step-by-step explanations.
-
-🎯 **Core Teaching Philosophy:**
-- **Socratic Method**: Guide students to discover answers through thoughtful questions
-- **Scaffolded Learning**: Build knowledge systematically from simple to complex
-- **Active Learning**: Engage through discussions, examples, and problem-solving
-- **Growth Mindset**: Celebrate progress and treat mistakes as learning opportunities
-
-📚 **Subject Coverage:**
-✅ Academic subjects (Math, Science, History, Literature, etc.)
-✅ Study strategies and learning techniques
-✅ Homework assistance and concept explanations
-✅ Critical thinking and problem-solving skills
-❌ Medical advice, dangerous content, or non-academic planning
-
-🧠 **Teaching Techniques:**
-- **Analogies**: Compare complex ideas to familiar concepts
-- **Storytelling**: Use narratives to make information memorable
-- **Mnemonics**: Provide memory devices for facts and formulas
-- **Chunking**: Break large amounts of information into smaller pieces
-- **Elaborative Questioning**: Ask "why" and "how" to deepen understanding
-
-💡 **Communication Style:**
-- Enthusiastic but not overwhelming
-- Patient and understanding
-- Clear and concise explanations
-- Use age-appropriate language
-- Encourage questions and curiosity
-
-Remember: Your goal is not just to provide answers, but to develop independent learners who can think critically and solve problems confidently.`;
     };
 
     // Keep messages ref in sync
@@ -147,48 +290,42 @@ Focus on helping a college student understand both the concept and its applicati
         setIsLoading(true);
 
         try {
-            // Check if Groq API key is available
-            if (!GROQ_API_KEY) {
-                throw new Error("Groq API key is not configured. Please add VITE_GROQ_API_KEY to your .env.local file.");
+            // Use ref to get the most current state
+            const currentFastMode = fastResponseModeRef.current;
+            
+            // Smart thinking detection for complex scenarios
+            const shouldEnableThinking = !currentFastMode && detectComplexReasoningNeeded(processedPrompt);
+            
+            // Add memory context if available
+            const memorySummary = localStorage.getItem('ai_guru_memory_summary');
+            if (memorySummary && messages.length > 0) {
+                processedPrompt = `${memorySummary}\n\nCurrent question: ${processedPrompt}`;
             }
-
-            const groq = new Groq({ 
-                apiKey: GROQ_API_KEY, 
-                dangerouslyAllowBrowser: true 
+            
+            console.log(`🎯 AI Guru calling with fastMode: ${currentFastMode} (UI state: ${fastResponseMode}, ref: ${fastResponseModeRef.current}), thinking: ${shouldEnableThinking}`);
+            const response = await enhancedAIService.generateResponse(processedPrompt, currentFastMode, shouldEnableThinking);
+            
+            console.log('✅ AI Response received:', {
+                text: response.text ? `${response.text.substring(0, 100)}...` : 'EMPTY',
+                textLength: response.text?.length || 0,
+                model: response.model,
+                provider: response.provider,
+                fastModeUsed: currentFastMode
             });
 
-            // Build conversation messages for Groq
-            const conversationMessages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
-                { role: 'system', content: getSystemPrompt(isEnhancedRequest) },
-                ...messagesRef.current.map(msg => ({
-                    role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
-                    content: msg.text
-                })),
-                { role: 'user', content: processedPrompt }
-            ];
-
-            const resultStream = await groq.chat.completions.create({
-                messages: conversationMessages,
-                model: 'moonshotai/kimi-k2-instruct',
-                stream: true,
-                temperature: 0.7,
-                max_tokens: isEnhancedRequest ? 1500 : 1000,
-            });
-
-            let fullText = '';
-            setMessages(prev => [...prev, { role: 'model', text: '...', isEnhanced: isEnhancedRequest }]);
-
-            for await (const chunk of resultStream) {
-                const content = chunk.choices[0]?.delta?.content || '';
-                if (content) {
-                    fullText += content;
-                    setMessages(prev => prev.map((msg, index) => 
-                        index === prev.length - 1 
-                            ? { ...msg, text: fullText }
-                            : msg
-                    ));
-                }
+            if (!response.text || response.text.trim() === '') {
+                throw new Error('Empty response received from AI service');
             }
+
+            // Stream the response text
+            streamText(response.text, () => {
+                setMessages(prev => [...prev, { 
+                    role: 'model', 
+                    text: response.text, 
+                    isEnhanced: isEnhancedRequest 
+                }]);
+                setIsLoading(false);
+            });
 
         } catch (error) {
             console.error('AI Guru error:', error);
@@ -197,17 +334,25 @@ Focus on helping a college student understand both the concept and its applicati
                 text: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.',
                 isEnhanced: isEnhancedRequest 
             }]);
-        } finally {
             setIsLoading(false);
+            setIsStreaming(false);
         }
     }, []);
+
+    // Keep ref in sync with state
+    React.useEffect(() => {
+        fastResponseModeRef.current = fastResponseMode;
+        console.log(`🔄 State synced: ${fastResponseMode} → ref: ${fastResponseModeRef.current}`);
+    }, [fastResponseMode]);
 
     React.useEffect(() => {
         if (isOpen) {
             if (initialPrompt) {
-                setMessages([]); // Clear previous chat
+                // Only clear if we have a specific initial prompt to handle
+                setMessages([]); 
                 handleSend(initialPrompt);
-            } else {
+            } else if (messages.length === 0) {
+                // Only show welcome message if no previous history
                 setMessages([{
                     role: 'model',
                     text: "🎓 **Welcome to AI Guru - Your Educational Companion!**\n\nI'm your dedicated AI tutor, designed to make learning engaging and effective for college students. Here's how I can help:\n\n## 📚 **My Capabilities:**\n- **Interactive Learning**: Step-by-step explanations with real-world examples\n- **Guided Discovery**: Socratic questioning to help you understand deeply\n- **Homework Support**: Problem-solving guidance without giving away answers\n- **Practice Sessions**: Adaptive quizzes and exercises tailored to your level\n- **Study Strategies**: Learning techniques backed by educational science\n- **Mathematical Support**: LaTeX rendering for complex equations\n\n## ✨ **What makes me special:**\n• I adapt to your learning style and pace\n• I use **analogies** and *stories* to make concepts memorable\n• I celebrate your progress and help you learn from mistakes\n• I connect new knowledge to what you already know\n• I provide properly formatted responses with math support\n\n**Ready to start your learning journey? What would you like to explore today?** 🚀",
@@ -244,7 +389,7 @@ Focus on helping a college student understand both the concept and its applicati
                             <p className="text-xs theme-text-secondary">Your Personal Learning Assistant</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1 rounded-full hover:theme-surface2 theme-transition">
+                    <button onClick={handleClose} className="p-1 rounded-full hover:theme-surface2 theme-transition">
                         <CloseIcon />
                     </button>
                 </header>
@@ -293,13 +438,54 @@ Focus on helping a college student understand both the concept and its applicati
                                 )}
                             </div>
                         ))}
-                        {isLoading && messages[messages.length - 1]?.role !== 'model' && (
+                        
+                        {/* Streaming Response Display */}
+                        {isStreaming && streamingText && (
+                            <div className="mb-3 flex justify-start">
+                                <div className="w-full max-w-[98%]">
+                                    <EnhancedAIResponse 
+                                        content={streamingText} 
+                                        isLoading={false}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        {(isLoading && !isStreaming) && messages[messages.length - 1]?.role !== 'model' && (
                              <div className="flex justify-start">
-                                 <div className="max-w-[95%] sm:max-w-md p-2.5 sm:p-3 rounded-2xl theme-surface2 theme-text rounded-bl-none">
-                                    <div className="flex gap-1.5 items-center">
-                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-0"></span>
-                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></span>
-                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-300"></span>
+                                 <div className="max-w-[95%] sm:max-w-md p-4 sm:p-5 rounded-2xl theme-surface2 theme-text rounded-bl-none border-l-4 border-blue-500">
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center animate-pulse">
+                                                <span className="text-white text-sm">🤖</span>
+                                            </div>
+                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce"></div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-medium text-sm theme-text">AI Guru</span>
+                                                <div className="flex gap-1">
+                                                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '200ms' }}></span>
+                                                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '400ms' }}></span>
+                                                </div>
+                                            </div>
+                                            <div className="text-xs theme-text-secondary">
+                                                {isLoading ? (fastResponseMode ? '⚡ Generating quick response...' : '🧠 Deep thinking in progress...') : '✍️ Writing response...'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 text-xs theme-text-secondary bg-opacity-50 theme-surface p-2 rounded">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                            <span>
+                                                {isLoading 
+                                                    ? (fastResponseMode 
+                                                        ? 'Using Gemini 2.5 Flash for rapid analysis' 
+                                                        : 'Using Gemini for detailed response')
+                                                    : 'Typing response...'
+                                                }
+                                            </span>
+                                        </div>
                                     </div>
                                  </div>
                              </div>
@@ -326,18 +512,68 @@ Focus on helping a college student understand both the concept and its applicati
                                 target.style.height = Math.min(target.scrollHeight, 100) + 'px';
                             }}
                         />
+                        
+                        {/* Fast Response Toggle - Always show for mode selection */}
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md theme-surface border theme-border">
+                            <span className="text-xs theme-text-secondary whitespace-nowrap">
+                                {fastResponseMode ? '⚡' : '🧠'}
+                            </span>
+                            <button
+                                onClick={() => {
+                                    const newMode = !fastResponseMode;
+                                    console.log(`🔄 Toggle clicked: ${fastResponseMode} → ${newMode}`);
+                                    setFastResponseMode(newMode);
+                                    fastResponseModeRef.current = newMode; // Immediately update ref
+                                    console.log(`🔄 State updated: ref now = ${fastResponseModeRef.current}`);
+                                }}
+                                className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                                    fastResponseMode 
+                                        ? 'bg-blue-600' 
+                                        : 'bg-gray-300 dark:bg-gray-600'
+                                }`}
+                                title={
+                                    isPremiumAIActive 
+                                        ? (fastResponseMode ? 'Fast Response Mode: Quick answers using Gemini 2.5 Flash' : 'Reasoning Mode: Deep thinking using Gemini 2.5 Pro')
+                                        : (fastResponseMode ? 'Fast Response Mode: Quick answers' : 'Reasoning Mode: Detailed analysis')
+                                }
+                            >
+                                <span
+                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                        fastResponseMode ? 'translate-x-3.5' : 'translate-x-0.5'
+                                    }`}
+                                />
+                            </button>
+                            <span className="text-xs theme-text-secondary whitespace-nowrap">
+                                {fastResponseMode ? 'Fast' : 'Reason'}
+                            </span>
+                        </div>
+                        
                         <button 
-                            onClick={() => {handleSend(input); setInput('');}} 
-                            disabled={isLoading || !input.trim()} 
-                            className="p-1.5 sm:p-2 theme-accent text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:hover:bg-opacity-100 theme-transition flex-shrink-0"
+                            onClick={isStreaming ? stopStreaming : () => {handleSend(input); setInput('');}} 
+                            disabled={isLoading && !isStreaming || !input.trim() && !isStreaming} 
+                            className={`p-1.5 sm:p-2 text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:hover:bg-opacity-100 theme-transition flex-shrink-0 ${
+                                isStreaming ? 'bg-red-500 hover:bg-red-600' : 'theme-accent'
+                            }`}
+                            title={isStreaming ? 'Stop generation' : 'Send message'}
                         >
-                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z" />
-                            </svg>
+                            {isStreaming ? (
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M6,6H18V18H6V6Z" />
+                                </svg>
+                            ) : (
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z" />
+                                </svg>
+                            )}
                         </button>
                     </div>
                     <p className="text-xs theme-text-secondary mt-2 text-center px-2" style={{ lineHeight: '1.2', fontSize: '10px' }}>
                         💡 Tip: Enhanced responses include LaTeX math, proper formatting, and detailed explanations
+                        {isPremiumAIActive && (
+                            <span className="block mt-1">
+                                🧠 Reasoning: Deep analysis with Gemini 2.5 Pro | ⚡ Fast: Quick responses with Gemini 2.5 Flash
+                            </span>
+                        )}
                     </p>
                 </footer>
             </div>

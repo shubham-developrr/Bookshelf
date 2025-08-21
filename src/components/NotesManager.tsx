@@ -18,12 +18,14 @@ interface Note {
 interface NotesManagerProps {
     currentBook: string;
     currentChapter: string;
+    tabId?: string; // Unique tab identifier for isolation
     className?: string;
 }
 
 const NotesManager: React.FC<NotesManagerProps> = ({
     currentBook,
     currentChapter,
+    tabId,
     className = ''
 }) => {
     const [notes, setNotes] = useState<Note[]>([]);
@@ -32,7 +34,9 @@ const NotesManager: React.FC<NotesManagerProps> = ({
     const [newTopic, setNewTopic] = useState('');
     const [isAddingNote, setIsAddingNote] = useState(false);
     
-    const storageKey = `notes_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    // Create unique storage key that includes tab ID for isolation
+    const baseKey = `notes_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
 
     // Load notes from localStorage
     useEffect(() => {

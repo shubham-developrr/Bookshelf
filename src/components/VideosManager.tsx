@@ -15,12 +15,14 @@ interface VideoItem {
 interface VideosManagerProps {
     currentBook: string;
     currentChapter: string;
+    tabId?: string; // Unique tab identifier for isolation
     className?: string;
 }
 
 const VideosManager: React.FC<VideosManagerProps> = ({
     currentBook,
     currentChapter,
+    tabId,
     className = ''
 }) => {
     const [videos, setVideos] = useState<VideoItem[]>([]);
@@ -31,7 +33,9 @@ const VideosManager: React.FC<VideosManagerProps> = ({
     const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
     const [showPlayer, setShowPlayer] = useState(false);
     
-    const storageKey = `videos_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    // Create unique storage key that includes tab ID for isolation
+    const baseKey = `videos_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
 
     // Mobile detection
     const isMobile = () => window.innerWidth <= 768;

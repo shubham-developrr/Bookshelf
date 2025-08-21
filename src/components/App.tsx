@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Highlight } from '../types/types';
 import { ThemeProvider } from '../contexts/ThemeContext';
-import { UserProvider } from '../contexts/UserContext';
+import { UserProvider, useUser } from '../contexts/UserContext';
+import UserProfileDropdown from './UserProfileDropdown';
+import EnhancedAuthModal from './EnhancedAuthModal';
 import EnhancedAIGuruModal from './EnhancedAIGuruModal';
 import EnhancedBookshelfPage from '../pages/EnhancedBookshelfPage';
 import SearchPage from '../pages/SearchPage';
@@ -11,13 +13,24 @@ import EnhancedReaderPage from '../pages/EnhancedReaderPage';
 import HighlightsPage from '../pages/HighlightsPage';
 import BookContentPage from '../pages/BookContentPage';
 import ExamModePage from '../pages/ExamModePage';
+import AuthCallback from '../pages/AuthCallback';
+import { tabPersistenceManager } from '../services/TabPersistenceManager';
 
 function AppContent() {
-    // For now, maintain backward compatibility with local highlight state
-    // TODO: Integrate with UserContext highlights after standardizing types
+    const { state } = useUser();
     const [highlights, setHighlights] = useState<Highlight[]>([]);
     const [isAIGuruModalOpen, setAIGuruModalOpen] = useState(false);
     const [aiInitialPrompt, setAiInitialPrompt] = useState('');
+    const [showAuthModal, setShowAuthModal] = useState(false);
+
+    // Initialize tab persistence when user logs in
+    useEffect(() => {
+        if (state.isAuthenticated && state.user) {
+            tabPersistenceManager.initialize(state.user.id);
+        } else {
+            tabPersistenceManager.cleanup();
+        }
+    }, [state.isAuthenticated, state.user]);
 
     const addHighlight = (highlight: Highlight) => {
         setHighlights(prev => {
@@ -44,7 +57,13 @@ function AppContent() {
         <Router>
             <div className="theme-bg min-h-screen theme-transition">
                 <Routes>
-                    <Route path="/" element={<EnhancedBookshelfPage />} />
+                    <Route path="/" element={
+                        <EnhancedBookshelfPage 
+                            showAuthModal={showAuthModal}
+                            setShowAuthModal={setShowAuthModal}
+                        />
+                    } />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/search" element={<SearchPage />} />
                     <Route path="/subject/:subjectName" element={<SubjectPage />} />
                     <Route path="/book/:bookId/content" element={<BookContentPage />} />
@@ -66,16 +85,22 @@ function AppContent() {
                     />
 
                     <Route 
-                            path="/highlights/:subjectName/:chapterName" 
-                            element={
-                                <HighlightsPage 
-                                    highlights={highlights}
-                                    openAIGuru={openAIGuru}
-                                    removeHighlight={removeHighlight}
-                                />
-                            } 
-                        />
+                        path="/highlights/:subjectName/:chapterName" 
+                        element={
+                            <HighlightsPage 
+                                highlights={highlights}
+                                openAIGuru={openAIGuru}
+                                removeHighlight={removeHighlight}
+                            />
+                        } 
+                    />
                 </Routes>
+
+                {/* Modals */}
+                <EnhancedAuthModal 
+                    isOpen={showAuthModal} 
+                    onClose={() => setShowAuthModal(false)} 
+                />
 
                 <EnhancedAIGuruModal
                     isOpen={isAIGuruModalOpen}
