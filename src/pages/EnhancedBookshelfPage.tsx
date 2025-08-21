@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpenIcon, AlertIcon, AIGuruIcon, PlusIcon, SearchIconSvg, PaperAirplaneIcon } from '../components/icons';
+import { BookOpenIcon, AlertIcon, AIGuruIcon, PlusIcon, SearchIconSvg, PaperAirplaneIcon, CloudUploadIcon } from '../components/icons';
 import { getBookImage } from '../assets/images/index';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
@@ -8,15 +8,20 @@ import { bookLoader } from '../utils/bookModuleLoader';
 import { BookModule } from '../types/bookModule';
 import ThemeSelector from '../components/ThemeSelector';
 import UserProfileDropdown from '../components/UserProfileDropdown';
-import { BookBookstore } from '../components/BookBookstore';
+import BackendMarketplace from '../components/BackendMarketplace';
 import CreateBookModal, { BookData } from '../components/CreateBookModal';
 import EditBookModal from '../components/EditBookModal';
 import SearchModal from '../components/SearchModal';
 import BookOptionsMenu from '../components/BookOptionsMenu';
+import { MarketplaceBookImportService } from '../services/marketplaceImportService';
+import { MarketplaceBookExportService } from '../services/marketplaceExportService';
+import { EnhancedMarketplaceService } from '../services/EnhancedMarketplaceService';
+import BookManager from '../utils/BookManager';
+import { supabase } from '../services/supabaseClient';
 import PublishModal from '../components/PublishModal';
 import EnhancedAIGuruModal from '../components/EnhancedAIGuruModal';
-import { MarketplaceBookImportService } from '../services/marketplaceImportService';
 import MarketplaceBookManager from '../components/MarketplaceBookManager';
+import UpdateChecker from '../components/UpdateChecker';
 
 // Gear icon component
 const GearIcon: React.FC = () => (
@@ -59,6 +64,10 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
     const [isImporting, setIsImporting] = useState(false);
     const [importMessage, setImportMessage] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Publishing functionality state
+    const [publishingBooks, setPublishingBooks] = useState<Set<string>>(new Set());
+    const [publishMessage, setPublishMessage] = useState<string>('');
 
     // Legacy subjects for backward compatibility + imported books (default books removed)
     const legacySubjects = [
@@ -68,6 +77,13 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
 
     useEffect(() => {
         loadInitialBooks();
+        
+        // Migrate legacy books to new UUID system
+        const migratedCount = BookManager.migrateLegacyBooks();
+        if (migratedCount > 0) {
+            console.log(`Migrated ${migratedCount} books to new UUID system`);
+        }
+        
         // Load created books from localStorage
         const savedBooks = localStorage.getItem('createdBooks');
         if (savedBooks) {
@@ -101,14 +117,46 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
         }
     };
 
-    const handleBookDownload = async (bookUrl: string) => {
+    const handleBookDownload = async (marketplaceBook: any) => {
         try {
-            const bookModule = await bookLoader.loadBookModule(bookUrl);
-            setLoadedBooks([...bookLoader.getLoadedBooks()]);
-            console.log('Book downloaded successfully:', bookModule.title);
+            // For marketplace books, we need to download from the backend
+            if (marketplaceBook.id) {
+                const result = await EnhancedMarketplaceService.downloadBook(marketplaceBook.id);
+                
+                if (result.success && result.downloadData) {
+                    // For now, we'll use a simplified approach since the actual book file 
+                    // download and import is complex. Let's just add it to the imported books.
+                    const newImportedBook = {
+                        id: marketplaceBook.book_id || marketplaceBook.id,
+                        name: marketplaceBook.title,
+                        description: marketplaceBook.description,
+                        creatorName: marketplaceBook.author_name,
+                        university: marketplaceBook.university || '',
+                        semester: marketplaceBook.semester || '',
+                        subjectCode: marketplaceBook.subject_code || '',
+                        marketplaceId: marketplaceBook.id,
+                        downloadDate: new Date().toISOString(),
+                        version: marketplaceBook.version
+                    };
+                    
+                    const updatedImportedBooks = [...importedBooks, newImportedBook];
+                    setImportedBooks(updatedImportedBooks);
+                    localStorage.setItem('importedBooks', JSON.stringify(updatedImportedBooks));
+                    
+                    console.log('Book downloaded successfully:', marketplaceBook.title);
+                    alert('Book downloaded successfully! Check "Your Shelf" section.');
+                } else {
+                    throw new Error(result.error || 'Download failed');
+                }
+            } else {
+                // Legacy URL-based download (for backward compatibility)
+                const bookModule = await bookLoader.loadBookModule(marketplaceBook);
+                setLoadedBooks([...bookLoader.getLoadedBooks()]);
+                console.log('Book downloaded successfully:', bookModule.title);
+            }
         } catch (error) {
             console.error('Error downloading book:', error);
-            alert('Failed to download book. Please check the URL and try again.');
+            alert(`Failed to download book: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     };
 
@@ -131,18 +179,58 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
     };
 
     const handleCreateBook = (bookData: BookData) => {
+        // Use new BookManager to create book with proper UUID and versioning
+        const newBookMetadata = BookManager.createBook({
+            name: bookData.name,
+            description: `${bookData.university} - ${bookData.semester}`,
+            image: bookData.image,
+            creatorName: bookData.creatorName,
+            university: bookData.university,
+            semester: bookData.semester,
+            subjectCode: bookData.subjectCode
+        });
+
+        // Convert to legacy format for compatibility
         const newBook = {
             ...bookData,
-            id: `created-${Date.now()}`, // Simple ID generation
-            chapters: [] // Initialize with empty chapters
+            id: newBookMetadata.id, // Use UUID instead of timestamp
+            chapters: [],
+            version: newBookMetadata.version,
+            createdAt: newBookMetadata.createdAt,
+            updatedAt: newBookMetadata.updatedAt
         };
+
         const updatedBooks = [...createdBooks, newBook];
         setCreatedBooks(updatedBooks);
         
-        // Persist to localStorage
-        localStorage.setItem('createdBooks', JSON.stringify(updatedBooks));
+        // Use BookManager's safe storage instead of direct localStorage
+        // BookManager already saves to localStorage with quota handling
+        try {
+            localStorage.setItem('createdBooks', JSON.stringify(updatedBooks));
+        } catch (error) {
+            if (error instanceof Error && error.name === 'QuotaExceededError') {
+                console.warn('LocalStorage quota exceeded for createdBooks. Using minimal storage.');
+                // Save only essential data if quota exceeded
+                const minimalBooks = updatedBooks.map(book => ({
+                    id: book.id,
+                    name: book.name,
+                    creatorName: book.creatorName,
+                    university: book.university
+                }));
+                try {
+                    localStorage.setItem('createdBooks', JSON.stringify(minimalBooks));
+                } catch (minimalError) {
+                    console.error('Cannot save even minimal book data:', minimalError);
+                }
+            } else {
+                console.error('Error saving created books:', error);
+            }
+        }
         
-        console.log('Book created:', newBook);
+        // Close the modal on successful creation
+        setCreateBookOpen(false);
+        
+        console.log('Book created with UUID:', newBookMetadata);
     };
 
     const handleEditBook = (bookId: string) => {
@@ -186,6 +274,19 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
         localStorage.setItem('createdBooks', JSON.stringify(updatedBooks));
         
         console.log('Book deleted:', bookId);
+    };
+
+    const handleDeleteImportedBook = (bookId: string) => {
+        const book = importedBooks.find(b => b.id === bookId);
+        if (book && confirm(`Are you sure you want to delete "${book.name}"? This action cannot be undone.`)) {
+            const updatedBooks = importedBooks.filter(b => b.id !== bookId);
+            setImportedBooks(updatedBooks);
+            
+            // Persist to localStorage
+            localStorage.setItem('importedBooks', JSON.stringify(updatedBooks));
+            
+            console.log('Imported book deleted:', bookId);
+        }
     };
 
     const handleImportBook = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,10 +341,75 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
         }
     };
 
-    const handlePublishBooks = (bookIds: string[]) => {
+    const handlePublishBooks = async (bookIds: string[]) => {
         console.log('Publishing books:', bookIds);
-        // TODO: Implement actual publishing logic
-        alert(`Published ${bookIds.length} book(s) to bookstore!`);
+        
+        // For now, publish the first book in the selection
+        if (bookIds.length > 0) {
+            await handlePublishBook(bookIds[0]);
+        }
+    };
+
+    const handlePublishBook = async (bookId: string) => {
+        setPublishingBooks(prev => new Set(prev).add(bookId));
+        setPublishMessage('Publishing book to marketplace...');
+
+        try {
+            // Get book data using BookManager
+            const bookData = BookManager.getBookById(bookId);
+            
+            if (!bookData) {
+                throw new Error('Book not found');
+            }
+
+            // Export book module for marketplace
+            await MarketplaceBookExportService.exportBookModule(bookData.name, bookId);
+            
+            // Get current user ID
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error('User not authenticated');
+            }
+
+            // Prepare publish options
+            const publishOptions = {
+                book_id: bookId,
+                title: bookData.name,
+                description: bookData.description || `Interactive study book: ${bookData.name}`,
+                category: 'Education',
+                tags: bookData.tags || ['study', 'education'],
+                difficulty: bookData.difficulty || 'intermediate',
+                estimated_hours: bookData.estimatedHours || 10,
+                file_data: bookData, // The book metadata and content
+                release_notes: 'Initial publication'
+            };
+
+            // Publish to backend marketplace
+            const publishResult = await EnhancedMarketplaceService.publishBook(publishOptions);
+
+            if (publishResult.success) {
+                setPublishMessage('Book published successfully!');
+                
+                // Update local book metadata to mark as published
+                BookManager.updateBook(bookId, { 
+                    isPublished: true,
+                    marketplaceId: publishResult.marketplaceId
+                });
+            } else {
+                throw new Error(publishResult.error || 'Publishing failed');
+            }
+        } catch (error) {
+            console.error('Publishing error:', error);
+            setPublishMessage(`Publishing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setPublishingBooks(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(bookId);
+                return newSet;
+            });
+            // Clear message after 3 seconds
+            setTimeout(() => setPublishMessage(''), 3000);
+        }
     };
 
     const handleAIGuruClick = () => {
@@ -350,6 +516,31 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                     </div>
                 </div>
             </button>
+            
+            {/* Publish Button */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handlePublishBook(book.id);
+                }}
+                disabled={publishingBooks.has(book.id)}
+                className="mt-3 w-full py-2 px-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 
+                         text-white text-xs font-medium rounded-lg theme-transition 
+                         flex items-center justify-center gap-2"
+                title="Publish to Marketplace"
+            >
+                {publishingBooks.has(book.id) ? (
+                    <>
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                        Publishing...
+                    </>
+                ) : (
+                    <>
+                        <CloudUploadIcon className="w-3 h-3" />
+                        Publish
+                    </>
+                )}
+            </button>
         </div>
     );
 
@@ -375,6 +566,52 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                 </p>
             </div>
         </button>
+    );
+
+    const renderImportedBookCard = (book: any) => (
+        <div
+            key={book.id}
+            className="card theme-transition group text-left p-3 sm:p-4 lg:p-6 flex flex-col h-full relative"
+        >
+            {/* Three-dot menu - same style as creator section */}
+            <div className="absolute top-2 right-2 z-10">
+                <BookOptionsMenu
+                    bookId={book.id}
+                    bookName={book.name}
+                    onEdit={() => {}} // No edit function for imported books
+                    onDelete={handleDeleteImportedBook}
+                    hideEdit={true} // We'll add this prop to hide edit option
+                />
+            </div>
+            
+            <button
+                onClick={() => navigate(`/subject/${encodeURIComponent(book.name)}`)}
+                className="flex-1 w-full"
+            >
+                <div className="aspect-[3/4] mb-3 sm:mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-purple-100 to-purple-200 flex-shrink-0 flex items-center justify-center">
+                    <BookOpenIcon className="w-12 h-12 text-purple-600" />
+                </div>
+                <div className="flex-grow flex flex-col justify-between">
+                    <div>
+                        <h3 className="font-semibold theme-text mb-2 group-hover:theme-accent-text theme-transition text-xs sm:text-sm lg:text-base leading-tight">
+                            {book.name}
+                        </h3>
+                        <p className="text-xs theme-text-secondary mb-1">by {book.creatorName}</p>
+                        <p className="text-xs theme-text-secondary mb-2">{book.university}</p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded-full">
+                            Downloaded
+                        </span>
+                        {book.version && (
+                            <span className="text-xs theme-text-secondary">
+                                v{book.version}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </button>
+        </div>
     );
 
     return (
@@ -474,6 +711,17 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                     </div>
                 )}
 
+                {/* Publish Message */}
+                {publishMessage && (
+                    <div className={`mb-6 p-4 rounded-lg ${
+                        publishMessage.includes('successfully') 
+                            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' 
+                            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                    }`}>
+                        {publishMessage}
+                    </div>
+                )}
+
                 {/* Book Management Section */}
                 <div className="mb-8">
                     <div className="flex flex-wrap gap-4 justify-center mobile-btn-group">
@@ -534,11 +782,20 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                     <div>
                         {/* Your Shelf Section - Only Imported and Downloaded Books from Bookstore */}
                         <div className="mb-8">
-                            <h2 className="text-xl font-bold theme-text mb-4 flex items-center gap-2">
-                                📚 Your Shelf
-                            </h2>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold theme-text flex items-center gap-2">
+                                    📚 Your Shelf
+                                </h2>
+                                {state.user && importedBooks.length > 0 && (
+                                    <UpdateChecker 
+                                        userId={state.user.id} 
+                                        onUpdateAvailable={(updates) => console.log('Updates available:', updates)}
+                                    />
+                                )}
+                            </div>
                             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                                 {loadedBooks.map(renderBookCard)}
+                                {importedBooks.map(renderImportedBookCard)}
                                 
                                 {/* Download from Bookstore Button */}
                                 <button
@@ -673,18 +930,18 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
             {/* Book Bookstore Modal */}
             {isBookstoreOpen && (
                 <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden" data-testid="book-bookstore-modal">
-                        <div className="flex justify-between items-center p-4 border-b">
+                    <div className="theme-surface rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden theme-transition" data-testid="book-bookstore-modal">
+                        <div className="flex justify-between items-center p-4 border-b theme-border">
                             <h2 className="text-xl font-semibold theme-text">Book Bookstore</h2>
                             <button
                                 onClick={() => setBookstoreOpen(false)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                className="p-2 hover:theme-surface2 rounded-lg theme-transition theme-text"
                             >
                                 ✕
                             </button>
                         </div>
-                        <div className="overflow-auto max-h-[80vh]">
-                            <BookBookstore onDownloadBook={handleBookDownload} />
+                        <div className="overflow-auto max-h-[80vh] theme-bg">
+                            <BackendMarketplace onDownloadBook={handleBookDownload} />
                         </div>
                     </div>
                 </div>

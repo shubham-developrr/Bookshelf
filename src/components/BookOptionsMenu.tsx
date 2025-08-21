@@ -13,9 +13,10 @@ interface BookOptionsMenuProps {
     bookName: string;
     onEdit: (bookId: string) => void;
     onDelete: (bookId: string) => void;
+    hideEdit?: boolean; // Optional prop to hide edit option
 }
 
-const BookOptionsMenu: React.FC<BookOptionsMenuProps> = ({ bookId, bookName, onEdit, onDelete }) => {
+const BookOptionsMenu: React.FC<BookOptionsMenuProps> = ({ bookId, bookName, onEdit, onDelete, hideEdit = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -66,13 +67,15 @@ const BookOptionsMenu: React.FC<BookOptionsMenuProps> = ({ bookId, bookName, onE
             {isOpen && (
                 <div className="absolute right-0 top-full mt-1 w-48 theme-surface rounded-lg shadow-lg border theme-border z-50">
                     <div className="py-2">
-                        <button
-                            onClick={handleEdit}
-                            className="w-full px-4 py-2 text-left flex items-center gap-3 hover:theme-surface2 theme-transition theme-text"
-                        >
-                            <PencilIcon className="w-4 h-4" />
-                            Edit Details
-                        </button>
+                        {!hideEdit && (
+                            <button
+                                onClick={handleEdit}
+                                className="w-full px-4 py-2 text-left flex items-center gap-3 hover:theme-surface2 theme-transition theme-text"
+                            >
+                                <PencilIcon className="w-4 h-4" />
+                                Edit Details
+                            </button>
+                        )}
                         <button
                             onClick={handleDelete}
                             className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-red-50 dark:hover:bg-red-900/20 theme-transition text-red-600 dark:text-red-400"

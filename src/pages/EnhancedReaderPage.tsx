@@ -347,6 +347,21 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
         }
     }, [currentBook, currentChapter]);
 
+    // Initialize TabPersistenceManager when user is authenticated
+    useEffect(() => {
+        if (userState.isAuthenticated && userState.user?.id) {
+            const initializeTabManager = async () => {
+                try {
+                    await tabPersistenceManager.initialize(userState.user!.id);
+                    console.log('TabPersistenceManager initialized for user:', userState.user!.id);
+                } catch (error) {
+                    console.error('Failed to initialize TabPersistenceManager:', error);
+                }
+            };
+            initializeTabManager();
+        }
+    }, [userState.isAuthenticated, userState.user?.id]);
+
     // Tab persistence integration
     useEffect(() => {
         if (!currentBook || !currentChapter || !userState.isAuthenticated || isTabsLoaded) return;

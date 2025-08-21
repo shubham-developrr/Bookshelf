@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { geminiAPIService } from '../services/GeminiAPIService';
 import PremiumAIModal from './PremiumAIModal';
 import ThemeSelector from './ThemeSelector';
+import MyLibraryModal from './MyLibraryModal';
 
 // Custom SVG Icons (replacing lucide-react imports)
 const LogOutIcon = () => (
@@ -78,6 +79,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className = '
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showCustomThemeModal, setShowCustomThemeModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showLibraryModal, setShowLibraryModal] = useState(false);
   const [geminiStatus, setGeminiStatus] = useState<'checking' | 'available' | 'unavailable'>('checking');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -270,7 +272,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className = '
             <button
               onClick={() => {
                 setIsOpen(false);
-                // TODO: Navigate to user's library
+                setShowLibraryModal(true);
               }}
               className="flex items-center space-x-3 w-full px-4 py-2 text-left 
                          hover:theme-surface-hover theme-text transition-colors duration-150"
@@ -390,6 +392,12 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className = '
           onClose={() => setShowCustomThemeModal(false)} 
         />
       )}
+
+      {/* My Library Modal */}
+      <MyLibraryModal
+        isOpen={showLibraryModal}
+        onClose={() => setShowLibraryModal(false)}
+      />
     </div>
   );
 };
