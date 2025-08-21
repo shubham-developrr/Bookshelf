@@ -625,7 +625,7 @@ export class MarketplaceBookImportService {
             
             const chapters = Object.keys(bookModule.content.chapters);
             const totalTabs = Object.values(bookModule.content.chapters)
-                .reduce((sum: number, chapter: any) => sum + Object.keys(chapter.tabs || {}).length, 0);
+                .reduce((sum: number, chapter: any) => sum + Object.keys(chapter.tabs || {}).length, 0) as number;
             const totalAssets = Object.keys(bookModule.assets.images).length + 
                               Object.keys(bookModule.assets.documents).length;
             
