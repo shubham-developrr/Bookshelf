@@ -823,42 +823,35 @@ Recursion is a programming technique where a function calls itself to solve smal
 
                             {getCurrentSection() && (
                                 <>
-                                    {/* Section Header */}
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div>
-                                            <h3 className="text-base font-medium theme-text">
-                                                {getCurrentSection()?.name}
-                                            </h3>
-                                            <p className="text-xs theme-text-secondary">
-                                                {getCurrentQuestions().length} questions
-                                            </p>
-                                        </div>
-                                        <div className="flex gap-2">
+                                    {/* Section Header - Compact Mobile Layout */}
+                                    <div className="flex flex-col gap-2 mb-4">
+                                        {/* Single Line Button Layout for Mobile and Desktop */}
+                                        <div className="flex flex-wrap gap-2 items-center">
                                             <button
                                                 onClick={() => {
                                                     const currentSectionData = getCurrentSection();
                                                     setRenameSectionName(currentSectionData?.name || '');
                                                     setShowRenameSection(true);
                                                 }}
-                                                className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 theme-transition"
+                                                className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 theme-transition flex-shrink-0"
                                             >
                                                 Rename
                                             </button>
                                             <button
                                                 onClick={handleSectionSettings}
-                                                className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 theme-transition"
+                                                className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 theme-transition flex-shrink-0"
                                             >
                                                 Settings
                                             </button>
                                             <button
                                                 onClick={() => setShowQuestionList(true)}
-                                                className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 theme-transition"
+                                                className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 theme-transition flex-shrink-0"
                                             >
                                                 List
                                             </button>
                                             <button
                                                 onClick={handleAddQuestion}
-                                                className="px-2 py-1 text-xs theme-accent text-white rounded hover:opacity-90 theme-transition"
+                                                className="px-2 py-1 text-xs theme-accent text-white rounded hover:opacity-90 theme-transition flex-shrink-0"
                                             >
                                                 Add Question
                                             </button>
@@ -871,9 +864,9 @@ Recursion is a programming technique where a function calls itself to solve smal
                                                             handleAddOrOption(lastQuestion.id);
                                                         }
                                                     }}
-                                                    className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded theme-transition"
+                                                    className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded theme-transition flex-shrink-0"
                                                 >
-                                                    Add Optional Question
+                                                    Add OR
                                                 </button>
                                             )}
                                         </div>
@@ -1004,32 +997,34 @@ Recursion is a programming technique where a function calls itself to solve smal
                                     
                                     {/* Question Option Navigation */}
                                     {editingQuestion && editingQuestion.questionOptions.length > 1 && (
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    if (currentOptionIndex > 0) {
-                                                        handleEditQuestion(editingQuestion, currentOptionIndex - 1);
-                                                    }
-                                                }}
-                                                disabled={currentOptionIndex === 0}
-                                                className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 disabled:opacity-50 theme-transition"
-                                            >
-                                                Previous
-                                            </button>
-                                            <span className="text-xs theme-text">
-                                                {currentOptionIndex + 1} of {editingQuestion.questionOptions.length}
-                                            </span>
-                                            <button
-                                                onClick={() => {
-                                                    if (currentOptionIndex < editingQuestion.questionOptions.length - 1) {
-                                                        handleEditQuestion(editingQuestion, currentOptionIndex + 1);
-                                                    }
-                                                }}
-                                                disabled={currentOptionIndex === editingQuestion.questionOptions.length - 1}
-                                                className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 disabled:opacity-50 theme-transition"
-                                            >
-                                                Next
-                                            </button>
+                                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        if (currentOptionIndex > 0) {
+                                                            handleEditQuestion(editingQuestion, currentOptionIndex - 1);
+                                                        }
+                                                    }}
+                                                    disabled={currentOptionIndex === 0}
+                                                    className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 disabled:opacity-50 theme-transition"
+                                                >
+                                                    Previous
+                                                </button>
+                                                <span className="text-xs theme-text">
+                                                    {currentOptionIndex + 1} of {editingQuestion.questionOptions.length}
+                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        if (currentOptionIndex < editingQuestion.questionOptions.length - 1) {
+                                                            handleEditQuestion(editingQuestion, currentOptionIndex + 1);
+                                                        }
+                                                    }}
+                                                    disabled={currentOptionIndex === editingQuestion.questionOptions.length - 1}
+                                                    className="px-2 py-1 text-xs theme-surface theme-text border theme-border rounded hover:theme-surface2 disabled:opacity-50 theme-transition"
+                                                >
+                                                    Next
+                                                </button>
+                                            </div>
                                             
                                             {/* Delete Current Option Button */}
                                             {editingQuestion.questionOptions.length > 1 && (
@@ -1039,7 +1034,7 @@ Recursion is a programming technique where a function calls itself to solve smal
                                                             handleDeleteQuestionOption(editingQuestion.id, currentOptionIndex);
                                                         }
                                                     }}
-                                                    className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded theme-transition"
+                                                    className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded theme-transition self-start md:self-auto"
                                                     title={`Delete Option ${String.fromCharCode(65 + currentOptionIndex)}`}
                                                 >
                                                     Delete Option
@@ -1354,11 +1349,11 @@ Recursion is a programming technique where a function calls itself to solve smal
                 )}
 
                 {/* Footer */}
-                <div className="flex justify-between items-center p-3 border-t theme-border">
+                <div className="flex flex-col gap-2 md:flex-row md:justify-between md:items-center p-3 border-t theme-border">
                     <div className="text-xs theme-text-secondary">
                         {sections.length} section{sections.length > 1 ? 's' : ''} • {sections.reduce((total, section) => total + section.questions.length, 0)} question{sections.reduce((total, section) => total + section.questions.length, 0) !== 1 ? 's' : ''}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 justify-end">
                         <button
                             onClick={onClose}
                             className="px-3 py-1 text-sm theme-surface theme-text border theme-border rounded hover:theme-surface2 theme-transition"
@@ -1377,9 +1372,9 @@ Recursion is a programming technique where a function calls itself to solve smal
 
             {/* Rename Section Modal */}
             {showRenameSection && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="theme-surface theme-border border rounded-lg shadow-lg p-6 w-96">
-                        <h3 className="text-lg font-medium theme-text mb-4">Rename Section</h3>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="theme-surface theme-border border rounded-lg shadow-lg p-4 md:p-6 w-full max-w-96">
+                        <h3 className="text-base md:text-lg font-medium theme-text mb-4">Rename Section</h3>
                         <input
                             type="text"
                             value={renameSectionName}
@@ -1387,7 +1382,7 @@ Recursion is a programming technique where a function calls itself to solve smal
                             placeholder="Enter new section name"
                             className="w-full px-3 py-2 theme-surface theme-text theme-border border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <div className="flex justify-end gap-2 mt-4">
+                        <div className="flex flex-col gap-2 md:flex-row md:justify-end md:gap-2 mt-4">
                             <button
                                 onClick={() => {
                                     setShowRenameSection(false);

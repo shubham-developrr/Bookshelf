@@ -1382,10 +1382,10 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
             <div>
                 {/* Add Subtopic Button */}
                 {isCustomChapter && (
-                    <div className="mb-6">
+                    <div className="mb-4">
                         <button
                             onClick={() => setShowAddSubtopic(!showAddSubtopic)}
-                            className="px-4 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                            className="px-3 py-2 text-sm theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
                         >
                             {showAddSubtopic ? 'Cancel' : '+ Add Subtopic'}
                         </button>
@@ -1394,10 +1394,10 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
 
                 {/* Add Subtopic Form */}
                 {isCustomChapter && showAddSubtopic && (
-                    <div className="mb-6 card p-6">
+                    <div className="mb-6 card p-4 sm:p-6">
                         <h3 className="text-lg font-semibold theme-text mb-4">Add New Subtopic</h3>
-                        <div className="flex gap-4 items-end">
-                            <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-end">
+                            <div className="flex-1 w-full">
                                 <label className="block text-sm font-medium theme-text mb-2">Subtopic Title</label>
                                 <input
                                     type="text"
@@ -1407,16 +1407,16 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
                                     className="w-full px-3 py-2 theme-surface border border-gray-300 rounded-lg theme-text"
                                 />
                             </div>
-                            <div className="flex gap-3">
+                            <div className="flex gap-2 w-full sm:w-auto">
                                 <button
                                     onClick={() => setShowAddSubtopic(false)}
-                                    className="px-4 py-2 text-gray-600 hover:text-gray-800 theme-transition"
+                                    className="flex-1 sm:flex-none px-3 py-2 text-sm text-gray-600 hover:text-gray-800 theme-transition"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleAddSubtopic}
-                                    className="px-4 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                                    className="flex-1 sm:flex-none px-4 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
                                 >
                                     Add Subtopic
                                 </button>

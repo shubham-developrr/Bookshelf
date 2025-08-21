@@ -388,25 +388,13 @@ const EnhancedBookshelfPage: React.FC = () => {
                     {/* Logo and Title */}
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 theme-accent rounded-lg flex items-center justify-center">
-                            <span className="w-5 h-5 text-white flex items-center justify-center">
-                                <BookOpenIcon />
-                            </span>
+                            <BookOpenIcon className="w-5 h-5 text-white" />
                         </div>
-                        <h1 className="text-xl sm:text-2xl font-bold theme-text">Book Creator</h1>
+                        <h1 className="text-xl sm:text-2xl font-bold theme-text flex items-center">Bookshelf</h1>
                     </div>
                     
                     {/* Action Buttons */}
                     <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => setBookstoreOpen(true)}
-                            className="px-3 py-2 hover:theme-surface2 rounded-lg theme-transition text-sm font-medium flex items-center gap-2"
-                            title="Browse Book Bookstore"
-                            data-testid="bookstore-button"
-                        >
-                            <BookOpenIcon />
-                            Bookstore
-                        </button>
-                        
                         {/* Settings Gear Button with Dropdown */}
                         <div className="relative" ref={settingsDropdownRef}>
                             <button 
@@ -442,13 +430,28 @@ const EnhancedBookshelfPage: React.FC = () => {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
                 {/* Google-style Search Section in Main Area */}
                 <div className="mb-8 text-center">
-                    {/* Search Image */}
+                    {/* Search SVG */}
                     <div className="mb-4">
-                        <img 
-                            src="/src/assets/images/search.png" 
-                            alt="Search" 
-                            className="w-64 h-64 mx-auto"
-                        />
+                        <svg 
+                            width="256" 
+                            height="256" 
+                            viewBox="0 0 256 256" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-64 h-64 mx-auto mobile-search-image theme-text"
+                        >
+                            {/* Search glass */}
+                            <circle cx="110" cy="110" r="70" stroke="currentColor" strokeWidth="8" fill="none" opacity="0.7"/>
+                            
+                            {/* Search handle */}
+                            <path d="m165 165 50 50" stroke="currentColor" strokeWidth="8" strokeLinecap="round" opacity="0.7"/>
+                            
+                            {/* Magnifying glass inner circle (optional highlight) */}
+                            <circle cx="110" cy="110" r="50" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.3"/>
+                            
+                            {/* Small reflection on glass */}
+                            <ellipse cx="95" cy="95" rx="8" ry="12" fill="currentColor" opacity="0.2" transform="rotate(-45 95 95)"/>
+                        </svg>
                     </div>
                     
                     {/* Search Bar */}
@@ -459,7 +462,7 @@ const EnhancedBookshelfPage: React.FC = () => {
                                 placeholder="Search your books, chapters, and content..."
                                 onClick={() => setSearchOpen(true)}
                                 readOnly
-                                className="w-full px-4 py-4 pr-12 text-lg border border-gray-300 rounded-full theme-bg theme-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm hover:shadow-md theme-transition cursor-pointer"
+                                className="w-full px-4 py-4 pr-12 text-lg border border-gray-300 rounded-full theme-bg theme-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm hover:shadow-md theme-transition cursor-pointer mobile-search-input"
                             />
                             <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
                                 <SearchIconSvg />
@@ -490,12 +493,12 @@ const EnhancedBookshelfPage: React.FC = () => {
 
                 {/* Book Management Section */}
                 <div className="mb-8">
-                    <div className="flex flex-wrap gap-4 justify-center">
+                    <div className="flex flex-wrap gap-4 justify-center mobile-btn-group">
                         <button
-                            onClick={() => setPublishModalOpen(true)}
+                            onClick={() => setBookstoreOpen(true)}
                             className="btn-primary flex items-center gap-2"
                         >
-                            <PaperAirplaneIcon className="w-4 h-4" />
+                            <BookOpenIcon className="w-4 h-4" />
                             Browse Bookstore
                         </button>
                         
@@ -556,7 +559,9 @@ const EnhancedBookshelfPage: React.FC = () => {
 
                         {/* Creator Section - Created Books + Create Button */}
                         <div>
-                            <h2 className="text-xl font-bold theme-text mb-4">Creator Section</h2>
+                            <h2 className="text-xl font-bold theme-text mb-4 flex items-center gap-2">
+                                ✨ Creator Section
+                            </h2>
                             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                                 {/* Created Books */}
                                 {createdBooks.map(renderCreatedBookCard)}

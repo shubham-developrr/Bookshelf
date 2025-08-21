@@ -32,6 +32,7 @@ const QAManager: React.FC<QAManagerProps> = ({
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedMarks, setSelectedMarks] = useState<number[]>([]);
     const [showAnswers, setShowAnswers] = useState<{ [key: string]: boolean }>({});
+    const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
 
     // Form states for adding new questions
     const [newQuestion, setNewQuestion] = useState('');
@@ -762,6 +763,101 @@ Code a simple linear regression|Algorithm that models relationship between varia
                     >
                         ⚙️ Manage
                     </button>
+                    {/* Settings Gear Icon */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
+                            className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm px-3 py-2'} flex items-center gap-1`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            {!isMobile() && <span>Settings</span>}
+                        </button>
+                        
+                        {/* Settings Dropdown */}
+                        {showSettingsDropdown && (
+                            <div className="absolute top-full right-0 mt-2 w-64 theme-surface rounded-lg shadow-lg border theme-border z-20 p-4">
+                                <div className="space-y-4">
+                                    {/* Display mode toggle */}
+                                    <div>
+                                        <div className="text-sm font-medium theme-text mb-2">View Mode:</div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setDisplayMode('individual');
+                                                    setShowSettingsDropdown(false);
+                                                }}
+                                                className={`flex-1 px-3 py-1 text-sm rounded ${
+                                                    displayMode === 'individual' 
+                                                        ? 'theme-accent text-white' 
+                                                        : 'btn-secondary'
+                                                }`}
+                                            >
+                                                Individual
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setDisplayMode('batch');
+                                                    setShowSettingsDropdown(false);
+                                                }}
+                                                className={`flex-1 px-3 py-1 text-sm rounded ${
+                                                    displayMode === 'batch' 
+                                                        ? 'theme-accent text-white' 
+                                                        : 'btn-secondary'
+                                                }`}
+                                            >
+                                                Batch View
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Marks filter */}
+                                    <div>
+                                        <div className="text-sm font-medium theme-text mb-2">Filter by marks:</div>
+                                        <div className="flex flex-wrap gap-1">
+                                            {getAvailableMarks().map(mark => (
+                                                <button
+                                                    key={mark}
+                                                    onClick={() => {
+                                                        setSelectedMarks(prev => 
+                                                            prev.includes(mark) 
+                                                                ? prev.filter(m => m !== mark)
+                                                                : [...prev, mark]
+                                                        );
+                                                    }}
+                                                    className={`px-2 py-1 text-xs rounded ${
+                                                        selectedMarks.includes(mark)
+                                                            ? 'theme-accent text-white'
+                                                            : 'btn-secondary'
+                                                    }`}
+                                                >
+                                                    {mark}
+                                                </button>
+                                            ))}
+                                            {selectedMarks.length > 0 && (
+                                                <button
+                                                    onClick={() => setSelectedMarks([])}
+                                                    className="px-2 py-1 text-xs btn-secondary"
+                                                >
+                                                    Clear
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Close dropdown when clicking outside */}
+                        {showSettingsDropdown && (
+                            <div 
+                                className="fixed inset-0 z-10" 
+                                onClick={() => setShowSettingsDropdown(false)}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -782,67 +878,6 @@ Code a simple linear regression|Algorithm that models relationship between varia
                 </div>
             ) : (
                 <div className="space-y-4 sm:space-y-6">
-                    {/* Controls */}
-                    <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'flex-wrap gap-4 items-center'}`}>
-                        {/* Display mode toggle */}
-                        <div className={`flex ${isMobile() ? 'justify-center' : ''} gap-2`}>
-                            <button
-                                onClick={() => setDisplayMode('individual')}
-                                className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded ${
-                                    displayMode === 'individual' 
-                                        ? 'theme-accent text-white' 
-                                        : 'btn-secondary'
-                                }`}
-                            >
-                                Individual
-                            </button>
-                            <button
-                                onClick={() => setDisplayMode('batch')}
-                                className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded ${
-                                    displayMode === 'batch' 
-                                        ? 'theme-accent text-white' 
-                                        : 'btn-secondary'
-                                }`}
-                            >
-                                Batch View
-                            </button>
-                        </div>
-
-                        {/* Marks filter */}
-                        <div className={`flex ${isMobile() ? 'flex-col gap-2' : 'items-center gap-2'}`}>
-                            <span className={`${isMobile() ? 'text-xs' : 'text-sm'} theme-text`}>Filter by marks:</span>
-                            <div className={`flex ${isMobile() ? 'flex-wrap justify-center' : ''} gap-1`}>
-                                {getAvailableMarks().map(mark => (
-                                    <button
-                                        key={mark}
-                                        onClick={() => {
-                                            setSelectedMarks(prev => 
-                                                prev.includes(mark) 
-                                                    ? prev.filter(m => m !== mark)
-                                                    : [...prev, mark]
-                                            );
-                                        }}
-                                        className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-2 py-1 text-xs'} rounded ${
-                                            selectedMarks.includes(mark)
-                                                ? 'theme-accent text-white'
-                                                : 'btn-secondary'
-                                        }`}
-                                    >
-                                        {mark}
-                                    </button>
-                                ))}
-                                {selectedMarks.length > 0 && (
-                                    <button
-                                        onClick={() => setSelectedMarks([])}
-                                        className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-2 py-1 text-xs'} btn-secondary`}
-                                    >
-                                        Clear
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Questions display */}
                     {displayMode === 'individual' ? (
                         // Individual question display

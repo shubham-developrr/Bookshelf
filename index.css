@@ -436,6 +436,94 @@ body {
   .mobile-min-w-0 {
     min-width: 0;
   }
+  
+  /* Mobile-specific search section */
+  .mobile-search-image {
+    width: 8rem !important;
+    height: 8rem !important;
+  }
+  
+  .mobile-search-input {
+    padding: 0.75rem 1rem !important;
+    font-size: 1rem !important;
+  }
+  
+  /* Mobile button group - single line layout with auto-sizing */
+  .mobile-btn-group {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 0.5rem !important;
+    justify-content: center !important;
+  }
+  
+  .mobile-btn-group > button {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+    min-width: auto !important;
+    height: 2.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+  }
+  
+  .mobile-btn-group > button .w-4 {
+    width: 0.875rem !important;
+    height: 0.875rem !important;
+  }
+  
+  /* Chapter card mobile optimization */
+  .mobile-chapter-card {
+    margin-left: -1rem !important;
+    margin-right: -1rem !important;
+    width: calc(100% + 2rem) !important;
+    border-radius: 0.75rem !important;
+    padding: 0.5rem !important; /* Reduced from default padding */
+    min-height: auto !important; /* Remove any min-height constraints */
+  }
+
+  .mobile-chapter-card .flex.items-center {
+    padding: 0.5rem 0.75rem !important; /* Reduced from p-3 sm:p-4 */
+    gap: 0.75rem !important; /* Reduced gap */
+  }
+  
+  .mobile-chapter-card .flex.justify-between {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  /* Unit badge mobile sizing - wider for better text fit */
+  .mobile-chapter-card .w-14.h-10 {
+    width: 3.5rem !important;
+    height: 2.5rem !important;
+  }
+
+  .mobile-chapter-card .w-10.h-10 {
+    width: 3.5rem !important;
+    height: 2.5rem !important;
+  }
+
+  /* Text sizing for mobile chapters */
+  .mobile-chapter-card h3 {
+    font-size: 0.875rem !important; /* text-sm */
+    line-height: 1.25rem !important;
+  }
+
+  .mobile-chapter-card p {
+    font-size: 0.75rem !important; /* text-xs */
+    margin-top: 0.25rem !important;
+  }
+  
+  /* Unit badge alignment */
+  .mobile-unit-left {
+    margin-left: -0.5rem !important;
+  }
+  
+  /* Action buttons alignment */
+  .mobile-actions-right {
+    margin-right: -0.5rem !important;
+  }
 }
 
 @media (min-width: 641px) and (max-width: 1024px) {

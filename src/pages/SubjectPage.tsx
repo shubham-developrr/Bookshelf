@@ -456,19 +456,19 @@ const SubjectPage: React.FC = () => {
                         const bookDetails = savedBooks.find((b: any) => b.name === book);
                         
                         return (
-                            <div key={chapter.id} className="card w-full hover:scale-[1.01] theme-transition cursor-pointer"
+                            <div key={chapter.id} className="card w-full hover:scale-[1.01] theme-transition cursor-pointer mobile-chapter-card"
                                  onClick={() => navigate(`/reader/${encodeURIComponent(book)}/${encodeURIComponent(chapter.name)}`)}>
-                                <div className="flex items-center gap-4 p-3 sm:p-4">
-                                    <div className="w-10 h-10 sm:w-12 sm:h-12 theme-accent rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <span className="text-white font-bold text-xs sm:text-sm">Unit {chapter.number}</span>
+                                <div className="flex items-center gap-3 p-3 sm:p-4">
+                                    <div className="w-14 h-10 sm:w-16 sm:h-12 theme-accent rounded-lg flex items-center justify-center flex-shrink-0 mobile-unit-left">
+                                        <span className="text-white font-bold text-xs sm:text-sm whitespace-nowrap">Unit {chapter.number}</span>
                                     </div>
-                                    <div className="flex-1 min-w-0">
+                                    <div className="flex-1 min-w-0 ml-2">
                                         <h3 className="font-semibold theme-text text-sm sm:text-base line-clamp-1">{chapter.name}</h3>
                                         <p className="theme-text-secondary text-xs mt-1">
                                             {chapter.subtopics.length > 0 ? `${chapter.subtopics.length} subtopics` : 'No content yet'}
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1 mobile-actions-right">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -507,13 +507,13 @@ const SubjectPage: React.FC = () => {
                             <button 
                                 key={chapter} 
                                 onClick={() => navigate(`/reader/${encodeURIComponent(book)}/${encodeURIComponent(chapter)}`)} 
-                                className="card w-full text-left p-3 sm:p-4 hover:scale-[1.01] theme-transition"
+                                className="card w-full text-left p-3 sm:p-4 hover:scale-[1.01] theme-transition mobile-chapter-card"
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 sm:w-12 sm:h-12 theme-accent rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <span className="text-white font-bold text-xs sm:text-sm">Unit {i + 1}</span>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-14 h-10 sm:w-16 sm:h-12 theme-accent rounded-lg flex items-center justify-center flex-shrink-0 mobile-unit-left">
+                                        <span className="text-white font-bold text-xs sm:text-sm whitespace-nowrap">Unit {i + 1}</span>
                                     </div>
-                                    <div className="flex-1 min-w-0">
+                                    <div className="flex-1 min-w-0 ml-2">
                                         <h3 className="font-semibold theme-text text-sm sm:text-base line-clamp-1">{chapter}</h3>
                                         <p className="theme-text-secondary text-xs mt-1">
                                             {subtopicCount > 0 ? `${subtopicCount} subtopics` : 'Topics available'}

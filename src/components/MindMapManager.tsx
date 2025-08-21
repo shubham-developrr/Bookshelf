@@ -32,6 +32,9 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
 
     const storageKey = `mindmaps_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
 
+    // Mobile detection
+    const isMobile = () => window.innerWidth <= 768;
+
     // Load mind maps from localStorage
     React.useEffect(() => {
         const saved = localStorage.getItem(storageKey);
@@ -270,42 +273,46 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
     }
 
     return (
-        <div className={`theme-surface rounded-lg p-6 ${className}`}>
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
-                    <ImageIcon />
-                    Mind Maps
-                </h2>
-                <div className="flex gap-2">
-                    <div className="flex theme-surface2 rounded-lg p-1">
+        <div className={`theme-surface rounded-lg p-2 sm:p-6 ${className}`}>
+            <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 sm:mb-6`}>
+                <div className={`flex items-center ${isMobile() ? 'justify-between' : 'gap-4'}`}>
+                    <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
+                        <ImageIcon />
+                        Mind Maps
+                    </h2>
+                    
+                    {/* Moved controls to left side */}
+                    <div className={`flex ${isMobile() ? 'gap-1' : 'gap-2'}`}>
+                        <div className={`flex theme-surface2 rounded-lg ${isMobile() ? 'p-0.5' : 'p-1'}`}>
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded ${
+                                    viewMode === 'grid' 
+                                        ? 'theme-surface theme-text shadow-sm' 
+                                        : 'theme-text-secondary hover:theme-text'
+                                }`}
+                            >
+                                🔲 {!isMobile() && 'Grid'}
+                            </button>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`${isMobile() ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'} rounded ${
+                                    viewMode === 'list' 
+                                        ? 'theme-surface theme-text shadow-sm' 
+                                        : 'theme-text-secondary hover:theme-text'
+                                }`}
+                            >
+                                📋 {!isMobile() && 'List'}
+                            </button>
+                        </div>
                         <button
-                            onClick={() => setViewMode('grid')}
-                            className={`px-3 py-1 text-sm rounded ${
-                                viewMode === 'grid' 
-                                    ? 'theme-surface theme-text shadow-sm' 
-                                    : 'theme-text-secondary hover:theme-text'
-                            }`}
+                            onClick={() => setMode('add')}
+                            className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'} flex items-center gap-1`}
                         >
-                            🔲 Grid
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`px-3 py-1 text-sm rounded ${
-                                viewMode === 'list' 
-                                    ? 'theme-surface theme-text shadow-sm' 
-                                    : 'theme-text-secondary hover:theme-text'
-                            }`}
-                        >
-                            📋 List
+                            <PlusIcon />
+                            {!isMobile() && 'Add Mind Map'}
                         </button>
                     </div>
-                    <button
-                        onClick={() => setMode('add')}
-                        className="btn-secondary text-sm flex items-center gap-2"
-                    >
-                        <PlusIcon />
-                        Add Mind Map
-                    </button>
                 </div>
             </div>
 
@@ -358,13 +365,13 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
             ) : (
                 <div>
                     {viewMode === 'grid' ? (
-                        // Grid View
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        // Grid View - Ensure 2 items per row on mobile
+                        <div className={`grid ${isMobile() ? 'grid-cols-2 gap-2' : 'md:grid-cols-2 lg:grid-cols-3 gap-4'}`}>
                             {mindMaps.map((mindMap) => (
-                                <div key={mindMap.id} className="border theme-border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div key={mindMap.id} className={`border theme-border rounded-lg ${isMobile() ? 'p-2' : 'p-4'} hover:shadow-md transition-shadow`}>
                                     {/* Preview */}
                                     <div 
-                                        className="aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg mb-3 relative overflow-hidden cursor-pointer group"
+                                        className={`aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg ${isMobile() ? 'mb-2' : 'mb-3'} relative overflow-hidden cursor-pointer group`}
                                         onClick={() => openFullScreen(mindMap)}
                                     >
                                         {mindMap.type === 'image' ? (
@@ -376,45 +383,45 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-red-100 dark:bg-red-900/20">
                                                 <div className="text-center">
-                                                    <FileIcon className="w-12 h-12 text-red-500 mx-auto mb-2" />
-                                                    <span className="text-xs font-medium text-red-700 dark:text-red-300">PDF</span>
+                                                    <FileIcon className={`${isMobile() ? 'w-8 h-8' : 'w-12 h-12'} text-red-500 mx-auto mb-2`} />
+                                                    <span className={`${isMobile() ? 'text-xs' : 'text-xs'} font-medium text-red-700 dark:text-red-300`}>PDF</span>
                                                 </div>
                                             </div>
                                         )}
                                         
                                         {/* Overlay on hover */}
                                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
-                                            <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity text-sm font-medium">
-                                                Click to view full screen
+                                            <span className={`text-white opacity-0 group-hover:opacity-100 transition-opacity ${isMobile() ? 'text-xs' : 'text-sm'} font-medium`}>
+                                                {isMobile() ? 'Tap to view' : 'Click to view full screen'}
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Mind Map info */}
                                     <div>
-                                        <h3 className="font-medium theme-text text-sm line-clamp-2 mb-2">
+                                        <h3 className={`font-medium theme-text ${isMobile() ? 'text-xs' : 'text-sm'} line-clamp-2 ${isMobile() ? 'mb-1' : 'mb-2'}`}>
                                             {mindMap.label}
                                         </h3>
                                         
-                                        <div className="text-xs theme-text-secondary mb-2">
-                                            <div className="flex items-center justify-between">
-                                                <span>{mindMap.fileName}</span>
-                                                {mindMap.fileSize && <span>{mindMap.fileSize}</span>}
+                                        <div className={`${isMobile() ? 'text-xs' : 'text-xs'} theme-text-secondary ${isMobile() ? 'mb-1' : 'mb-2'}`}>
+                                            <div className={`flex ${isMobile() ? 'flex-col gap-0' : 'items-center justify-between'}`}>
+                                                <span className={`${isMobile() ? 'truncate' : ''}`}>{mindMap.fileName}</span>
+                                                {mindMap.fileSize && !isMobile() && <span>{mindMap.fileSize}</span>}
                                             </div>
-                                            <div>Added {mindMap.timestamp.toLocaleDateString()}</div>
+                                            {!isMobile() && <div>Added {mindMap.timestamp.toLocaleDateString()}</div>}
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="flex gap-2 mt-3">
+                                        <div className={`flex gap-1 ${isMobile() ? 'mt-2' : 'mt-3'}`}>
                                             <button
                                                 onClick={() => openFullScreen(mindMap)}
-                                                className="flex-1 btn-primary text-xs"
+                                                className={`flex-1 btn-primary ${isMobile() ? 'text-xs px-2 py-1' : 'text-xs'}`}
                                             >
-                                                View Full Screen
+                                                {isMobile() ? 'View' : 'View Full Screen'}
                                             </button>
                                             <button
                                                 onClick={() => deleteMindMap(mindMap.id)}
-                                                className="px-2 py-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-xs"
+                                                className={`${isMobile() ? 'px-1.5 py-1' : 'px-2 py-1'} text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-xs`}
                                                 title="Delete mind map"
                                             >
                                                 <TrashIcon />

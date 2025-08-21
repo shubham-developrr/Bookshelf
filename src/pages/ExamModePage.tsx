@@ -94,6 +94,9 @@ const ExamModePage: React.FC = () => {
     const [showReports, setShowReports] = useState(false);
     const [backgroundEvaluations, setBackgroundEvaluations] = useState<Map<string, any>>(new Map());
     
+    // Mobile UI State
+    const [showSidePanel, setShowSidePanel] = useState(false);
+    
     // Add Paper Form States
     const [paperTitle, setPaperTitle] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<'previous-year' | 'mock' | 'custom'>('previous-year');
@@ -131,7 +134,7 @@ const ExamModePage: React.FC = () => {
                     id: 'section_1',
                     name: 'Section A',
                     totalQuestions: 0,
-                    requiredAnswers: 0,
+                    requiredAnswers: 0, // Will be updated when questions are added
                     questions: []
                 }
             ], // Default section
@@ -382,17 +385,26 @@ const ExamModePage: React.FC = () => {
         let obtainedMarks = 0;
         const questionResults: any[] = [];
 
+        // Ensure requiredAnswers defaults to total questions if it's 0
+        const normalizedPaper = {
+            ...paper,
+            sections: paper.sections.map(section => ({
+                ...section,
+                requiredAnswers: section.requiredAnswers === 0 ? section.questions.length : section.requiredAnswers
+            }))
+        };
+
         // Calculate total marks - use simple approach first
-        paper.sections.forEach(section => {
+        normalizedPaper.sections.forEach(section => {
             section.questions.forEach(question => {
                 totalMarks += question.marks;
             });
         });
 
         // If using section limits, adjust total marks
-        if (paper.sections.some(section => section.requiredAnswers > 0 && section.requiredAnswers < section.questions.length)) {
+        if (normalizedPaper.sections.some(section => section.requiredAnswers > 0 && section.requiredAnswers < section.questions.length)) {
             totalMarks = 0;
-            paper.sections.forEach(section => {
+            normalizedPaper.sections.forEach(section => {
                 if (section.requiredAnswers > 0) {
                     // Take the maximum marks from questions in this section
                     const sortedQuestions = section.questions.sort((a, b) => b.marks - a.marks);
@@ -409,7 +421,7 @@ const ExamModePage: React.FC = () => {
         }
 
         // Evaluate each section
-        for (const section of paper.sections) {
+        for (const section of normalizedPaper.sections) {
             // Get all answered questions in this section
             const answeredQuestions = section.questions.filter(question => {
                 const userAnswer = answers[question.id];
@@ -777,13 +789,13 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                     {/* Exit Button - Top Left */}
                     <button
                         onClick={() => setShowExitConfirm(true)}
-                        className="btn-responsive flex items-center gap-2 p-2 rounded-lg hover:theme-surface2 theme-transition"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 transition-colors duration-200"
                         title="Exit Exam Mode"
                     >
-                        <svg className="w-6 h-6 theme-text btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                        <span className="btn-text theme-text">Exit Exam Mode</span>
+                        <span className="text-sm font-medium">Exit</span>
                     </button>
 
                     {/* Title */}
@@ -811,10 +823,10 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                         {/* Add Question Paper Button */}
                         <button
                             onClick={() => setShowAddPaper(true)}
-                            className="btn-responsive flex items-center gap-2 px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
+                            className="btn-responsive w-10 h-10 theme-accent text-white rounded-lg hover:opacity-90 theme-transition flex items-center justify-center"
+                            title="Add Question Paper"
                         >
-                            <PlusIcon className="btn-icon" />
-                            <span className="btn-text">Add Paper</span>
+                            <PlusIcon className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
@@ -947,7 +959,7 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                 )}
 
                 {/* Question Papers List - Grouped by Category */}
-                <div className="space-y-8">
+                <div className="space-y-6">
                     {questionPapers.length === 0 ? (
                         <div className="text-center py-12">
                             <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
@@ -968,70 +980,91 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                         </div>
                     ) : (
                         groupedPapers().map(([categoryName, papers]) => (
-                            <div key={categoryName} className="space-y-4">
+                            <div key={categoryName} className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <h2 className="text-xl font-semibold theme-text">{categoryName}</h2>
-                                    <span className="text-sm theme-text-secondary">
+                                    <h2 className="text-lg font-semibold theme-text">{categoryName}</h2>
+                                    <span className="text-xs theme-text-secondary">
                                         {papers.length} paper{papers.length !== 1 ? 's' : ''}
                                     </span>
                                 </div>
                                 
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     {papers.map((paper) => (
-                                        <div key={paper.id} className="theme-surface rounded-lg p-4 border theme-border hover:theme-surface2 theme-transition">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <h3 className="font-semibold theme-text">{paper.title}</h3>
-                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryBadgeColor(paper.category)}`}>
+                                        <div key={paper.id} className="theme-surface rounded-lg border theme-border hover:theme-surface2 theme-transition">
+                                            {/* Compact Mobile-First Layout */}
+                                            <div className="p-2 md:p-3">
+                                                {/* Header Row - Compact */}
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="font-medium theme-text text-sm mb-1 truncate">
+                                                            {paper.title}
+                                                        </h3>
+                                                        <span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-medium ${getCategoryBadgeColor(paper.category)}`}>
                                                             {getCategoryDisplay(paper)}
                                                         </span>
                                                     </div>
                                                     
-                                                    <div className="flex items-center gap-4 text-sm theme-text-secondary">
+                                                    {/* Mobile: Delete button only, other actions below */}
+                                                    <button
+                                                        onClick={() => handleDeletePaper(paper.id)}
+                                                        className="p-1.5 text-red-500 hover:text-red-700 theme-transition md:hidden"
+                                                        title="Delete Paper"
+                                                    >
+                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                                
+                                                {/* Stats Row - More Compact and Better Aligned */}
+                                                <div className="flex items-center justify-between gap-2 text-xs theme-text-secondary mb-2">
+                                                    <div className="flex items-center gap-3">
                                                         <div className="flex items-center gap-1">
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                             </svg>
-                                                            <span>{paper.duration} min</span>
+                                                            <span>{paper.duration}m</span>
                                                         </div>
                                                         <div className="flex items-center gap-1">
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                             </svg>
-                                                            <span>{paper.sections.reduce((total, section) => total + section.questions.length, 0)} questions</span>
+                                                            <span>{paper.sections.reduce((total, section) => total + section.questions.length, 0)}q</span>
                                                         </div>
                                                         <div className="flex items-center gap-1">
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                                             </svg>
-                                                            <span>{paper.sections.reduce((total, section) => total + section.questions.reduce((sum, q) => sum + q.marks, 0), 0)} marks</span>
+                                                            <span>{paper.sections.reduce((total, section) => total + section.questions.reduce((sum, q) => sum + q.marks, 0), 0)}pts</span>
                                                         </div>
-                                                        <span className="text-xs">
-                                                            {paper.createdAt.toLocaleDateString()}
-                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs">
+                                                        {paper.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="flex items-center gap-2 ml-4">
+                                                {/* Action Buttons - Compact */}
+                                                <div className="flex flex-col sm:flex-row gap-1.5">
                                                     <button
                                                         onClick={() => handleEditQuestions(paper)}
-                                                        className="px-3 py-2 text-sm theme-accent border border-current rounded-lg hover:theme-accent hover:text-white theme-transition"
+                                                        className="flex-1 px-2 py-1.5 text-xs theme-accent border border-current rounded hover:theme-accent hover:text-white theme-transition text-center"
                                                     >
                                                         Edit Questions
                                                     </button>
                                                     <button 
                                                         onClick={() => handleStartExam(paper)}
-                                                        className="px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg theme-transition"
+                                                        className="flex-1 px-2 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded theme-transition text-center"
                                                     >
                                                         Start Exam
                                                     </button>
+                                                    
+                                                    {/* Desktop: Delete button in action row */}
                                                     <button
                                                         onClick={() => handleDeletePaper(paper.id)}
-                                                        className="p-2 text-red-500 hover:text-red-700 theme-transition"
+                                                        className="hidden md:block p-1.5 text-red-500 hover:text-red-700 theme-transition"
                                                         title="Delete Paper"
                                                     >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                         </svg>
                                                     </button>
@@ -1091,7 +1124,7 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                                             <p className="font-medium">{section.name}</p>
                                             <p className="text-sm theme-text-secondary">
                                                 Total Questions: {section.questions.length} | 
-                                                Required to Answer: {section.requiredAnswers}
+                                                Required to Answer: {section.requiredAnswers === 0 ? section.questions.length : section.requiredAnswers}
                                             </p>
                                         </div>
                                     ))}
@@ -1132,16 +1165,28 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
             {/* Exam Interface */}
             {examStarted && selectedExamPaper && (
                 <div className="fixed inset-0 theme-bg z-40">
-                    {/* Header with Timer */}
-                    <div className="h-16 border-b theme-border flex items-center justify-between px-6">
-                        <h1 className="text-lg font-semibold theme-text">{selectedExamPaper.title}</h1>
-                        <div className="flex items-center gap-4">
-                            <div className={`text-lg font-mono ${timeRemaining < 300 ? 'text-red-600' : 'theme-text'}`}>
+                    {/* Mobile Header with Side Panel Toggle */}
+                    <div className="h-16 border-b theme-border flex items-center justify-between px-4 md:px-6">
+                        <div className="flex items-center gap-3">
+                            {/* Mobile Menu Toggle */}
+                            <button
+                                onClick={() => setShowSidePanel(true)}
+                                className="md:hidden p-2 theme-surface theme-text border theme-border rounded hover:theme-surface2 theme-transition"
+                                title="Show Questions"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                            <h1 className="text-base md:text-lg font-semibold theme-text">{selectedExamPaper.title}</h1>
+                        </div>
+                        <div className="flex items-center gap-2 md:gap-4">
+                            <div className={`text-sm md:text-lg font-mono ${timeRemaining < 300 ? 'text-red-600' : 'theme-text'}`}>
                                 {formatTime(timeRemaining)}
                             </div>
                             <button
                                 onClick={handleExitExamInterface}
-                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded theme-transition"
+                                className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-sm bg-red-600 hover:bg-red-700 text-white rounded theme-transition"
                             >
                                 End Exam
                             </button>
@@ -1149,15 +1194,89 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                     </div>
 
                     <div className="flex h-[calc(100vh-64px)]">
-                        {/* Question Navigation Panel */}
-                        <div className="w-80 border-r theme-border theme-surface overflow-y-auto">
+                        {/* Mobile Side Panel Overlay */}
+                        {showSidePanel && (
+                            <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex">
+                                <div className="w-80 max-w-[85vw] theme-surface border-r theme-border overflow-y-auto">
+                                    <div className="p-4">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="font-semibold theme-text">Questions</h3>
+                                            <button
+                                                onClick={() => setShowSidePanel(false)}
+                                                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 transition-colors duration-200"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        {selectedExamPaper.sections.map((section) => (
+                                            <div key={section.id} className="mb-4">
+                                                <h4 className="font-medium theme-text mb-2">{section.name}</h4>
+                                                <p className="text-xs theme-text-secondary mb-2">
+                                                    Answer {section.requiredAnswers === 0 ? section.questions.length : section.requiredAnswers} out of {section.questions.length}
+                                                </p>
+                                                <div className="grid grid-cols-5 gap-2">
+                                                    {section.questions.map((question) => (
+                                                        <button
+                                                            key={question.id}
+                                                            onClick={() => {
+                                                                // Find global question index
+                                                                let globalIndex = 0;
+                                                                for (const sect of selectedExamPaper.sections) {
+                                                                    if (sect.id === section.id) {
+                                                                        globalIndex += sect.questions.findIndex(q => q.id === question.id);
+                                                                        break;
+                                                                    }
+                                                                    globalIndex += sect.questions.length;
+                                                                }
+                                                                setCurrentQuestionIndex(globalIndex);
+                                                                setShowSidePanel(false); // Close panel on mobile after selection
+                                                            }}
+                                                            className={`
+                                                                w-8 h-8 text-xs rounded border theme-border
+                                                                ${examAnswers[question.id] 
+                                                                    ? 'bg-green-500 text-white' 
+                                                                    : 'theme-surface theme-text hover:theme-surface2'
+                                                                }
+                                                                ${(() => {
+                                                                    let globalIndex = 0;
+                                                                    for (const sect of selectedExamPaper.sections) {
+                                                                        if (sect.id === section.id) {
+                                                                            globalIndex += sect.questions.findIndex(q => q.id === question.id);
+                                                                            break;
+                                                                        }
+                                                                        globalIndex += sect.questions.length;
+                                                                    }
+                                                                    return globalIndex === currentQuestionIndex ? 'ring-2 ring-blue-500' : '';
+                                                                })()}
+                                                                theme-transition
+                                                            `}
+                                                        >
+                                                            {question.questionNumber}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div 
+                                    className="flex-1"
+                                    onClick={() => setShowSidePanel(false)}
+                                />
+                            </div>
+                        )}
+
+                        {/* Desktop Side Panel */}
+                        <div className="hidden md:block w-80 border-r theme-border theme-surface overflow-y-auto">
                             <div className="p-4">
                                 <h3 className="font-semibold theme-text mb-4">Questions</h3>
                                 {selectedExamPaper.sections.map((section) => (
                                     <div key={section.id} className="mb-4">
                                         <h4 className="font-medium theme-text mb-2">{section.name}</h4>
                                         <p className="text-xs theme-text-secondary mb-2">
-                                            Answer {section.requiredAnswers} out of {section.questions.length}
+                                            Answer {section.requiredAnswers === 0 ? section.questions.length : section.requiredAnswers} out of {section.questions.length}
                                         </p>
                                         <div className="grid grid-cols-5 gap-2">
                                             {section.questions.map((question) => (
@@ -1542,7 +1661,7 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                     <div className="theme-bg rounded-lg shadow-2xl p-6 w-full max-w-md">
                         <h3 className="text-lg font-bold theme-text mb-4">Exit Exam Mode?</h3>
                         <p className="theme-text-secondary mb-6">
-                            Are you sure you want to exit exam mode? All unsaved progress will be lost.
+                            Are you sure you want to exit exam mode? You'll return to the reader page.
                         </p>
                         <div className="flex gap-4">
                             <button

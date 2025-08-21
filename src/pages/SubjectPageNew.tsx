@@ -76,7 +76,7 @@ const SubjectPage: React.FC = () => {
                         <button 
                             key={chapter} 
                             onClick={() => navigate(`/reader/${encodeURIComponent(book)}/${encodeURIComponent(chapter)}`)} 
-                            className="card w-full text-left p-4 sm:p-6 hover:scale-[1.01] theme-transition"
+                            className="card w-full text-left p-4 sm:p-6 hover:scale-[1.01] theme-transition mobile-chapter-card"
                         >
                             <div className="flex justify-between items-start gap-4">
                                 <div className="flex-1 min-w-0">

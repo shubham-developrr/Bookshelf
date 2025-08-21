@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BackIcon, SearchIconSvg, BookOpenIcon, AcademicCapIcon, LightbulbIcon } from '../components/icons';
 import { SearchResult } from '../types/types';
@@ -12,7 +12,100 @@ const SearchPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
-    const handleSearch = useCallback((query: string) => {
+    // Get dynamic content from localStorage (same as SearchModal)
+    const getAvailableContent = () => {
+        const results: SearchResult[] = [];
+        
+        // Get created books
+        try {
+            const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+            savedBooks.forEach((book: any) => {
+                // Add book as subject
+                results.push({
+                    type: 'subject',
+                    title: book.title || book.name,
+                    subtitle: 'Book',
+                    category: 'subjects'
+                });
+                
+                // Check if chapters exist and is an array
+                if (Array.isArray(book.chapters) && book.chapters.length > 0) {
+                    book.chapters.forEach((chapter: any) => {
+                        results.push({
+                            type: 'chapter',
+                            title: chapter.title || chapter.name,
+                            subtitle: book.title || book.name,
+                            subject: book.title || book.name,
+                            category: 'chapters'
+                        });
+                        
+                        // Check subtopics
+                        if (Array.isArray(chapter.subtopics) && chapter.subtopics.length > 0) {
+                            chapter.subtopics.forEach((subtopic: any) => {
+                                results.push({
+                                    type: 'subtopic',
+                                    title: subtopic.title || subtopic.name,
+                                    subtitle: `${book.title || book.name} → ${chapter.title || chapter.name}`,
+                                    subject: book.title || book.name,
+                                    chapter: chapter.title || chapter.name,
+                                    category: 'subtopics'
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('Error loading created books:', error);
+        }
+        
+        // Get imported books and their chapters
+        try {
+            const importedBooks = JSON.parse(localStorage.getItem('importedBooks') || '[]');
+            importedBooks.forEach((book: any) => {
+                // Add book as subject
+                results.push({
+                    type: 'subject',
+                    title: book.name,
+                    subtitle: 'Book',
+                    category: 'subjects'
+                });
+
+                // Check for chapters in imported books
+                if (Array.isArray(book.chapters) && book.chapters.length > 0) {
+                    book.chapters.forEach((chapter: any) => {
+                        results.push({
+                            type: 'chapter',
+                            title: chapter.title || chapter.name,
+                            subtitle: book.name,
+                            subject: book.name,
+                            category: 'chapters'
+                        });
+                        
+                        // Check subtopics in imported chapters
+                        if (Array.isArray(chapter.subtopics) && chapter.subtopics.length > 0) {
+                            chapter.subtopics.forEach((subtopic: any) => {
+                                results.push({
+                                    type: 'subtopic',
+                                    title: subtopic.title || subtopic.name,
+                                    subtitle: `${book.name} → ${chapter.title || chapter.name}`,
+                                    subject: book.name,
+                                    chapter: chapter.title || chapter.name,
+                                    category: 'subtopics'
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('Error loading imported books:', error);
+        }
+
+        return results;
+    };
+
+    const handleSearch = (query: string) => {
         setSearchQuery(query);
         
         if (!query.trim()) {
@@ -20,54 +113,37 @@ const SearchPage: React.FC = () => {
             return;
         }
 
-        const results: SearchResult[] = [];
         const queryLower = query.toLowerCase();
+        const allContent = getAvailableContent();
+        const filtered = allContent.filter(item => {
+            // Ensure all properties exist before calling toLowerCase
+            const title = item.title || '';
+            const subtitle = item.subtitle || '';
+            const subject = item.subject || '';
+            const chapter = item.chapter || '';
+            
+            return title.toLowerCase().includes(queryLower) ||
+                   subtitle.toLowerCase().includes(queryLower) ||
+                   subject.toLowerCase().includes(queryLower) ||
+                   chapter.toLowerCase().includes(queryLower);
+        });
 
-        // Search through subjects
-        Object.entries(syllabus).forEach(([subjectName, chapters]) => {
-            if (subjectName.toLowerCase().includes(queryLower)) {
-                results.push({
-                    type: 'subject',
-                    title: subjectName,
-                    subtitle: 'Subject',
-                    category: 'subjects'
-                });
+        // Sort by hierarchy: Books first, then Chapters, then Subtopics
+        const sorted = filtered.sort((a, b) => {
+            const typeOrder = { subject: 0, chapter: 1, subtopic: 2 };
+            const aOrder = typeOrder[a.type as keyof typeof typeOrder];
+            const bOrder = typeOrder[b.type as keyof typeof typeOrder];
+            
+            if (aOrder !== bOrder) {
+                return aOrder - bOrder;
             }
             
-            // Search chapters
-            chapters.forEach(chapter => {
-                if (chapter.toLowerCase().includes(queryLower)) {
-                    results.push({
-                        type: 'chapter',
-                        title: chapter,
-                        subtitle: subjectName,
-                        subject: subjectName,
-                        category: 'chapters'
-                    });
-                }
-            });
-        });
-        
-        // Search subtopics
-        Object.entries(chapterSubtopics).forEach(([subjectName, chapters]) => {
-            Object.entries(chapters).forEach(([chapterName, subtopics]) => {
-                subtopics.forEach(subtopic => {
-                    if (subtopic.toLowerCase().includes(queryLower)) {
-                        results.push({
-                            type: 'subtopic',
-                            title: subtopic,
-                            subtitle: `${subjectName} → ${chapterName}`,
-                            subject: subjectName,
-                            chapter: chapterName,
-                            category: 'subtopics'
-                        });
-                    }
-                });
-            });
+            // Within same type, sort alphabetically
+            return (a.title || '').localeCompare(b.title || '');
         });
 
-        setSearchResults(results);
-    }, []);
+        setSearchResults(sorted.slice(0, 15)); // Limit to 15 results
+    };
 
     const handleResultClick = (result: SearchResult) => {
         if (result.category === 'subjects') {
@@ -145,10 +221,10 @@ const SearchPage: React.FC = () => {
                                                     </div>
                                                     <div className="flex-1 min-w-0 overflow-hidden pr-2">
                                                         <h3 className="font-medium theme-text mb-1 text-sm sm:text-base leading-tight">
-                                                            {result.title.length > 40 ? result.title.substring(0, 40) + '...' : result.title}
+                                                            {(result.title || '').length > 40 ? (result.title || '').substring(0, 40) + '...' : (result.title || '')}
                                                         </h3>
                                                         <p className="text-xs sm:text-sm theme-text-secondary leading-tight">
-                                                            {result.subtitle.length > 50 ? result.subtitle.substring(0, 50) + '...' : result.subtitle}
+                                                            {(result.subtitle || '').length > 50 ? (result.subtitle || '').substring(0, 50) + '...' : (result.subtitle || '')}
                                                         </p>
                                                     </div>
                                                     <div className="theme-text-secondary flex-shrink-0">

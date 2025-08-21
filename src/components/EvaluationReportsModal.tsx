@@ -93,14 +93,14 @@ const EvaluationReportsModal: React.FC<EvaluationReportsModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="theme-surface w-full max-w-6xl max-h-[90vh] rounded-xl flex flex-col shadow-2xl">
-                {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b theme-border">
-                    <div className="flex items-center gap-3">
-                        <FileTextIcon className="w-6 h-6 theme-accent-text" />
-                        <div>
-                            <h2 className="text-xl font-bold theme-text">Previous Evaluation Reports</h2>
-                            <p className="text-sm theme-text-secondary">
+            <div className="theme-surface w-full max-w-6xl h-[90vh] md:max-h-[90vh] rounded-xl flex flex-col shadow-2xl overflow-hidden">
+                {/* Header - Mobile Optimized */}
+                <div className="flex justify-between items-center p-3 md:p-4 border-b theme-border flex-shrink-0">
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                        <FileTextIcon className="w-5 h-5 md:w-6 md:h-6 theme-accent-text flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                            <h2 className="text-base md:text-xl font-bold theme-text truncate">Previous Evaluation Reports</h2>
+                            <p className="text-xs md:text-sm theme-text-secondary">
                                 {reports.length} report{reports.length !== 1 ? 's' : ''} • 
                                 {reports.filter(r => r.status === 'processing').length} processing
                             </p>
@@ -108,32 +108,32 @@ const EvaluationReportsModal: React.FC<EvaluationReportsModalProps> = ({
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:theme-surface2 theme-transition"
+                        className="p-1.5 md:p-2 rounded-lg hover:theme-surface2 theme-transition flex-shrink-0"
                     >
                         <CloseIcon />
                     </button>
                 </div>
 
-                {/* Filters and Sort */}
-                <div className="p-4 border-b theme-border flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2">
-                        <label className="text-sm theme-text-secondary">Sort by:</label>
+                {/* Filters and Sort - Mobile Optimized */}
+                <div className="p-3 md:p-4 border-b theme-border flex flex-col sm:flex-row gap-2 sm:gap-4 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs md:text-sm theme-text-secondary whitespace-nowrap">Sort by:</label>
                         <select 
                             value={sortBy} 
                             onChange={(e) => setSortBy(e.target.value as any)}
-                            className="px-3 py-1 rounded-lg theme-surface2 theme-text text-sm border theme-border"
+                            className="px-2 md:px-3 py-1.5 md:py-1 rounded-lg theme-surface2 theme-text text-xs md:text-sm border theme-border flex-1"
                         >
                             <option value="date">Date</option>
                             <option value="score">Score</option>
                             <option value="title">Title</option>
                         </select>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <label className="text-sm theme-text-secondary">Filter:</label>
+                    <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs md:text-sm theme-text-secondary whitespace-nowrap">Filter:</label>
                         <select 
                             value={filterStatus} 
                             onChange={(e) => setFilterStatus(e.target.value as any)}
-                            className="px-3 py-1 rounded-lg theme-surface2 theme-text text-sm border theme-border"
+                            className="px-2 md:px-3 py-1.5 md:py-1 rounded-lg theme-surface2 theme-text text-xs md:text-sm border theme-border flex-1"
                         >
                             <option value="all">All</option>
                             <option value="completed">Completed</option>
@@ -143,123 +143,135 @@ const EvaluationReportsModal: React.FC<EvaluationReportsModalProps> = ({
                     </div>
                 </div>
 
-                {/* Reports List */}
-                <div className="flex-1 overflow-y-auto p-4">
+                {/* Reports List - Mobile Optimized with No Scroll */}
+                <div className="flex-1 p-3 md:p-4 overflow-hidden">
                     {filteredAndSortedReports.length === 0 ? (
-                        <div className="text-center py-12">
-                            <FileTextIcon className="w-12 h-12 mx-auto theme-text-secondary mb-4" />
-                            <p className="theme-text-secondary">No evaluation reports found</p>
-                            <p className="text-sm theme-text-secondary mt-1">
+                        <div className="text-center py-8 md:py-12 h-full flex flex-col justify-center">
+                            <FileTextIcon className="w-8 h-8 md:w-12 md:h-12 mx-auto theme-text-secondary mb-3 md:mb-4" />
+                            <p className="theme-text-secondary text-sm md:text-base">No evaluation reports found</p>
+                            <p className="text-xs md:text-sm theme-text-secondary mt-1">
                                 {filterStatus !== 'all' ? 'Try changing the filter' : 'Take an exam to see reports here'}
                             </p>
                         </div>
                     ) : (
-                        <div className="grid gap-4">
-                            {filteredAndSortedReports.map((report) => (
-                                <div 
-                                    key={report.id}
-                                    className="theme-surface2 rounded-lg p-4 border theme-border hover:theme-surface3 theme-transition"
-                                >
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                {getStatusIcon(report.status)}
-                                                <h3 className="font-semibold theme-text">{report.paperTitle}</h3>
-                                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                                    report.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                    report.status === 'processing' ? 'bg-yellow-100 text-yellow-700' :
-                                                    'bg-red-100 text-red-700'
-                                                }`}>
-                                                    {getStatusText(report.status)}
-                                                </span>
+                        <div className="h-full overflow-y-auto">
+                            <div className="grid gap-2 md:gap-4">
+                                {filteredAndSortedReports.map((report) => (
+                                    <div 
+                                        key={report.id}
+                                        className="theme-surface2 rounded-lg p-3 md:p-4 border theme-border hover:theme-surface3 theme-transition"
+                                    >
+                                        {/* Mobile-First Compact Layout */}
+                                        <div className="space-y-2 md:space-y-3">
+                                            {/* Header Row - Always Visible */}
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    {getStatusIcon(report.status)}
+                                                    <div className="min-w-0 flex-1">
+                                                        <h3 className="font-medium md:font-semibold theme-text text-sm md:text-base leading-tight truncate">
+                                                            {report.paperTitle}
+                                                        </h3>
+                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                            <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                                                report.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                                report.status === 'processing' ? 'bg-yellow-100 text-yellow-700' :
+                                                                'bg-red-100 text-red-700'
+                                                            }`}>
+                                                                {getStatusText(report.status)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-1 md:gap-2 flex-shrink-0">
+                                                    {report.status === 'completed' && (
+                                                        <button
+                                                            onClick={() => onViewReport(report)}
+                                                            className="px-2 md:px-3 py-1 md:py-2 bg-blue-600 text-white rounded text-xs md:text-sm hover:bg-blue-700 theme-transition"
+                                                        >
+                                                            View Details
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => onDeleteReport(report.id)}
+                                                        className="p-1 md:p-2 text-red-600 hover:bg-red-50 rounded theme-transition"
+                                                        title="Delete Report"
+                                                    >
+                                                        <TrashIcon className="w-3 h-3 md:w-4 md:h-4" />
+                                                    </button>
+                                                </div>
                                             </div>
                                             
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                                                <div>
-                                                    <p className="text-sm theme-text-secondary">Subject</p>
-                                                    <p className="text-sm theme-text">{report.subjectName}</p>
+                                            {/* Content Row - Compact Mobile Layout */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 text-xs md:text-sm">
+                                                <div className="min-w-0">
+                                                    <p className="theme-text-secondary text-xs">Subject</p>
+                                                    <p className="theme-text truncate">{report.subjectName}</p>
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm theme-text-secondary">Chapter</p>
-                                                    <p className="text-sm theme-text">{report.chapterName}</p>
+                                                <div className="min-w-0">
+                                                    <p className="theme-text-secondary text-xs">Chapter</p>
+                                                    <p className="theme-text truncate">{report.chapterName}</p>
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm theme-text-secondary">Submitted</p>
-                                                    <p className="text-sm theme-text">
-                                                        {new Date(report.submittedAt).toLocaleString()}
-                                                    </p>
-                                                </div>
+                                                {report.status === 'completed' && (
+                                                    <>
+                                                        <div className="min-w-0">
+                                                            <p className="theme-text-secondary text-xs">Score</p>
+                                                            <p className="theme-text font-medium">
+                                                                {report.obtainedMarks}/{report.totalMarks}
+                                                            </p>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="theme-text-secondary text-xs">Percentage</p>
+                                                            <p className={`font-medium ${
+                                                                report.percentage >= 75 ? 'text-green-600' :
+                                                                report.percentage >= 50 ? 'text-yellow-600' :
+                                                                'text-red-600'
+                                                            }`}>
+                                                                {report.percentage}%
+                                                            </p>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
 
-                                            {report.status === 'completed' && (
-                                                <div className="flex items-center gap-6 mb-3">
-                                                    <div>
-                                                        <p className="text-sm theme-text-secondary">Score</p>
-                                                        <p className="text-lg font-semibold theme-text">
-                                                            {report.obtainedMarks}/{report.totalMarks}
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm theme-text-secondary">Percentage</p>
-                                                        <p className={`text-lg font-semibold ${
-                                                            report.percentage >= 75 ? 'text-green-600' :
-                                                            report.percentage >= 50 ? 'text-yellow-600' :
-                                                            'text-red-600'
-                                                        }`}>
-                                                            {report.percentage}%
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm theme-text-secondary">Questions</p>
-                                                        <p className="text-sm theme-text">
-                                                            {report.questionResults.filter(q => q.isCorrect).length}/{report.questionResults.length} correct
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            )}
+                                            {/* Bottom Row - Questions and Date */}
+                                            <div className="flex justify-between items-center text-xs theme-text-secondary pt-1 border-t theme-border">
+                                                <span>
+                                                    {report.status === 'completed' ? 
+                                                        `${report.questionResults.filter(q => q.isCorrect).length}/${report.questionResults.length} correct` :
+                                                        'In progress'
+                                                    }
+                                                </span>
+                                                <span>
+                                                    {new Date(report.submittedAt).toLocaleDateString()}
+                                                </span>
+                                            </div>
 
+                                            {/* Processing Progress - Only on Mobile when Processing */}
                                             {report.status === 'processing' && report.processingProgress !== undefined && (
-                                                <div className="mb-3">
-                                                    <div className="flex justify-between text-sm theme-text-secondary mb-1">
+                                                <div className="mt-2">
+                                                    <div className="flex justify-between text-xs theme-text-secondary mb-1">
                                                         <span>Processing...</span>
                                                         <span>{report.processingProgress}%</span>
                                                     </div>
-                                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                                    <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
                                                         <div 
-                                                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                                            className="bg-blue-600 h-1.5 md:h-2 rounded-full transition-all duration-300"
                                                             style={{ width: `${report.processingProgress}%` }}
                                                         ></div>
                                                     </div>
                                                 </div>
                                             )}
 
+                                            {/* Error Display - Compact */}
                                             {report.status === 'failed' && report.error && (
-                                                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                                    <p className="text-sm text-red-700">{report.error}</p>
+                                                <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                                                    {report.error}
                                                 </div>
                                             )}
                                         </div>
-
-                                        <div className="flex gap-2 ml-4">
-                                            {report.status === 'completed' && (
-                                                <button
-                                                    onClick={() => onViewReport(report)}
-                                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 theme-transition text-sm"
-                                                >
-                                                    View Details
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => onDeleteReport(report.id)}
-                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg theme-transition"
-                                                title="Delete Report"
-                                            >
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
-                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
