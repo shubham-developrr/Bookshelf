@@ -5,6 +5,7 @@ import { getBookImage } from '../assets/images/index';
 import { syllabus, chapterSubtopics } from '../constants/constants';
 import { useTheme } from '../contexts/ThemeContext';
 import { MarketplaceBookExportService } from '../services/marketplaceExportService';
+import UnifiedBookAdapter from '../services/UnifiedBookAdapter';
 
 interface Chapter {
     id: string;
@@ -57,6 +58,50 @@ const SubjectPage: React.FC = () => {
             return;
         }
 
+        // Check if this is a backend book (from EnhancedBookshelfPage)
+        const bookDataKey = `book_${book}`;
+        const savedBookData = localStorage.getItem(bookDataKey);
+        
+        if (savedBookData) {
+            try {
+                const bookData = JSON.parse(savedBookData);
+                
+                // Look for chapters data with various possible keys
+                let chaptersData = null;
+                const possibleKeys = [
+                    `chapters_${book}`,
+                    `chapters_${bookData.id}`, 
+                ];
+                
+                for (const key of possibleKeys) {
+                    const storedChapters = localStorage.getItem(key);
+                    if (storedChapters) {
+                        chaptersData = JSON.parse(storedChapters);
+                        break;
+                    }
+                }
+                
+                if (chaptersData && Array.isArray(chaptersData)) {
+                    setIsCustomBook(true);
+                    setCustomBookData(bookData);
+                    
+                    // Convert backend chapters to expected format
+                    const backendChapters = chaptersData.map((chapter: any, index: number) => ({
+                        id: chapter.id || `backend-${index + 1}`,
+                        number: chapter.number || index + 1,
+                        name: chapter.name || chapter.title || `Chapter ${index + 1}`,
+                        subtopics: chapter.subtopics || []
+                    }));
+                    
+                    setCustomChapters(backendChapters);
+                    console.log(`📚 Loaded ${backendChapters.length} chapters for backend book: ${book}`);
+                    return;
+                }
+            } catch (error) {
+                console.error('Error loading backend book data:', error);
+            }
+        }
+
         // Check if this is an imported book
         const importedBooks = JSON.parse(localStorage.getItem('importedBooks') || '[]');
         const importedBook = importedBooks.find((importBook: any) => importBook.name === book);
@@ -87,26 +132,90 @@ const SubjectPage: React.FC = () => {
         setCustomChapters(chapters);
     };
 
-    const handleAddChapter = () => {
+    const handleAddChapter = async () => {
         if (!newChapterName.trim()) return;
         
-        const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
-        const customBook = savedBooks.find((savedBook: any) => savedBook.name === book);
-        if (!customBook) return;
-
-        const newChapter: Chapter = {
-            id: `chapter_${Date.now()}`,
-            number: newChapterNumber,
-            name: newChapterName.trim(),
-            subtopics: []
-        };
-
-        const updatedChapters = [...customChapters, newChapter];
-        saveCustomChapters(customBook.id, updatedChapters);
+        console.log(`📄 UNIFIED: Adding chapter to book: ${book}`);
         
-        setNewChapterName('');
-        setNewChapterNumber(updatedChapters.length + 1);
-        setShowAddChapter(false);
+        try {
+            // Try to find in created books first
+            const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+            const customBook = savedBooks.find((savedBook: any) => savedBook.name === book);
+            
+            let bookId;
+            
+            if (customBook) {
+                bookId = customBook.id;
+            } else if (customBookData) {
+                bookId = customBookData.id || book;
+            } else {
+                bookId = book;
+            }
+
+            // Use UnifiedBookAdapter for automatic cloud sync
+            const unifiedAdapter = UnifiedBookAdapter.getInstance();
+            
+            const result = await unifiedAdapter.addChapter(bookId, {
+                number: newChapterNumber,
+                name: newChapterName.trim()
+            });
+
+            if (result.success) {
+                // Update local state
+                const newChapter: Chapter = {
+                    id: `chapter_${Date.now()}`,
+                    number: newChapterNumber,
+                    name: newChapterName.trim(),
+                    subtopics: []
+                };
+
+                const updatedChapters = [...customChapters, newChapter];
+                setCustomChapters(updatedChapters);
+                
+                console.log(`✅ UNIFIED: Chapter added and synced: ${newChapter.name}`);
+                
+                setNewChapterName('');
+                setNewChapterNumber(updatedChapters.length + 1);
+                setShowAddChapter(false);
+            } else {
+                console.error('UNIFIED: Failed to add chapter:', result.error);
+                // Fallback to old method
+                const newChapter: Chapter = {
+                    id: `chapter_${Date.now()}`,
+                    number: newChapterNumber,
+                    name: newChapterName.trim(),
+                    subtopics: []
+                };
+
+                const updatedChapters = [...customChapters, newChapter];
+                
+                // Save locally with fallback keys
+                localStorage.setItem(`chapters_${bookId}`, JSON.stringify(updatedChapters));
+                localStorage.setItem(`chapters_${book}`, JSON.stringify(updatedChapters));
+                
+                setCustomChapters(updatedChapters);
+                setNewChapterName('');
+                setNewChapterNumber(updatedChapters.length + 1);
+                setShowAddChapter(false);
+            }
+
+        } catch (error) {
+            console.error('UNIFIED: Error adding chapter:', error);
+            
+            // Fallback to old method
+            const newChapter: Chapter = {
+                id: `chapter_${Date.now()}`,
+                number: newChapterNumber,
+                name: newChapterName.trim(),
+                subtopics: []
+            };
+
+            const updatedChapters = [...customChapters, newChapter];
+            setCustomChapters(updatedChapters);
+            setNewChapterName('');
+            setNewChapterNumber(updatedChapters.length + 1);
+            setShowAddChapter(false);
+        }
     };
 
     const handleEditChapter = (chapter: Chapter) => {
@@ -118,9 +227,21 @@ const SubjectPage: React.FC = () => {
     const handleUpdateChapter = () => {
         if (!editingChapter || !newChapterName.trim()) return;
         
+        // Try to find in created books first
         const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
         const customBook = savedBooks.find((savedBook: any) => savedBook.name === book);
-        if (!customBook) return;
+        
+        let bookId;
+        
+        if (customBook) {
+            bookId = customBook.id;
+        } else if (customBookData) {
+            // This is a backend book, use its ID
+            bookId = customBookData.id || book;
+        } else {
+            // Fallback - use book name as ID
+            bookId = book;
+        }
 
         const updatedChapters = customChapters.map(ch => 
             ch.id === editingChapter.id 
@@ -128,19 +249,40 @@ const SubjectPage: React.FC = () => {
                 : ch
         );
         
-        saveCustomChapters(customBook.id, updatedChapters);
+        // Save chapters with multiple possible keys for backend compatibility
+        localStorage.setItem(`chapters_${bookId}`, JSON.stringify(updatedChapters));
+        localStorage.setItem(`chapters_${book}`, JSON.stringify(updatedChapters));
+        
+        setCustomChapters(updatedChapters);
         setEditingChapter(null);
         setNewChapterName('');
     };
 
     const handleDeleteChapter = (chapterId: string) => {
         if (confirm('Are you sure you want to delete this chapter?')) {
+            // Try to find in created books first
             const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
             const customBook = savedBooks.find((savedBook: any) => savedBook.name === book);
-            if (!customBook) return;
+            
+            let bookId;
+            
+            if (customBook) {
+                bookId = customBook.id;
+            } else if (customBookData) {
+                // This is a backend book, use its ID
+                bookId = customBookData.id || book;
+            } else {
+                // Fallback - use book name as ID
+                bookId = book;
+            }
 
             const updatedChapters = customChapters.filter(ch => ch.id !== chapterId);
-            saveCustomChapters(customBook.id, updatedChapters);
+            
+            // Save chapters with multiple possible keys for backend compatibility
+            localStorage.setItem(`chapters_${bookId}`, JSON.stringify(updatedChapters));
+            localStorage.setItem(`chapters_${book}`, JSON.stringify(updatedChapters));
+            
+            setCustomChapters(updatedChapters);
         }
     };
 
@@ -465,7 +607,7 @@ const SubjectPage: React.FC = () => {
                                     <div className="flex-1 min-w-0 ml-2">
                                         <h3 className="font-semibold theme-text text-sm sm:text-base line-clamp-1">{chapter.name}</h3>
                                         <p className="theme-text-secondary text-xs mt-1">
-                                            {chapter.subtopics.length > 0 ? `${chapter.subtopics.length} subtopics` : 'No content yet'}
+                                            {(chapter.subtopics && chapter.subtopics.length > 0) ? `${chapter.subtopics.length} subtopics` : 'No content yet'}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-1 mobile-actions-right">

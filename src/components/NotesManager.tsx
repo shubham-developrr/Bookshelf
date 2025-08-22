@@ -6,6 +6,8 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { PencilIcon, EyeIcon, BookOpenIcon, PlusIcon, TrashIcon } from './icons';
 import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
+import { UnifiedBookAdapter } from '../services/UnifiedBookAdapter';
+import { RealTimeSyncService } from '../services/RealTimeSyncService';
 import 'katex/dist/katex.min.css';
 
 interface Note {
@@ -35,27 +37,108 @@ const NotesManager: React.FC<NotesManagerProps> = ({
     const [newTopic, setNewTopic] = useState('');
     const [isAddingNote, setIsAddingNote] = useState(false);
     
-    // Create unique storage key that includes tab ID for isolation
-    const baseKey = `notes_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
-    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
+    // Initialize real-time sync service
+    const realTimeSync = React.useMemo(() => RealTimeSyncService.getInstance(), []);
+    
+    // Create tab context for book-linked data management
+    const tabContext: BookTabContext = BookTabManager.createTemplateTabContext(
+        currentBook, 
+        currentChapter, 
+        'NOTES'
+    );
 
-    // Load notes from localStorage
+    // Load notes using unified system with cloud sync
     useEffect(() => {
-        const savedNotes = localStorage.getItem(storageKey);
-        if (savedNotes) {
-            const parsedNotes = JSON.parse(savedNotes).map((note: any) => ({
-                ...note,
-                createdAt: new Date(note.createdAt),
-                updatedAt: new Date(note.updatedAt)
-            }));
-            setNotes(parsedNotes);
-        }
-    }, [storageKey]);
+        const loadNotesWithCloudSync = async () => {
+            try {
+                // Try unified system with cloud sync first for cross-browser sync
+                const unifiedData = await UnifiedBookAdapter.getTemplateDataWithCloudSync(currentBook, currentChapter, 'NOTES', tabId);
+                if (unifiedData && Array.isArray(unifiedData) && unifiedData.length > 0) {
+                    const parsedNotes = unifiedData.map((note: any) => ({
+                        ...note,
+                        createdAt: new Date(note.createdAt),
+                        updatedAt: new Date(note.updatedAt)
+                    }));
+                    setNotes(parsedNotes);
+                    return;
+                }
 
-    // Save notes to localStorage
-    const saveNotes = (updatedNotes: Note[]) => {
-        localStorage.setItem(storageKey, JSON.stringify(updatedNotes));
-        setNotes(updatedNotes);
+                // Fallback to legacy data
+                const loadedNotes = BookTabManager.loadTabData('NOTES', tabContext);
+                if (loadedNotes && Array.isArray(loadedNotes)) {
+                    const parsedNotes = loadedNotes.map((note: any) => ({
+                        ...note,
+                        createdAt: new Date(note.createdAt),
+                        updatedAt: new Date(note.updatedAt)
+                    }));
+                    setNotes(parsedNotes);
+                }
+            } catch (error) {
+                console.error('❌ Error loading notes with cloud sync:', error);
+                
+                // Fallback to sync method if async fails
+                const unifiedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'NOTES', tabId);
+                if (unifiedData && Array.isArray(unifiedData) && unifiedData.length > 0) {
+                    const parsedNotes = unifiedData.map((note: any) => ({
+                        ...note,
+                        createdAt: new Date(note.createdAt),
+                        updatedAt: new Date(note.updatedAt)
+                    }));
+                    setNotes(parsedNotes);
+                }
+            }
+        };
+        
+        loadNotesWithCloudSync();
+    }, [currentBook, currentChapter, tabId, tabContext.tabId]);
+
+    // Listen for real-time sync events
+    useEffect(() => {
+        const handleSyncEvent = (event: any) => {
+            if (event.templateType === 'NOTES' && 
+                event.bookName === currentBook && 
+                event.chapterName === currentChapter) {
+                // Reload data when sync event occurs
+                const syncedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'NOTES', tabId);
+                if (syncedData && Array.isArray(syncedData)) {
+                    const parsedNotes = syncedData.map((note: any) => ({
+                        ...note,
+                        createdAt: new Date(note.createdAt),
+                        updatedAt: new Date(note.updatedAt)
+                    }));
+                    setNotes(parsedNotes);
+                }
+            }
+        };
+
+        const unsubscribe = realTimeSync.subscribe(`notes_${currentBook}_${currentChapter}`, handleSyncEvent);
+        return unsubscribe;
+    }, [currentBook, currentChapter, tabId, realTimeSync]);
+
+    // Save notes using unified system with real-time sync
+    const saveNotes = async (updatedNotes: Note[]) => {
+        try {
+            // Save using unified adapter with automatic cloud sync
+            const adapter = UnifiedBookAdapter.getInstance();
+            await adapter.saveTemplateData(currentBook, currentChapter, 'NOTES', updatedNotes, tabId);
+            setNotes(updatedNotes);
+            
+            // Broadcast real-time sync event to other tabs
+            realTimeSync.broadcastSyncEvent({
+                type: 'template_updated',
+                bookName: currentBook,
+                chapterName: currentChapter,
+                templateType: 'NOTES'
+            });
+
+            // Also save to legacy system for backward compatibility
+            BookTabManager.saveTabData('NOTES', tabContext, updatedNotes);
+        } catch (error) {
+            console.error('Failed to save notes:', error);
+            // Fallback to legacy save
+            BookTabManager.saveTabData('NOTES', tabContext, updatedNotes);
+            setNotes(updatedNotes);
+        }
     };
 
     // Add new note

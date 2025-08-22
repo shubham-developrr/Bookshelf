@@ -14,15 +14,20 @@ import EditBookModal from '../components/EditBookModal';
 import SearchModal from '../components/SearchModal';
 import BookOptionsMenu from '../components/BookOptionsMenu';
 import { MarketplaceBookImportService } from '../services/marketplaceImportService';
+import { BackendBookService } from '../services/BackendBookService';
 import { MarketplaceBookExportService } from '../services/marketplaceExportService';
 import { EnhancedMarketplaceService } from '../services/EnhancedMarketplaceService';
 import BookManager from '../utils/BookManager';
+import UnifiedBookAdapter from '../services/UnifiedBookAdapter';
+import RealTimeSyncService from '../services/RealTimeSyncService';
 import { supabase } from '../services/supabaseClient';
 import PublishModal from '../components/PublishModal';
 import EnhancedAIGuruModal from '../components/EnhancedAIGuruModal';
 import MarketplaceBookManager from '../components/MarketplaceBookManager';
 import UpdateChecker from '../components/UpdateChecker';
 import SyncStatusUI from '../components/SyncStatusUI';
+import { BookSyncService, LoadingState } from '../services/BookSyncService';
+import { BookMetadata } from '../services/BackendBookService';
 
 // Gear icon component
 const GearIcon: React.FC = () => (
@@ -55,7 +60,22 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
     const [marketplaceInitialTab, setMarketplaceInitialTab] = useState<'export' | 'import'>('export');
     const [aiGuruPrompt, setAIGuruPrompt] = useState('');
     const [loadedBooks, setLoadedBooks] = useState<BookModule[]>([]);
-    const [createdBooks, setCreatedBooks] = useState<Array<BookData & { id: string }>>([]);
+    const [isLoadingBackendBooks, setIsLoadingBackendBooks] = useState(false);
+    const [backendBooksLoaded, setBackendBooksLoaded] = useState(false);
+    
+    // PROGRESSIVE LOADING STATE - Backend books integrated into existing sections
+    const [bookMetadataList, setBookMetadataList] = useState<BookMetadata[]>([]);
+    const [loadingState, setLoadingState] = useState<LoadingState>({
+        isLoadingBookList: false,
+        isLoadingBook: {},
+        lastSync: {},
+        syncErrors: {}
+    });
+    const [syncService] = useState(() => BookSyncService.getInstance());
+    
+    // Legacy support - keep for compatibility during transition
+    const [createdBooks, setCreatedBooks] = useState<Array<BookData & { id: string; isBackendBook?: boolean }>>([]);
+    
     const [importedBooks, setImportedBooks] = useState<Array<any>>([]);
     const [loading, setLoading] = useState(true);
     const [editingBook, setEditingBook] = useState<string | null>(null);
@@ -77,26 +97,151 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
     ];
 
     useEffect(() => {
-        loadInitialBooks();
+        console.log('🚀 UNIFIED: Initializing unified book system...');
         
-        // Migrate legacy books to new UUID system
-        const migratedCount = BookManager.migrateLegacyBooks();
-        if (migratedCount > 0) {
-            console.log(`Migrated ${migratedCount} books to new UUID system`);
-        }
+        const initializeSystem = async () => {
+            try {
+                setLoading(true);
+                console.log('📚 UNIFIED: Starting book loading...');
+                
+                // Use the existing unified system initialization
+                await initializeUnifiedSystem();
+                
+                console.log('✅ UNIFIED: System initialized successfully');
+                setLoading(false);
+                
+            } catch (error) {
+                console.error('❌ UNIFIED: Initialization failed:', error);
+                setLoading(false);
+            }
+        };
+
+        initializeSystem();
         
-        // Load created books from localStorage
-        const savedBooks = localStorage.getItem('createdBooks');
-        if (savedBooks) {
-            setCreatedBooks(JSON.parse(savedBooks));
-        }
+        // REAL-TIME SYNC: Initialize for cross-browser sync
+        const realTimeSync = RealTimeSyncService.getInstance();
+        console.log('🔄 REALTIME: Adding listener bookshelf');
         
-        // Load imported books from localStorage
-        const savedImportedBooks = localStorage.getItem('importedBooks');
-        if (savedImportedBooks) {
-            setImportedBooks(JSON.parse(savedImportedBooks));
-        }
+        const unsubscribe = realTimeSync.subscribe('bookshelf', (event) => {
+            console.log(`🔄 REALTIME: Received sync event:`, event);
+            if (event.type === 'book_created' || event.type === 'book_updated') {
+                refreshBooksFromUnifiedService();
+            }
+        });
+        
+        return () => {
+            unsubscribe();
+            realTimeSync.stop();
+        };
     }, []);
+
+    // UNIFIED SYSTEM: Initialize unified book system
+    const initializeUnifiedSystem = async () => {
+        try {
+            console.log('🚀 UNIFIED: Initializing unified book system...');
+            await refreshBooksFromUnifiedService();
+            console.log('✅ UNIFIED: System initialized successfully');
+        } catch (error) {
+            console.error('💥 UNIFIED: Failed to initialize unified system:', error);
+        }
+    };
+
+    // UNIFIED SYSTEM: Refresh books from unified service with progressive loading
+    const refreshBooksFromUnifiedService = async () => {
+        try {
+            console.log('🔄 UNIFIED: Starting progressive book loading...');
+            
+            // PHASE 1: Load book metadata quickly (for UI display)
+            console.log('📚 PHASE 1: Loading book list metadata...');
+            const unifiedAdapter = UnifiedBookAdapter.getInstance();
+            const result = await unifiedAdapter.getAllBooks();
+            
+            if (result.success) {
+                // Convert to legacy format for UI compatibility
+                const legacyBooks = result.books.map(book => ({
+                    id: book.id,
+                    name: book.name,
+                    image: book.image,
+                    creatorName: book.creatorName,
+                    university: book.university,
+                    semester: book.semester,
+                    subjectCode: book.subjectCode,
+                    chapters: [],
+                    version: book.version,
+                    createdAt: book.createdAt,
+                    updatedAt: book.updatedAt,
+                    isBackendBook: true,
+                    // Add loading indicator for content that will be loaded progressively
+                    isContentLoaded: false
+                }));
+                
+                setCreatedBooks(legacyBooks);
+                console.log(`✅ PHASE 1 COMPLETE: Loaded ${legacyBooks.length} books from unified service`);
+                
+                // PHASE 2: Background load recently accessed books
+                console.log('⚡ PHASE 2: Starting background sync for recent books...');
+                setTimeout(() => {
+                    if (syncService) {
+                        syncService.backgroundSyncRecent().catch(error => {
+                            console.error('Background sync failed:', error);
+                        });
+                    }
+                }, 100); // Small delay to not block UI
+                
+            } else {
+                console.error('❌ UNIFIED: Failed to refresh books:', result.error);
+                // Fallback to localStorage if available
+                const savedBooks = localStorage.getItem('createdBooks');
+                if (savedBooks) {
+                    console.log('📦 FALLBACK: Using cached books from localStorage');
+                    setCreatedBooks(JSON.parse(savedBooks));
+                }
+            }
+        } catch (error) {
+            console.error('❌ UNIFIED: Error refreshing books:', error);
+            // Fallback to localStorage
+            const savedBooks = localStorage.getItem('createdBooks');
+            if (savedBooks) {
+                console.log('📦 FALLBACK: Using cached books from localStorage');
+                setCreatedBooks(JSON.parse(savedBooks));
+            }
+        }
+    };
+
+    // PHASE 2: Progressive book click handler
+    const handleProgressiveBookClick = async (bookId: string) => {
+        try {
+            console.log(`📖 Phase 2: Loading complete book data for ${bookId}...`);
+            
+            // Track book access for smart background sync
+            syncService.trackBookAccess(bookId);
+            
+            // Load complete book content on-demand
+            const bookData = await syncService.loadBookContent(bookId);
+            console.log(`✅ Loaded complete book data: ${bookData.metadata.name}`);
+            
+            // Navigate to book reader with full data available
+            navigate(`/shelf/subject/${encodeURIComponent(bookId)}`);
+            
+        } catch (error) {
+            console.error(`💥 Failed to load book ${bookId}:`, error);
+            
+            // Fallback to legacy navigation if progressive loading fails
+            navigate(`/shelf/subject/${encodeURIComponent(bookId)}`);
+        }
+    };
+
+    // Manual refresh handler for Phase 1
+    const handleRefresh = async () => {
+        try {
+            console.log('🔄 Manually refreshing book list...');
+            const books = await syncService.loadBookList(undefined, true);
+            setBookMetadataList(books);
+            console.log(`✅ Refreshed ${books.length} books`);
+        } catch (error) {
+            console.error('💥 Manual refresh failed:', error);
+        }
+    };
 
     const loadInitialBooks = async () => {
         try {
@@ -192,59 +337,54 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
         window.open('http://localhost:5180', '_blank');
     };
 
-    const handleCreateBook = (bookData: BookData) => {
-        // Use new BookManager to create book with proper UUID and versioning
-        const newBookMetadata = BookManager.createBook({
-            name: bookData.name,
-            description: `${bookData.university} - ${bookData.semester}`,
-            image: bookData.image,
-            creatorName: bookData.creatorName,
-            university: bookData.university,
-            semester: bookData.semester,
-            subjectCode: bookData.subjectCode
-        });
-
-        // Convert to legacy format for compatibility
-        const newBook = {
-            ...bookData,
-            id: newBookMetadata.id, // Use UUID instead of timestamp
-            chapters: [],
-            version: newBookMetadata.version,
-            createdAt: newBookMetadata.createdAt,
-            updatedAt: newBookMetadata.updatedAt
-        };
-
-        const updatedBooks = [...createdBooks, newBook];
-        setCreatedBooks(updatedBooks);
+    const handleCreateBook = async (bookData: BookData) => {
+        console.log(`📚 UNIFIED: Creating book with auto-sync: ${bookData.name}`);
         
-        // Use BookManager's safe storage instead of direct localStorage
-        // BookManager already saves to localStorage with quota handling
         try {
-            localStorage.setItem('createdBooks', JSON.stringify(updatedBooks));
-        } catch (error) {
-            if (error instanceof Error && error.name === 'QuotaExceededError') {
-                console.warn('LocalStorage quota exceeded for createdBooks. Using minimal storage.');
-                // Save only essential data if quota exceeded
-                const minimalBooks = updatedBooks.map(book => ({
-                    id: book.id,
-                    name: book.name,
-                    creatorName: book.creatorName,
-                    university: book.university
-                }));
-                try {
-                    localStorage.setItem('createdBooks', JSON.stringify(minimalBooks));
-                } catch (minimalError) {
-                    console.error('Cannot save even minimal book data:', minimalError);
-                }
+            // Use UnifiedBookAdapter for automatic cloud sync
+            const unifiedAdapter = UnifiedBookAdapter.getInstance();
+            
+            const result = await unifiedAdapter.createBook({
+                name: bookData.name,
+                description: `${bookData.university} - ${bookData.semester}`,
+                image: bookData.image,
+                creatorName: bookData.creatorName,
+                university: bookData.university,
+                semester: bookData.semester,
+                subjectCode: bookData.subjectCode
+            });
+
+            if (result.success && result.book) {
+                console.log(`✅ UNIFIED: Book created and auto-synced: ${result.book.name}`);
+                
+                // UNIFIED SYSTEM: UnifiedBookAdapter already handles ALL storage
+                // No need to duplicate in local state - just refresh the UI
+                
+                // Refresh books from unified service
+                await refreshBooksFromUnifiedService();
+                
+                // Broadcast sync event to other tabs
+                const realTimeSync = RealTimeSyncService.getInstance();
+                realTimeSync.broadcastSyncEvent({
+                    type: 'book_created',
+                    bookId: result.book.id,
+                    bookName: result.book.name
+                });
+                
+                setCreateBookOpen(false);
+                
+                // Show success message
+                alert(`✅ Book "${result.book.name}" created and synced to cloud!`);
+                
             } else {
-                console.error('Error saving created books:', error);
+                console.error('UNIFIED: Failed to create book:', result.error);
+                alert(`❌ Failed to create book: ${result.error}`);
             }
+
+        } catch (error) {
+            console.error('UNIFIED: Error creating book:', error);
+            alert(`❌ Error creating book: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-        
-        // Close the modal on successful creation
-        setCreateBookOpen(false);
-        
-        console.log('Book created with UUID:', newBookMetadata);
     };
 
     const handleEditBook = (bookId: string) => {
@@ -280,14 +420,29 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
         setIsEditBookOpen(false);
     };
 
-    const handleDeleteBook = (bookId: string) => {
-        const updatedBooks = createdBooks.filter(book => book.id !== bookId);
-        setCreatedBooks(updatedBooks);
-        
-        // Persist to localStorage
-        localStorage.setItem('createdBooks', JSON.stringify(updatedBooks));
-        
-        console.log('Book deleted:', bookId);
+    const handleDeleteBook = async (bookId: string) => {
+        try {
+            // Use BookManager's async delete method for both local and backend books
+            const success = await BookManager.deleteBook(bookId);
+            
+            if (success) {
+                // Remove from display state
+                const updatedBooks = createdBooks.filter(book => book.id !== bookId);
+                setCreatedBooks(updatedBooks);
+                
+                // Persist to localStorage (local books only - backend books are managed separately)
+                const localOnlyBooks = updatedBooks.filter(book => !book.isBackendBook);
+                localStorage.setItem('createdBooks', JSON.stringify(localOnlyBooks));
+                
+                console.log('✅ Book deleted successfully:', bookId);
+            } else {
+                console.error('❌ Failed to delete book:', bookId);
+                alert('Failed to delete book. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error deleting book:', error);
+            alert('Error deleting book. Please try again.');
+        }
     };
 
     const handleDeleteImportedBook = (bookId: string) => {
@@ -370,7 +525,7 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
 
         try {
             // Get book data using BookManager
-            const bookData = BookManager.getBookById(bookId);
+            const bookData = await BookManager.getBookById(bookId);
             
             if (!bookData) {
                 throw new Error('Book not found');
@@ -480,9 +635,128 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
         </button>
     );
 
-    const renderCreatedBookCard = (book: BookData & { id: string }) => (
+    // Progressive loading book card renderer
+    const renderProgressiveBookCard = (book: BookMetadata) => (
         <div
             key={book.id}
+            className="card theme-transition group text-left p-3 sm:p-4 lg:p-6 flex flex-col h-full relative"
+        >
+            {/* Loading indicator for individual books */}
+            {loadingState.isLoadingBook[book.id] && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20 rounded-lg">
+                    <div className="text-white text-center">
+                        <div className="animate-spin text-2xl mb-2">📖</div>
+                        <div>Loading book...</div>
+                    </div>
+                </div>
+            )}
+
+            <div className="absolute top-2 right-2 z-10">
+                <BookOptionsMenu
+                    bookId={book.id}
+                    bookName={book.name}
+                    onEdit={(bookId) => console.log('Edit not yet implemented for progressive books:', bookId)}
+                    onDelete={(bookId) => console.log('Delete not yet implemented for progressive books:', bookId)}
+                />
+            </div>
+            <button
+                onClick={() => handleProgressiveBookClick(book.id)}
+                className="flex-1 w-full"
+            >
+                <div className="relative aspect-[3/4] mb-3 overflow-hidden rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center">
+                    {book.coverImage ? (
+                        <img 
+                            src={book.coverImage} 
+                            alt={book.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = getBookImage(book.name);
+                            }}
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-center">
+                            <BookOpenIcon className="h-8 w-8 sm:h-12 sm:w-12 text-blue-500 dark:text-blue-400 mb-2" />
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-300 px-2">
+                                {book.name}
+                            </span>
+                        </div>
+                    )}
+                    
+                    {/* Progressive loading badges */}
+                    <div className="absolute top-2 left-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            📚 {book.chapterCount} chapters
+                        </span>
+                    </div>
+                    
+                    {/* Last sync indicator */}
+                    {loadingState.lastSync[book.id] && (
+                        <div className="absolute bottom-2 right-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                ✅ Synced
+                            </span>
+                        </div>
+                    )}
+                </div>
+                
+                <div className="text-left">
+                    <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white mb-1 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {book.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-2 line-clamp-2">
+                        By {book.authorName}
+                    </p>
+                    {book.description && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                            {book.description}
+                        </p>
+                    )}
+                    <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Updated: {new Date(book.lastModified).toLocaleDateString()}
+                        </span>
+                        {book.isPublished && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                📖 Published
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </button>
+        </div>
+    );
+
+    const renderCreatedBookCard = (book: BookData & { id: string, isBackendBook?: boolean }) => {
+        const handleBookClick = async () => {
+            if (book.isBackendBook) {
+                // Backend book: load content first, then navigate
+                console.log(`🔄 Loading backend book content: ${book.name}`);
+                try {
+                    // Phase 2: Load complete book data
+                    const fullBookData = await BackendBookService.getInstance().getBookDetails(book.id);
+                    console.log(`✅ Loaded backend book data:`, fullBookData);
+                    
+                    // Store the book data in localStorage for the reader page
+                    localStorage.setItem(`book_${book.name}`, JSON.stringify(fullBookData.metadata));
+                    localStorage.setItem(`chapters_${book.id}`, JSON.stringify(fullBookData.chapters));
+                    
+                    // Navigate to the book
+                    navigate(`/subject/${encodeURIComponent(book.name)}`);
+                } catch (error) {
+                    console.error(`❌ Failed to load backend book ${book.name}:`, error);
+                    // Still navigate, but with limited data
+                    navigate(`/subject/${encodeURIComponent(book.name)}`);
+                }
+            } else {
+                // Local book: navigate directly
+                navigate(`/subject/${encodeURIComponent(book.name)}`);
+            }
+        };
+
+        return (
+        <div
+            key={`${book.isBackendBook ? 'backend' : 'local'}_${book.id}`}
             className="card theme-transition group text-left p-3 sm:p-4 lg:p-6 flex flex-col h-full relative"
         >
             <div className="absolute top-2 right-2 z-10">
@@ -494,7 +768,7 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                 />
             </div>
             <button
-                onClick={() => navigate(`/subject/${encodeURIComponent(book.name)}`)}
+                onClick={handleBookClick}
                 className="flex-1 w-full"
             >
                 <div className="aspect-[3/4] mb-3 sm:mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex-shrink-0 flex items-center justify-center">
@@ -556,7 +830,8 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                 )}
             </button>
         </div>
-    );
+        );
+    };
 
     const renderLegacySubjectCard = (subject: string) => (
         <button
@@ -845,7 +1120,15 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                             </h2>
                             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                                 {/* Created Books */}
-                                {createdBooks.map(renderCreatedBookCard)}
+                                {isLoadingBackendBooks && (
+                                    <div className="col-span-2 md:col-span-3 lg:col-span-4 flex items-center justify-center p-8">
+                                        <div className="flex items-center gap-3 theme-text">
+                                            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                            <span className="text-sm">Loading your books from cloud...</span>
+                                        </div>
+                                    </div>
+                                )}
+                                {!isLoadingBackendBooks && createdBooks.map(renderCreatedBookCard)}
                                 
                                 {/* Create Your Own Books Button */}
                                 <button

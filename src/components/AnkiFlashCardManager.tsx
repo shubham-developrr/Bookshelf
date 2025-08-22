@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SparklesIcon, PlusIcon, TrashIcon, FileIcon } from './icons';
 import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
+import UnifiedBookAdapter from '../services/UnifiedBookAdapter';
+import RealTimeSyncService from '../services/RealTimeSyncService';
 
 interface AnkiCard {
     id: string;
@@ -52,7 +54,7 @@ const AnkiFlashCardManager: React.FC<AnkiFlashCardManagerProps> = ({
         );
     }, [currentBook, currentChapter]);
 
-    // Load flashcards using book-linked tab system
+    // Load flashcards using book-linked tab system with real-time sync
     useEffect(() => {
         try {
             const data = BookTabManager.loadTabData('flashcards', tabContext);
@@ -72,13 +74,88 @@ const AnkiFlashCardManager: React.FC<AnkiFlashCardManagerProps> = ({
         }
     }, [tabContext]);
 
-    // Save flashcards using book-linked tab system
-    const saveFlashCards = (cards: AnkiCard[]) => {
+    // REAL-TIME SYNC: Listen for changes from other tabs
+    useEffect(() => {
+        const realTimeSync = RealTimeSyncService.getInstance();
+        
+        const unsubscribe = realTimeSync.subscribe(`flashcards_${currentBook}_${currentChapter}`, (event) => {
+            if (event.bookName === currentBook && 
+                event.chapterName === currentChapter && 
+                event.contentType === 'flashcards') {
+                
+                console.log(`🔄 REALTIME: Reloading flashcards due to change in another tab`);
+                
+                // Reload flashcards from storage
+                const data = BookTabManager.loadTabData('flashcards', tabContext);
+                if (data && Array.isArray(data)) {
+                    const cards = data.map((card: any) => ({
+                        ...card,
+                        created: new Date(card.created),
+                        lastReviewed: card.lastReviewed ? new Date(card.lastReviewed) : undefined
+                    }));
+                    setFlashCards(cards);
+                }
+            }
+        });
+        
+        return unsubscribe;
+    }, [currentBook, currentChapter, tabContext]);
+
+    // Save flashcards using UNIFIED SYSTEM with cloud sync and real-time notifications
+    const saveFlashCards = async (cards: AnkiCard[]) => {
         try {
+            console.log(`💾 UNIFIED: Saving flashcards for ${currentBook} - ${currentChapter}`);
+            
+            // Save immediately to local storage for instant UI response
             BookTabManager.saveTabData('flashcards', tabContext, cards);
             setFlashCards(cards);
+            
+            // Get book ID for unified sync
+            const bookId = await getBookIdFromName(currentBook);
+            if (bookId) {
+                // Use UnifiedBookAdapter for automatic cloud sync
+                const unifiedAdapter = UnifiedBookAdapter.getInstance();
+                await unifiedAdapter.autoSaveContent(
+                    bookId,
+                    currentBook,
+                    currentChapter,
+                    'flashcards',
+                    cards
+                );
+                
+                // Broadcast sync event to other tabs
+                const realTimeSync = RealTimeSyncService.getInstance();
+                realTimeSync.broadcastSyncEvent({
+                    type: 'content_saved',
+                    bookId: bookId,
+                    bookName: currentBook,
+                    chapterName: currentChapter,
+                    contentType: 'flashcards'
+                });
+                
+                console.log(`✅ UNIFIED: Flashcards synced to cloud and broadcasted to other tabs`);
+            }
         } catch (error) {
-            console.error('Failed to save flashcards:', error);
+            console.error('UNIFIED: Failed to save flashcards:', error);
+            // Still save locally even if cloud sync fails
+            BookTabManager.saveTabData('flashcards', tabContext, cards);
+            setFlashCards(cards);
+        }
+    };
+
+    // Helper to get book ID from book name
+    const getBookIdFromName = async (bookName: string): Promise<string | null> => {
+        try {
+            // Check created books first
+            const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+            const book = savedBooks.find((b: any) => b.name === bookName);
+            if (book) return book.id;
+            
+            // Fallback - use book name as ID
+            return bookName;
+        } catch (error) {
+            console.error('Failed to get book ID:', error);
+            return bookName;
         }
     };
 

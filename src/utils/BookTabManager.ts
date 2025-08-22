@@ -143,14 +143,16 @@ export class BookTabManager {
   }
 
   /**
-   * Find custom tabs for a book/chapter
+   * Find custom tabs for a book/chapter using book-linked storage
    */
   private static findCustomTabs(bookName: string, chapterName: string): BookTabContext[] {
     const customTabs: BookTabContext[] = [];
     
-    // Look for custom tab storage keys
+    // Look for custom tab storage keys with book-linked pattern
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
+      
+      // Look for both old pattern and new book-linked pattern
       if (key && key.startsWith(`customtab_${bookName}_${chapterName}_`)) {
         const customName = key.replace(`customtab_${bookName}_${chapterName}_`, '');
         const content = localStorage.getItem(key);
@@ -163,6 +165,82 @@ export class BookTabManager {
     }
     
     return customTabs;
+  }
+
+  /**
+   * Create book-linked storage key for custom tabs
+   */
+  static createCustomTabStorageKey(
+    bookName: string,
+    chapterName: string,
+    customName: string,
+    useBookLinkedId = true
+  ): string {
+    const cleanBookName = bookName.replace(/\s+/g, '_');
+    const cleanChapterName = chapterName.replace(/\s+/g, '_');
+    
+    if (useBookLinkedId) {
+      // Use book-linked tab ID for new pattern
+      const tabId = this.generateBookLinkedTabId(bookName, chapterName, 'custom', customName);
+      return `customtab_${cleanBookName}_${cleanChapterName}_${tabId}`;
+    } else {
+      // Legacy pattern for compatibility
+      return `customtab_${cleanBookName}_${cleanChapterName}_${customName}`;
+    }
+  }
+
+  /**
+   * Save custom tab data with book-linked storage
+   */
+  static saveCustomTabData(
+    bookName: string,
+    chapterName: string,
+    customName: string,
+    data: string
+  ): void {
+    // Save with book-linked pattern
+    const newKey = this.createCustomTabStorageKey(bookName, chapterName, customName, true);
+    localStorage.setItem(newKey, data);
+    
+    // Also check and migrate from legacy pattern if exists
+    const legacyKey = this.createCustomTabStorageKey(bookName, chapterName, customName, false);
+    const legacyData = localStorage.getItem(legacyKey);
+    
+    if (legacyData && legacyData !== data) {
+      console.log(`Migrating custom tab data from ${legacyKey} to ${newKey}`);
+      localStorage.setItem(newKey, legacyData);
+      localStorage.removeItem(legacyKey);
+    }
+    
+    console.log(`💾 Saved custom tab "${customName}" for book: ${bookName}`);
+  }
+
+  /**
+   * Load custom tab data with book-linked storage
+   */
+  static loadCustomTabData(
+    bookName: string,
+    chapterName: string,
+    customName: string
+  ): string {
+    // Try book-linked pattern first
+    const newKey = this.createCustomTabStorageKey(bookName, chapterName, customName, true);
+    let data = localStorage.getItem(newKey);
+    
+    if (!data || data === 'null') {
+      // Fallback to legacy pattern and migrate if found
+      const legacyKey = this.createCustomTabStorageKey(bookName, chapterName, customName, false);
+      const legacyData = localStorage.getItem(legacyKey);
+      
+      if (legacyData && legacyData !== 'null') {
+        console.log(`Migrating custom tab data from ${legacyKey} to ${newKey}`);
+        localStorage.setItem(newKey, legacyData);
+        localStorage.removeItem(legacyKey);
+        return legacyData;
+      }
+    }
+    
+    return data || '';
   }
 
   /**

@@ -20,6 +20,7 @@ import HTMLCodeEditor from '../components/HTMLCodeEditor';
 import { ResponsiveTabBar } from '../components/ResponsiveTabBar';
 import { generateAIGuruResponse } from '../services/githubModelsService';
 import { tabPersistenceManager } from '../services/TabPersistenceManager';
+import { BookTabManager } from '../utils/BookTabManager';
 import Groq from 'groq-sdk';
 
 // Template ID Constants - Built-in IDs that cannot be changed
@@ -463,7 +464,9 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
             case 'videos':
                 return JSON.parse(localStorage.getItem(`videos_${currentBook}_${chapterKey}`) || '[]');
             default:
-                return localStorage.getItem(`customtab_${currentBook}_${chapterKey}_${tabNames[tabId] || tabId}`) || '';
+                // Handle custom tabs with book-linked storage
+                const customName = tabNames[tabId] || tabId;
+                return BookTabManager.loadCustomTabData(currentBook, chapterKey, customName);
         }
     };
 

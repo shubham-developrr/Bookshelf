@@ -5,6 +5,8 @@ import { OCRService } from '../utils/ocrService';
 import AILoadingAnimation from './AILoadingAnimation';
 import { QATest } from './TestComponents';
 import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
+import { UnifiedBookAdapter } from '../services/UnifiedBookAdapter';
+import { RealTimeSyncService } from '../services/RealTimeSyncService';
 
 interface QAQuestion {
     id: string;
@@ -49,6 +51,9 @@ const QAManager: React.FC<QAManagerProps> = ({
     const [showFormatModal, setShowFormatModal] = useState(false);
     const [isAIProcessing, setIsAIProcessing] = useState(false);
 
+    // Initialize real-time sync service
+    const realTimeSync = React.useMemo(() => RealTimeSyncService.getInstance(), []);
+
     // Edit state
     const [editingQuestion, setEditingQuestion] = useState<QAQuestion | null>(null);
 
@@ -79,9 +84,21 @@ const QAManager: React.FC<QAManagerProps> = ({
         return getAllMarksOptions().filter(mark => questionMarks.includes(mark));
     };
 
-    // Load Q&As from localStorage
+    // Load Q&As using unified system with real-time sync
     React.useEffect(() => {
         try {
+            // Try unified system first
+            const unifiedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'QA', tabId);
+            if (unifiedData && Array.isArray(unifiedData) && unifiedData.length > 0) {
+                const questions = unifiedData.map((q: any) => ({
+                    ...q,
+                    timestamp: new Date(q.timestamp)
+                }));
+                setQaQuestions(questions);
+                return;
+            }
+
+            // Fallback to legacy data
             const data = BookTabManager.loadTabData('qa', tabContext);
             if (data && Array.isArray(data)) {
                 const questions = data.map((q: any) => ({
@@ -93,15 +110,53 @@ const QAManager: React.FC<QAManagerProps> = ({
         } catch (error) {
             console.error('Failed to load QA questions:', error);
         }
-    }, [tabContext]);
+    }, [currentBook, currentChapter, tabId, tabContext]);
 
-    // Save Q&As to localStorage
-    const saveQaQuestions = (questions: QAQuestion[]) => {
+    // Listen for real-time sync events
+    React.useEffect(() => {
+        const handleSyncEvent = (event: any) => {
+            if (event.templateType === 'QA' && 
+                event.bookName === currentBook && 
+                event.chapterName === currentChapter) {
+                // Reload data when sync event occurs
+                const syncedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'QA', tabId);
+                if (syncedData && Array.isArray(syncedData)) {
+                    const questions = syncedData.map((q: any) => ({
+                        ...q,
+                        timestamp: new Date(q.timestamp)
+                    }));
+                    setQaQuestions(questions);
+                }
+            }
+        };
+
+        const unsubscribe = realTimeSync.subscribe(`qa_${currentBook}_${currentChapter}`, handleSyncEvent);
+        return unsubscribe;
+    }, [currentBook, currentChapter, tabId, realTimeSync]);
+
+    // Save Q&As using unified system with real-time sync
+    const saveQaQuestions = async (questions: QAQuestion[]) => {
         try {
-            BookTabManager.saveTabData('qa', tabContext, questions);
+            // Save using unified adapter with automatic cloud sync
+            const adapter = UnifiedBookAdapter.getInstance();
+            await adapter.saveTemplateData(currentBook, currentChapter, 'QA', questions, tabId);
             setQaQuestions(questions);
+            
+            // Broadcast real-time sync event to other tabs
+            realTimeSync.broadcastSyncEvent({
+                type: 'template_updated',
+                bookName: currentBook,
+                chapterName: currentChapter,
+                templateType: 'QA'
+            });
+
+            // Also save to legacy system for backward compatibility
+            BookTabManager.saveTabData('qa', tabContext, questions);
         } catch (error) {
             console.error('Failed to save QA questions:', error);
+            // Fallback to legacy save
+            BookTabManager.saveTabData('qa', tabContext, questions);
+            setQaQuestions(questions);
         }
     };
 

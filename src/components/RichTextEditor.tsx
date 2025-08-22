@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { PencilIcon, EyeIcon, BookOpenIcon } from './icons';
+import { BookTabManager } from '../utils/BookTabManager';
 import 'katex/dist/katex.min.css';
 
 interface RichTextEditorProps {
@@ -22,31 +23,30 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 }) => {
     const [content, setContent] = useState('');
     const [isEditing, setIsEditing] = useState(true);
-    const storageKey = `customtab_${currentBook}_${currentChapter.replace(/\s+/g, '_')}_${tabName.replace(/\s+/g, '_')}`;
 
-    // Load content from localStorage on component mount
-    React.useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            setContent(saved);
+    // Load content using BookTabManager
+    useEffect(() => {
+        const savedContent = BookTabManager.loadCustomTabData(currentBook, currentChapter, tabName);
+        if (savedContent) {
+            setContent(savedContent);
         }
-    }, [storageKey]);
+    }, [currentBook, currentChapter, tabName]);
 
-    // Save content to localStorage
+    // Save content using BookTabManager
     const handleSave = () => {
-        localStorage.setItem(storageKey, content);
+        BookTabManager.saveCustomTabData(currentBook, currentChapter, tabName, content);
     };
 
     // Auto-save on content change (with debouncing)
-    React.useEffect(() => {
+    useEffect(() => {
         const timer = setTimeout(() => {
             if (content.trim()) {
-                localStorage.setItem(storageKey, content);
+                BookTabManager.saveCustomTabData(currentBook, currentChapter, tabName, content);
             }
         }, 1000); // Save after 1 second of inactivity
 
         return () => clearTimeout(timer);
-    }, [content, storageKey]);
+    }, [content, currentBook, currentChapter, tabName]);
 
     const placeholder = `# ${tabName}
 

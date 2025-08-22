@@ -5,6 +5,8 @@ import { useBackgroundUpload } from '../hooks/useBackgroundUpload';
 import { BookBasedAssetService } from '../services/BookBasedAssetService';
 import { BookIdResolver } from '../utils/BookIdResolver';
 import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
+import { UnifiedBookAdapter } from '../services/UnifiedBookAdapter';
+import { RealTimeSyncService } from '../services/RealTimeSyncService';
 
 interface MindMapItem {
     id: string;
@@ -36,6 +38,9 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [fullScreenItem, setFullScreenItem] = useState<MindMapItem | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Initialize real-time sync service
+    const realTimeSync = React.useMemo(() => RealTimeSyncService.getInstance(), []);
 
     // Resolve Book ID from book name for book-based authentication
     const bookContext = React.useMemo(() => 
@@ -106,9 +111,21 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
     // Mobile detection
     const isMobile = () => window.innerWidth <= 768;
 
-    // Load mind maps using book-linked tab system
+    // Load mind maps using unified system with real-time sync
     React.useEffect(() => {
         try {
+            // Try unified system first
+            const unifiedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'MINDMAP', tabId);
+            if (unifiedData && Array.isArray(unifiedData) && unifiedData.length > 0) {
+                const mindMapData = unifiedData.map((m: any) => ({
+                    ...m,
+                    timestamp: new Date(m.timestamp)
+                }));
+                setMindMaps(mindMapData);
+                return;
+            }
+
+            // Fallback to legacy data
             const data = BookTabManager.loadTabData('mindmaps', tabContext);
             if (data && Array.isArray(data)) {
                 const mindMapData = data.map((m: any) => ({
@@ -123,15 +140,53 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
             console.error('Failed to load mind maps:', error);
             setMindMaps([]);
         }
-    }, [tabContext]);
+    }, [currentBook, currentChapter, tabId, tabContext]);
 
-    // Save mind maps using book-linked tab system
-    const saveMindMaps = (mapList: MindMapItem[]) => {
+    // Listen for real-time sync events
+    React.useEffect(() => {
+        const handleSyncEvent = (event: any) => {
+            if (event.templateType === 'MINDMAP' && 
+                event.bookName === currentBook && 
+                event.chapterName === currentChapter) {
+                // Reload data when sync event occurs
+                const syncedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'MINDMAP', tabId);
+                if (syncedData && Array.isArray(syncedData)) {
+                    const mindMapData = syncedData.map((m: any) => ({
+                        ...m,
+                        timestamp: new Date(m.timestamp)
+                    }));
+                    setMindMaps(mindMapData);
+                }
+            }
+        };
+
+        const unsubscribe = realTimeSync.subscribe(`mindmap_${currentBook}_${currentChapter}`, handleSyncEvent);
+        return unsubscribe;
+    }, [currentBook, currentChapter, tabId, realTimeSync]);
+
+    // Save mind maps using unified system with real-time sync
+    const saveMindMaps = async (mapList: MindMapItem[]) => {
         try {
-            BookTabManager.saveTabData('mindmaps', tabContext, mapList);
+            // Save using unified adapter with automatic cloud sync
+            const adapter = UnifiedBookAdapter.getInstance();
+            await adapter.saveTemplateData(currentBook, currentChapter, 'MINDMAP', mapList, tabId);
             setMindMaps(mapList);
+            
+            // Broadcast real-time sync event to other tabs
+            realTimeSync.broadcastSyncEvent({
+                type: 'template_updated',
+                bookName: currentBook,
+                chapterName: currentChapter,
+                templateType: 'MINDMAP'
+            });
+
+            // Also save to legacy system for backward compatibility
+            BookTabManager.saveTabData('mindmaps', tabContext, mapList);
         } catch (error) {
             console.error('Failed to save mind maps:', error);
+            // Fallback to legacy save
+            BookTabManager.saveTabData('mindmaps', tabContext, mapList);
+            setMindMaps(mapList);
         }
     };
 

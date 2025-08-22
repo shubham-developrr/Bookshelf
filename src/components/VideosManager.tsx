@@ -1,5 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PlusIcon, TrashIcon, PlayIcon, ExternalLinkIcon } from './icons';
+import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
+import { UnifiedBookAdapter } from '../services/UnifiedBookAdapter';
+import { RealTimeSyncService } from '../services/RealTimeSyncService';
 
 interface VideoItem {
     id: string;
@@ -33,29 +36,117 @@ const VideosManager: React.FC<VideosManagerProps> = ({
     const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
     const [showPlayer, setShowPlayer] = useState(false);
     
-    // Create unique storage key that includes tab ID for isolation
-    const baseKey = `videos_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
-    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
+    // Initialize real-time sync service
+    const realTimeSync = React.useMemo(() => RealTimeSyncService.getInstance(), []);
+    
+    // Create tab context for book-linked data management
+    const tabContext: BookTabContext = BookTabManager.createTemplateTabContext(
+        currentBook, 
+        currentChapter, 
+        'VIDEOS'
+    );
 
     // Mobile detection
     const isMobile = () => window.innerWidth <= 768;
 
-    // Load videos from localStorage
-    React.useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            const videoData = JSON.parse(saved).map((v: any) => ({
+    // Load videos using unified system with real-time sync
+    useEffect(() => {
+        // Try unified system first
+        const unifiedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'VIDEOS', tabId);
+        if (unifiedData && Array.isArray(unifiedData) && unifiedData.length > 0) {
+            const videoData = unifiedData.map((v: any) => ({
+                ...v,
+                addedDate: new Date(v.addedDate)
+            }));
+            setVideos(videoData);
+            return;
+        }
+
+        // Fallback to legacy data
+        const loadedVideos = BookTabManager.loadTabData('VIDEOS', tabContext);
+        if (loadedVideos && Array.isArray(loadedVideos)) {
+            const videoData = loadedVideos.map((v: any) => ({
                 ...v,
                 addedDate: new Date(v.addedDate)
             }));
             setVideos(videoData);
         }
-    }, [storageKey]);
+    }, [currentBook, currentChapter, tabId, tabContext.tabId]);
 
-    // Save videos to localStorage
-    const saveVideos = (videoList: VideoItem[]) => {
-        localStorage.setItem(storageKey, JSON.stringify(videoList));
-        setVideos(videoList);
+    // Listen for real-time sync events
+    useEffect(() => {
+        const handleSyncEvent = (event: any) => {
+            if (event.templateType === 'VIDEOS' && 
+                event.bookName === currentBook && 
+                event.chapterName === currentChapter) {
+                // Reload data when sync event occurs
+                const syncedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'VIDEOS', tabId);
+                if (syncedData && Array.isArray(syncedData)) {
+                    const videoData = syncedData.map((v: any) => ({
+                        ...v,
+                        addedDate: new Date(v.addedDate)
+                    }));
+                    setVideos(videoData);
+                }
+            }
+        };
+
+        const unsubscribe = realTimeSync.subscribe(`videos_${currentBook}_${currentChapter}`, handleSyncEvent);
+        return unsubscribe;
+    }, [currentBook, currentChapter, tabId, realTimeSync]);
+
+    // Auto-save videos using unified system with real-time sync
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (videos.length > 0) {
+                try {
+                    // Save using unified adapter
+                    const adapter = UnifiedBookAdapter.getInstance();
+                    await adapter.saveTemplateData(currentBook, currentChapter, 'VIDEOS', videos, tabId);
+                    
+                    // Broadcast real-time sync event to other tabs
+                    realTimeSync.broadcastSyncEvent({
+                        type: 'template_updated',
+                        bookName: currentBook,
+                        chapterName: currentChapter,
+                        templateType: 'VIDEOS'
+                    });
+
+                    // Also save to legacy system for backward compatibility
+                    BookTabManager.saveTabData('VIDEOS', tabContext, videos);
+                } catch (error) {
+                    // Fallback to legacy save
+                    BookTabManager.saveTabData('VIDEOS', tabContext, videos);
+                }
+            }
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [videos, currentBook, currentChapter, tabId, tabContext.tabId, realTimeSync]);
+
+    // Save videos using unified system with real-time sync
+    const saveVideos = async (videoList: VideoItem[]) => {
+        try {
+            // Save using unified adapter with automatic cloud sync
+            const adapter = UnifiedBookAdapter.getInstance();
+            await adapter.saveTemplateData(currentBook, currentChapter, 'VIDEOS', videoList, tabId);
+            setVideos(videoList);
+            
+            // Broadcast real-time sync event to other tabs
+            realTimeSync.broadcastSyncEvent({
+                type: 'template_updated',
+                bookName: currentBook,
+                chapterName: currentChapter,
+                templateType: 'VIDEOS'
+            });
+
+            // Also save to legacy system for backward compatibility
+            BookTabManager.saveTabData('VIDEOS', tabContext, videoList);
+        } catch (error) {
+            console.error('Failed to save videos:', error);
+            // Fallback to legacy save
+            BookTabManager.saveTabData('VIDEOS', tabContext, videoList);
+            setVideos(videoList);
+        }
     };
 
     // Extract YouTube video ID from URL

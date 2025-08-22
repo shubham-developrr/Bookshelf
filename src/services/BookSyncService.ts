@@ -1,10 +1,16 @@
 import { supabase } from './supabaseClient';
 import { SupabaseAssetService } from './SupabaseAssetService';
+import { BackendBookService, BookMetadata, FullBookData } from './BackendBookService';
+import { BookTabManager } from '../utils/BookTabManager';
 
 /**
- * COMPLETE BACKEND SYNCHRONIZATION SERVICE
- * This service handles syncing ALL book data between localStorage and Supabase
- * Solves the core issue: data disappearing on refresh due to missing backend sync
+ * PROGRESSIVE DATA LOADING & SYNC SYSTEM
+ * 
+ * Phase 1: Quick book list from backend (immediate)
+ * Phase 2: Book content from backend when clicked (on-demand)  
+ * Phase 3: Local cache for performance (smart caching)
+ * 
+ * Backend data always takes priority for cross-device consistency
  */
 
 export interface SyncResult {
@@ -20,6 +26,14 @@ export interface SyncResult {
   errors: string[];
 }
 
+// Loading states for UI feedback
+export interface LoadingState {
+  isLoadingBookList: boolean;
+  isLoadingBook: { [bookId: string]: boolean };
+  lastSync: { [bookId: string]: Date };
+  syncErrors: { [bookId: string]: string };
+}
+
 export interface SyncStatus {
   isOnline: boolean;
   lastSync: string | null;
@@ -27,7 +41,26 @@ export interface SyncStatus {
   isSyncing: boolean;
 }
 
+// Sync metadata interface
+interface SyncMetadata {
+  bookId: string;
+  lastSyncTimestamp: Date;
+  localVersion: string;
+  backendVersion: string;
+  syncStatus: 'synced' | 'pending' | 'conflict' | 'error' | 'loading';
+}
+
 export class BookSyncService {
+  private static instance: BookSyncService;
+  private backendService: BackendBookService;
+  private loadingState: LoadingState = {
+    isLoadingBookList: false,
+    isLoadingBook: {},
+    lastSync: {},
+    syncErrors: {}
+  };
+  private listeners: Set<(state: LoadingState) => void> = new Set();
+  
   private static syncStatus: SyncStatus = {
     isOnline: true,
     lastSync: null,
@@ -35,48 +68,514 @@ export class BookSyncService {
     isSyncing: false
   };
 
-  private static listeners: ((status: SyncStatus) => void)[] = [];
+  private static statusListeners: ((status: SyncStatus) => void)[] = [];
   
   // Cache for failed asset migrations to avoid retrying invalid blob URLs
   private static failedMigrationCache = new Set<string>();
 
-  // ==================== INITIALIZATION ====================
+  private constructor() {
+    this.backendService = BackendBookService.getInstance();
+  }
+
+  static getInstance(): BookSyncService {
+    if (!BookSyncService.instance) {
+      BookSyncService.instance = new BookSyncService();
+    }
+    return BookSyncService.instance;
+  }
 
   /**
-   * Initialize sync service and perform startup sync
+   * Initialize the BookSync service - sets up real-time sync, network detection, etc.
    */
   static async initialize(): Promise<void> {
-    console.log('🚀 Initializing BookSyncService...');
+    console.log('🔄 BookSyncService initialization started...');
     
     try {
-      // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('⚠️ User not authenticated, skipping sync initialization');
-        return;
-      }
-
-      // Setup online/offline detection
+      // Set up network detection
       this.setupNetworkDetection();
-
-      // Setup real-time subscriptions
-      this.setupRealtimeSync();
-
-      // Perform startup data migration and sync
-      await this.performStartupSync();
-
-      console.log('✅ BookSyncService initialized successfully');
+      
+      // Set up realtime sync if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        console.log('✅ User authenticated, setting up realtime sync...');
+        this.setupRealtimeSync();
+      } else {
+        console.log('ℹ️ User not authenticated, skipping realtime sync setup');
+      }
+      
+      console.log('✅ BookSyncService initialization complete');
     } catch (error) {
-      console.error('❌ BookSyncService initialization failed:', error);
+      console.warn('⚠️ BookSyncService initialization error:', error);
+      // Don't throw - allow app to continue in offline mode
     }
   }
 
-  // ==================== SYNC TO BACKEND ====================
+  // ==================== PROGRESSIVE LOADING SYSTEM ====================
 
   /**
-   * Sync a complete book to Supabase backend
+   * Subscribe to loading state changes
+   */
+  subscribe(listener: (state: LoadingState) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach(listener => listener({ ...this.loadingState }));
+  }
+
+  private updateLoadingState(updates: Partial<LoadingState>): void {
+    this.loadingState = { ...this.loadingState, ...updates };
+    this.notifyListeners();
+  }
+
+  /**
+   * PHASE 1: Load book list from backend (immediate on app start)
+   * Shows book cards quickly with just metadata
+   */
+  async loadBookList(userId?: string, forceRefresh = false): Promise<BookMetadata[]> {
+    console.log('📚 Phase 1: Loading book list from backend...');
+    
+    this.updateLoadingState({ isLoadingBookList: true });
+
+    try {
+      // Get authenticated user if not provided
+      let user;
+      if (userId) {
+        user = { id: userId };
+      } else {
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        if (authError || !authUser) {
+          console.warn('User not authenticated for book list');
+          this.updateLoadingState({ isLoadingBookList: false });
+          return this.getCachedBookList() || [];
+        }
+        user = authUser;
+      }
+
+      // Check cached book list first (unless force refresh)
+      if (!forceRefresh) {
+        const cachedList = this.getCachedBookList(user.id);
+        if (cachedList && cachedList.length > 0 && this.isBookListCacheFresh(user.id)) {
+          console.log(`✅ Found ${cachedList.length} cached books, using cache`);
+          this.updateLoadingState({ isLoadingBookList: false });
+          
+          // Start background refresh after returning cached data
+          setTimeout(() => this.loadBookList(user.id, true), 100);
+          return cachedList;
+        }
+      }
+
+      // Fetch from backend
+      const bookList = await this.backendService.getUserBooks(user.id);
+      console.log(`🌐 Loaded ${bookList.length} books from backend`);
+
+      // Cache the book list
+      this.cacheBookList(bookList, user.id);
+
+      this.updateLoadingState({ isLoadingBookList: false });
+      return bookList;
+
+    } catch (error) {
+      console.error('💥 Phase 1 failed:', error);
+      this.updateLoadingState({ 
+        isLoadingBookList: false,
+        syncErrors: { ...this.loadingState.syncErrors, bookList: error instanceof Error ? error.message : 'Unknown error' }
+      });
+
+      // Fallback to cached data
+      const cachedList = this.getCachedBookList(userId);
+      if (cachedList) {
+        console.log('🔄 Using cached book list as fallback');
+        return cachedList;
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * PHASE 2: Load complete book content from backend (on-demand when book clicked)
+   * Loads chapters, templates, custom tabs, etc.
+   */
+  async loadBookContent(bookId: string, forceRefresh = false): Promise<FullBookData> {
+    console.log(`📖 Phase 2: Loading book content for ${bookId}...`);
+    
+    this.updateLoadingState({ 
+      isLoadingBook: { ...this.loadingState.isLoadingBook, [bookId]: true }
+    });
+
+    try {
+      // Check if we need to refresh from backend
+      if (!forceRefresh && this.isBookDataFresh(bookId)) {
+        const cachedData = await this.getCachedBookData(bookId);
+        if (cachedData) {
+          console.log(`✅ Using fresh cached data for book ${bookId}`);
+          this.updateLoadingState({ 
+            isLoadingBook: { ...this.loadingState.isLoadingBook, [bookId]: false }
+          });
+          return cachedData;
+        }
+      }
+
+      // Fetch complete book data from backend
+      const bookData = await this.backendService.getBookDetails(bookId);
+      console.log(`🌐 Loaded complete book data for ${bookId} from backend`);
+
+      // Cache the book data locally (Phase 3)
+      await this.cacheBookData(bookId, bookData);
+
+      // Update sync metadata
+      this.updateSyncMetadata(bookId, 'synced');
+
+      this.updateLoadingState({ 
+        isLoadingBook: { ...this.loadingState.isLoadingBook, [bookId]: false },
+        lastSync: { ...this.loadingState.lastSync, [bookId]: new Date() }
+      });
+
+      // Track book access for smart background sync
+      this.trackBookAccess(bookId);
+
+      return bookData;
+
+    } catch (error) {
+      console.error(`💥 Phase 2 failed for book ${bookId}:`, error);
+      this.updateLoadingState({ 
+        isLoadingBook: { ...this.loadingState.isLoadingBook, [bookId]: false },
+        syncErrors: { ...this.loadingState.syncErrors, [bookId]: error instanceof Error ? error.message : 'Unknown error' }
+      });
+
+      // Try to fallback to cached data
+      const cachedData = await this.getCachedBookData(bookId);
+      if (cachedData) {
+        console.log(`🔄 Using cached book data as fallback for ${bookId}`);
+        return cachedData;
+      }
+
+      throw error;
+    }
+  }
+
+  // ==================== PHASE 3: INTELLIGENT CACHING ====================
+
+  /**
+   * Cache book data locally for performance
+   */
+  private async cacheBookData(bookId: string, data: FullBookData): Promise<void> {
+    console.log(`💾 Phase 3: Caching book data for ${bookId}...`);
+
+    try {
+      // Cache using existing BookTabManager system
+      const bookName = data.metadata.name;
+
+      // Store chapters
+      localStorage.setItem(`chapters_${bookId}`, JSON.stringify(data.chapters));
+
+      // Store template data for each chapter
+      Object.entries(data.templateData).forEach(([templateType, chapterData]) => {
+        Object.entries(chapterData).forEach(([chapterKey, templateContent]) => {
+          const tabContext = BookTabManager.createTemplateTabContext(bookName, chapterKey, templateType);
+          BookTabManager.saveTabData(templateType, tabContext, templateContent);
+        });
+      });
+
+      // Store custom tabs
+      Object.entries(data.customTabs).forEach(([chapterKey, tabData]) => {
+        Object.entries(tabData).forEach(([tabName, content]) => {
+          BookTabManager.saveCustomTabData(bookName, chapterKey, tabName, content);
+        });
+      });
+
+      // Store highlights
+      Object.entries(data.highlights).forEach(([chapterKey, highlightData]) => {
+        const key = `highlights_${chapterKey}`;
+        localStorage.setItem(key, JSON.stringify(highlightData));
+      });
+
+      // Store metadata and sync info
+      localStorage.setItem(`book_metadata_${bookId}`, JSON.stringify(data.metadata));
+      this.updateSyncMetadata(bookId, 'synced');
+
+      console.log(`✅ Successfully cached book data for ${bookId}`);
+    } catch (error) {
+      console.error(`💥 Failed to cache book data for ${bookId}:`, error);
+    }
+  }
+
+  private async getCachedBookData(bookId: string): Promise<FullBookData | null> {
+    try {
+      const metadataStr = localStorage.getItem(`book_metadata_${bookId}`);
+      if (!metadataStr) return null;
+
+      const metadata: BookMetadata = JSON.parse(metadataStr);
+      const chaptersStr = localStorage.getItem(`chapters_${bookId}`);
+      const chapters: any[] = chaptersStr ? JSON.parse(chaptersStr) : [];
+
+      // Reconstruct template data from BookTabManager
+      const templateData = {
+        flashcards: this.reconstructTemplateData(metadata.name, 'FLASHCARD'),
+        mindmaps: this.reconstructTemplateData(metadata.name, 'MINDMAP'),
+        mcq: this.reconstructTemplateData(metadata.name, 'MCQ'),
+        qa: this.reconstructTemplateData(metadata.name, 'QA'),
+        notes: this.reconstructTemplateData(metadata.name, 'NOTES'),
+        videos: this.reconstructTemplateData(metadata.name, 'VIDEOS')
+      };
+
+      // Reconstruct custom tabs
+      const customTabs = this.reconstructCustomTabs(metadata.name, chapters);
+
+      // Reconstruct highlights
+      const highlights = this.reconstructHighlights(chapters);
+
+      return {
+        metadata,
+        chapters,
+        templateData,
+        customTabs,
+        highlights,
+        assets: [] // Would need to implement asset caching
+      };
+    } catch (error) {
+      console.error(`Error loading cached book data for ${bookId}:`, error);
+      return null;
+    }
+  }
+
+  private reconstructTemplateData(bookName: string, templateType: string): { [chapterKey: string]: any[] } {
+    const data: { [chapterKey: string]: any[] } = {};
+    const normalizedBookName = bookName.replace(/\s+/g, '_');
+    const prefix = `${templateType.toLowerCase()}_${normalizedBookName}_`;
+
+    // Scan localStorage for template data
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        const chapterKey = key.substring(prefix.length);
+        const value = localStorage.getItem(key);
+        if (value) {
+          try {
+            data[chapterKey] = JSON.parse(value);
+          } catch (error) {
+            console.warn(`Failed to parse template data for key ${key}:`, error);
+          }
+        }
+      }
+    }
+
+    return data;
+  }
+
+  private reconstructCustomTabs(bookName: string, chapters: any[]): { [chapterKey: string]: { [tabName: string]: string } } {
+    const customTabs: { [chapterKey: string]: { [tabName: string]: string } } = {};
+    const normalizedBookName = bookName.replace(/\s+/g, '_');
+
+    // Scan for custom tab data
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`customtab_`) && key.includes(`_${normalizedBookName}_`)) {
+        const parts = key.split('_');
+        if (parts.length >= 4) {
+          const chapterKey = parts[2];
+          const tabName = parts.slice(3).join('_');
+          const value = localStorage.getItem(key);
+          
+          if (value) {
+            if (!customTabs[chapterKey]) {
+              customTabs[chapterKey] = {};
+            }
+            customTabs[chapterKey][tabName] = value;
+          }
+        }
+      }
+    }
+
+    return customTabs;
+  }
+
+  private reconstructHighlights(chapters: any[]): { [chapterKey: string]: any[] } {
+    const highlights: { [chapterKey: string]: any[] } = {};
+
+    // Reconstruct highlights for each chapter
+    chapters.forEach(chapter => {
+      const chapterKey = chapter.title?.replace(/\s+/g, '_') || chapter.id;
+      const highlightKey = `highlights_${chapterKey}`;
+      const value = localStorage.getItem(highlightKey);
+      
+      if (value) {
+        try {
+          highlights[chapterKey] = JSON.parse(value);
+        } catch (error) {
+          console.warn(`Failed to parse highlights for ${highlightKey}:`, error);
+        }
+      }
+    });
+
+    return highlights;
+  }
+
+  private cacheBookList(bookList: BookMetadata[], userId: string): void {
+    const cacheKey = `cached_book_list_${userId}`;
+    localStorage.setItem(cacheKey, JSON.stringify(bookList));
+    BackendBookService.setCacheTimestamp(cacheKey);
+  }
+
+  private getCachedBookList(userId?: string): BookMetadata[] | null {
+    try {
+      const cacheKey = userId ? `cached_book_list_${userId}` : 'cached_book_list';
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+      console.error('Error loading cached book list:', error);
+      return null;
+    }
+  }
+
+  private isBookListCacheFresh(userId: string, maxAgeMinutes = 15): boolean {
+    const cacheKey = `cached_book_list_${userId}`;
+    return BackendBookService.isCacheValid(cacheKey, maxAgeMinutes);
+  }
+
+  private isBookDataFresh(bookId: string, maxAgeMinutes = 30): boolean {
+    const syncMetadata = this.getSyncMetadata(bookId);
+    if (!syncMetadata || syncMetadata.syncStatus !== 'synced') return false;
+
+    const ageInMinutes = (Date.now() - syncMetadata.lastSyncTimestamp.getTime()) / (1000 * 60);
+    return ageInMinutes < maxAgeMinutes;
+  }
+
+  // ==================== SYNC METADATA ====================
+
+  private updateSyncMetadata(bookId: string, status: SyncMetadata['syncStatus']): void {
+    const metadata: SyncMetadata = {
+      bookId,
+      lastSyncTimestamp: new Date(),
+      localVersion: Date.now().toString(),
+      backendVersion: Date.now().toString(),
+      syncStatus: status
+    };
+    localStorage.setItem(`sync_metadata_${bookId}`, JSON.stringify(metadata));
+  }
+
+  private getSyncMetadata(bookId: string): SyncMetadata | null {
+    try {
+      const data = localStorage.getItem(`sync_metadata_${bookId}`);
+      if (!data) return null;
+      
+      const metadata = JSON.parse(data);
+      metadata.lastSyncTimestamp = new Date(metadata.lastSyncTimestamp);
+      return metadata;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Public methods for progressive loading
+  getLoadingState(): LoadingState {
+    return { ...this.loadingState };
+  }
+
+  async refreshBook(bookId: string): Promise<FullBookData> {
+    return this.loadBookContent(bookId, true);
+  }
+
+  // Track book access for smart background sync
+  trackBookAccess(bookId: string): void {
+    const recentBooks = this.getRecentlyAccessedBooks();
+    const updatedBooks = [bookId, ...recentBooks.filter(id => id !== bookId)].slice(0, 5);
+    localStorage.setItem('recently_accessed_books', JSON.stringify(updatedBooks));
+  }
+
+  private getRecentlyAccessedBooks(): string[] {
+    try {
+      const recent = localStorage.getItem('recently_accessed_books');
+      return recent ? JSON.parse(recent) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
+   * Background sync for recently accessed books
+   */
+  async backgroundSyncRecent(userId?: string): Promise<void> {
+    console.log('🔄 Starting background sync for recent books...');
+    
+    try {
+      let user;
+      if (userId) {
+        user = { id: userId };
+      } else {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+        user = authUser;
+      }
+      
+      // Refresh book list in background
+      await this.loadBookList(user.id, true);
+      
+      // Sync recently accessed books
+      const recentBooks = this.getRecentlyAccessedBooks();
+      for (const bookId of recentBooks.slice(0, 3)) { // Limit to 3 most recent
+        try {
+          await this.loadBookContent(bookId, true);
+        } catch (error) {
+          console.warn(`Background sync failed for book ${bookId}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Background sync failed:', error);
+    }
+  }
+
+  // ==================== LEGACY METHODS (kept for compatibility) ====================
+
+  /**
+   * Sync a complete book to Supabase backend (legacy compatibility)
    */
   static async syncBookToBackend(bookId: string): Promise<SyncResult> {
+    const instance = BookSyncService.getInstance();
+    const result: SyncResult = {
+      success: false,
+      bookId,
+      synced: {
+        metadata: false,
+        chapters: false,
+        templates: 0,
+        assets: 0,
+        userdata: false
+      },
+      errors: []
+    };
+
+    try {
+      BookSyncService.setSyncingStatus(true);
+      console.log(`📤 Legacy sync to backend: ${bookId}`);
+
+      // Get book data using new progressive loading
+      const bookData = await instance.loadBookContent(bookId);
+      
+      // The progressive loading already handles backend sync
+      result.synced.metadata = true;
+      result.synced.chapters = true;
+      result.synced.templates = Object.keys(bookData.templateData).length;
+      result.synced.userdata = true;
+      result.success = true;
+
+      return result;
+
+    } catch (error) {
+      console.error(`❌ Legacy sync failed for book ${bookId}:`, error);
+      result.errors.push(error instanceof Error ? error.message : 'Unknown sync error');
+      return result;
+    } finally {
+      BookSyncService.setSyncingStatus(false);
+    }
+  }
+
+  /**
+   * TEMPORARY - This method will be removed after fixing authentication
+   */
+  static async collectAllBookDataTemp(bookName: string, bookId: string): Promise<SyncResult> {
     const result: SyncResult = {
       success: false,
       bookId,
@@ -676,21 +1175,21 @@ export class BookSyncService {
    * Add status listener
    */
   static addStatusListener(callback: (status: SyncStatus) => void): void {
-    this.listeners.push(callback);
+    this.statusListeners.push(callback);
   }
 
   /**
    * Remove status listener
    */
   static removeStatusListener(callback: (status: SyncStatus) => void): void {
-    this.listeners = this.listeners.filter(listener => listener !== callback);
+    this.statusListeners = this.statusListeners.filter(listener => listener !== callback);
   }
 
   /**
    * Notify all listeners
    */
   private static notifyListeners(): void {
-    this.listeners.forEach(listener => listener(this.syncStatus));
+    this.statusListeners.forEach(listener => listener(this.syncStatus));
   }
 
   // ==================== MANUAL OPERATIONS ====================

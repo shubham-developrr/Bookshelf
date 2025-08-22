@@ -4,6 +4,8 @@ import { processAIImport } from '../utils/aiImportService';
 import { MCQTest } from './TestComponents';
 import AILoadingAnimation from './AILoadingAnimation';
 import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
+import { UnifiedBookAdapter } from '../services/UnifiedBookAdapter';
+import { RealTimeSyncService } from '../services/RealTimeSyncService';
 
 interface MCQOption {
     id: string;
@@ -42,6 +44,9 @@ const MCQManager: React.FC<MCQManagerProps> = ({
     const [showFormatModal, setShowFormatModal] = useState(false);
     const [isAIProcessing, setIsAIProcessing] = useState(false);
 
+    // Initialize real-time sync service
+    const realTimeSync = React.useMemo(() => RealTimeSyncService.getInstance(), []);
+
     // Edit state
     const [editingQuestion, setEditingQuestion] = useState<MCQQuestion | null>(null);
 
@@ -61,9 +66,17 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         );
     }, [currentBook, currentChapter]);
 
-    // Load MCQs using book-linked tab system
+    // Load MCQs using unified system with real-time sync
     React.useEffect(() => {
         try {
+            // Try unified system first
+            const unifiedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'MCQ', tabId);
+            if (unifiedData && Array.isArray(unifiedData) && unifiedData.length > 0) {
+                setMcqQuestions(unifiedData);
+                return;
+            }
+
+            // Fallback to legacy data
             const data = BookTabManager.loadTabData('mcq', tabContext);
             if (data && Array.isArray(data)) {
                 setMcqQuestions(data);
@@ -74,15 +87,49 @@ const MCQManager: React.FC<MCQManagerProps> = ({
             console.error('Failed to load MCQ questions:', error);
             setMcqQuestions([]);
         }
-    }, [tabContext]);
+    }, [currentBook, currentChapter, tabId, tabContext]);
 
-    // Save MCQs using book-linked tab system
-    const saveMcqQuestions = (questions: MCQQuestion[]) => {
+    // Listen for real-time sync events
+    React.useEffect(() => {
+        const handleSyncEvent = (event: any) => {
+            if (event.templateType === 'MCQ' && 
+                event.bookName === currentBook && 
+                event.chapterName === currentChapter) {
+                // Reload data when sync event occurs
+                const syncedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'MCQ', tabId);
+                if (syncedData && Array.isArray(syncedData)) {
+                    setMcqQuestions(syncedData);
+                }
+            }
+        };
+
+        const unsubscribe = realTimeSync.subscribe(`mcq_${currentBook}_${currentChapter}`, handleSyncEvent);
+        return unsubscribe;
+    }, [currentBook, currentChapter, tabId, realTimeSync]);
+
+    // Save MCQs using unified system with real-time sync
+    const saveMcqQuestions = async (questions: MCQQuestion[]) => {
         try {
-            BookTabManager.saveTabData('mcq', tabContext, questions);
+            // Save using unified adapter with automatic cloud sync
+            const adapter = UnifiedBookAdapter.getInstance();
+            await adapter.saveTemplateData(currentBook, currentChapter, 'MCQ', questions, tabId);
             setMcqQuestions(questions);
+            
+            // Broadcast real-time sync event to other tabs
+            realTimeSync.broadcastSyncEvent({
+                type: 'template_updated',
+                bookName: currentBook,
+                chapterName: currentChapter,
+                templateType: 'MCQ'
+            });
+
+            // Also save to legacy system for backward compatibility
+            BookTabManager.saveTabData('mcq', tabContext, questions);
         } catch (error) {
             console.error('Failed to save MCQ questions:', error);
+            // Fallback to legacy save
+            BookTabManager.saveTabData('mcq', tabContext, questions);
+            setMcqQuestions(questions);
         }
     };
 

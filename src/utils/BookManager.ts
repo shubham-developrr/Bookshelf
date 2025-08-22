@@ -1,8 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import SupabaseBookService from '../services/SupabaseBookService';
+import UnifiedBookService from '../services/UnifiedBookService';
 
 /**
- * Enhanced Book Management System with UUID, Version Control, and Backend Sync
+ * Enhanced Book Management System with UUID, Version Control, and Unified Backend Sync
+ * 
+ * UNIFIED APPROACH: This service now acts as a facade over UnifiedBookService
+ * All books are treated the same way - they automatically sync to cloud
  */
 
 export interface BookMetadata {
@@ -29,6 +33,7 @@ export interface BookMetadata {
   language: string;
   updateAvailable?: boolean; // Whether newer version is available
   latestVersion?: string; // Latest version available in marketplace
+  isBackendBook?: boolean; // Whether this book is synced with backend
 }
 
 export interface BookVersion {
@@ -100,9 +105,10 @@ export class BookManager {
   }
 
   /**
-   * Create a new book with proper metadata
+   * Create a new book with proper metadata - UNIFIED VERSION
+   * Automatically syncs to cloud immediately
    */
-  static createBook(bookData: {
+  static async createBook(bookData: {
     name: string;
     description?: string;
     image?: string;
@@ -113,32 +119,40 @@ export class BookManager {
     tags?: string[];
     estimatedHours?: number;
     difficulty?: 'beginner' | 'intermediate' | 'advanced';
-  }): BookMetadata {
-    const now = new Date().toISOString();
-    
-    const bookMetadata: BookMetadata = {
-      id: this.generateBookId(),
-      name: bookData.name,
-      description: bookData.description,
-      image: bookData.image,
-      creatorName: bookData.creatorName,
-      university: bookData.university,
-      semester: bookData.semester,
-      subjectCode: bookData.subjectCode,
-      version: this.generateInitialVersion(),
-      isPublished: false,
-      createdAt: now,
-      updatedAt: now,
-      tags: bookData.tags || [],
-      estimatedHours: bookData.estimatedHours || 10,
-      difficulty: bookData.difficulty || 'intermediate',
-      language: 'en'
-    };
+  }): Promise<BookMetadata | null> {
+    try {
+      const unifiedService = UnifiedBookService.getInstance();
+      
+      const result = await unifiedService.createBook({
+        name: bookData.name,
+        description: bookData.description,
+        image: bookData.image,
+        creatorName: bookData.creatorName,
+        university: bookData.university,
+        semester: bookData.semester,
+        subjectCode: bookData.subjectCode
+      });
 
-    // Save to localStorage
-    this.saveBook(bookMetadata);
-    
-    return bookMetadata;
+      if (result.success && result.book) {
+        console.log(`📚 UNIFIED: Book created and auto-synced: ${result.book.name}`);
+        const fullBook: BookMetadata = {
+          ...result.book,
+          version: result.book.version || this.generateInitialVersion(),
+          tags: bookData.tags || [],
+          estimatedHours: bookData.estimatedHours || 10,
+          difficulty: bookData.difficulty || 'intermediate',
+          language: 'en',
+          isPublished: result.book.isPublished || false
+        };
+        return fullBook;
+      } else {
+        console.error('UNIFIED: Failed to create book:', result.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('UNIFIED: Book creation error:', error);
+      return null;
+    }
   }
 
   /**
@@ -234,9 +248,30 @@ export class BookManager {
   }
 
   /**
-   * Get all books from localStorage
+   * Get all books from cloud first, then merge with local - UNIFIED VERSION
    */
-  static getAllBooks(): BookMetadata[] {
+  static async getAllBooks(): Promise<BookMetadata[]> {
+    try {
+      const unifiedService = UnifiedBookService.getInstance();
+      const result = await unifiedService.getAllBooks();
+      
+      if (result.success) {
+        console.log(`📚 UNIFIED: Loaded ${result.books.length} books from cloud/local`);
+        return result.books;
+      } else {
+        console.error('UNIFIED: Failed to load books:', result.error);
+        return this.getLocalBooksOnly();
+      }
+    } catch (error) {
+      console.error('UNIFIED: Error loading books:', error);
+      return this.getLocalBooksOnly();
+    }
+  }
+
+  /**
+   * Get local books only (fallback method)
+   */
+  static getLocalBooksOnly(): BookMetadata[] {
     const stored = localStorage.getItem(this.STORAGE_KEY);
     if (!stored) return [];
     
@@ -249,11 +284,35 @@ export class BookManager {
   }
 
   /**
-   * Get book by ID
+   * Get book by ID - UNIFIED VERSION
    */
-  static getBookById(id: string): BookMetadata | null {
-    const books = this.getAllBooks();
-    return books.find(book => book.id === id) || null;
+  static async getBookById(id: string): Promise<BookMetadata | null> {
+    try {
+      const unifiedService = UnifiedBookService.getInstance();
+      const result = await unifiedService.getCompleteBookData(id);
+      
+      if (result.success && result.book) {
+        // Convert Book to BookMetadata
+        const fullBook: BookMetadata = {
+          ...result.book,
+          version: result.book.version || '1.0.0',
+          tags: [],
+          estimatedHours: 10,
+          difficulty: 'intermediate' as const,
+          language: 'en',
+          isPublished: result.book.isPublished || false
+        };
+        return fullBook;
+      } else {
+        // Fallback to local storage
+        const books = this.getLocalBooksOnly();
+        return books.find(book => book.id === id) || null;
+      }
+    } catch (error) {
+      console.error('UNIFIED: Error getting book by ID:', error);
+      const books = this.getLocalBooksOnly();
+      return books.find(book => book.id === id) || null;
+    }
   }
 
   /**
@@ -274,21 +333,26 @@ export class BookManager {
   }
 
   /**
-   * Delete book
+   * Delete book - UNIFIED VERSION
    */
-  static deleteBook(id: string): boolean {
-    const books = this.getAllBooks();
-    const filteredBooks = books.filter(book => book.id !== id);
-    
-    if (filteredBooks.length < books.length) {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filteredBooks));
+  static async deleteBook(id: string): Promise<boolean> {
+    try {
+      console.log(`🗑️ UNIFIED: Deleting book: ${id}`);
       
-      // Also clean up chapter data
-      this.cleanupBookData(id);
-      return true;
+      const unifiedService = UnifiedBookService.getInstance();
+      const result = await unifiedService.deleteBook(id);
+      
+      if (result.success) {
+        console.log(`✅ UNIFIED: Book deleted successfully: ${id}`);
+        return true;
+      } else {
+        console.error(`UNIFIED: Failed to delete book: ${result.error}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`UNIFIED: Error deleting book ${id}:`, error);
+      return false;
     }
-    
-    return false;
   }
 
   /**

@@ -3,6 +3,9 @@ import { SparklesIcon, PlusIcon, TrashIcon } from './icons';
 import { processAIImport } from '../utils/aiImportService';
 import { OCRService } from '../utils/ocrService';
 import AILoadingAnimation from './AILoadingAnimation';
+import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
+import { UnifiedBookAdapter } from '../services/UnifiedBookAdapter';
+import { RealTimeSyncService } from '../services/RealTimeSyncService';
 
 interface FlashCard {
     id: string;
@@ -35,22 +38,70 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
     const [showFormatModal, setShowFormatModal] = useState(false);
     const [isAIProcessing, setIsAIProcessing] = useState(false);
 
-    // Create unique storage key that includes tab ID for isolation
-    // IMPORTANT: Use base key only to ensure data consistency across tabs
-    const baseKey = `flashcards_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
-    const storageKey = baseKey; // Temporarily disable tab isolation to fix sync issues
+    // Initialize real-time sync service
+    const realTimeSync = React.useMemo(() => RealTimeSyncService.getInstance(), []);
 
-    // Load flashcards from localStorage
+    // Book tab context for proper data isolation
+    const tabContext: BookTabContext = React.useMemo(() => {
+        return BookTabManager.createTemplateTabContext(
+            currentBook,
+            currentChapter,
+            'flashcards'
+        );
+    }, [currentBook, currentChapter]);
+
+    // Load flashcards using unified system with real-time sync
     useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            const cards = JSON.parse(saved).map((card: any) => ({
-                ...card,
-                created: new Date(card.created)
-            }));
-            setFlashCards(cards);
+        try {
+            // Try unified system first
+            const unifiedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'FLASHCARD', tabId);
+            if (unifiedData && Array.isArray(unifiedData) && unifiedData.length > 0) {
+                const cards = unifiedData.map((card: any) => ({
+                    ...card,
+                    created: new Date(card.created)
+                }));
+                setFlashCards(cards);
+                return;
+            }
+
+            // Fallback to legacy data
+            const data = BookTabManager.loadTabData('flashcards', tabContext);
+            if (data && Array.isArray(data)) {
+                const cards = data.map((card: any) => ({
+                    ...card,
+                    created: new Date(card.created)
+                }));
+                setFlashCards(cards);
+            } else {
+                setFlashCards([]);
+            }
+        } catch (error) {
+            console.error('Failed to load flashcards:', error);
+            setFlashCards([]);
         }
-    }, [storageKey]);
+    }, [currentBook, currentChapter, tabId, tabContext]);
+
+    // Listen for real-time sync events
+    useEffect(() => {
+        const handleSyncEvent = (event: any) => {
+            if (event.templateType === 'FLASHCARD' && 
+                event.bookName === currentBook && 
+                event.chapterName === currentChapter) {
+                // Reload data when sync event occurs
+                const syncedData = UnifiedBookAdapter.getTemplateData(currentBook, currentChapter, 'FLASHCARD', tabId);
+                if (syncedData && Array.isArray(syncedData)) {
+                    const cards = syncedData.map((card: any) => ({
+                        ...card,
+                        created: new Date(card.created)
+                    }));
+                    setFlashCards(cards);
+                }
+            }
+        };
+
+        const unsubscribe = realTimeSync.subscribe(`flashcard_${currentBook}_${currentChapter}`, handleSyncEvent);
+        return unsubscribe;
+    }, [currentBook, currentChapter, tabId, realTimeSync]);
 
     // Handle AI-powered smart import with OCR support
     const handleSmartImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,10 +180,30 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         };
     };
 
-    // Save flashcards to localStorage
-    const saveFlashCards = (cards: FlashCard[]) => {
-        localStorage.setItem(storageKey, JSON.stringify(cards));
-        setFlashCards(cards);
+    // Save flashcards using unified system with real-time sync
+    const saveFlashCards = async (cards: FlashCard[]) => {
+        try {
+            // Save using unified adapter with automatic cloud sync
+            const adapter = UnifiedBookAdapter.getInstance();
+            await adapter.saveTemplateData(currentBook, currentChapter, 'FLASHCARD', cards, tabId);
+            setFlashCards(cards);
+            
+            // Broadcast real-time sync event to other tabs
+            realTimeSync.broadcastSyncEvent({
+                type: 'template_updated',
+                bookName: currentBook,
+                chapterName: currentChapter,
+                templateType: 'FLASHCARD'
+            });
+
+            // Also save to legacy system for backward compatibility
+            BookTabManager.saveTabData('flashcards', tabContext, cards);
+        } catch (error) {
+            console.error('Failed to save flashcards:', error);
+            // Fallback to legacy save
+            BookTabManager.saveTabData('flashcards', tabContext, cards);
+            setFlashCards(cards);
+        }
     };
 
     // Handle file import

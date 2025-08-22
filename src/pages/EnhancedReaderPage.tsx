@@ -175,6 +175,354 @@ interface EnhancedReaderPageProps {
     removeHighlight: (id: string) => void;
 }
 
+// Custom Tab with Editor Switching Component - MOVED OUTSIDE TO FIX HOOKS ISSUE
+const CustomTabWithEditorSwitching: React.FC<{ tabName: string; currentBook: string; currentChapter: string }> = ({ tabName, currentBook, currentChapter }) => {
+    const [editorMode, setEditorMode] = useState<'rich' | 'html'>('rich');
+    const [htmlEditors, setHtmlEditors] = useState<{ id: string; title: string }[]>([]);
+    const [richTextEditors, setRichTextEditors] = useState<{ id: string; title: string }[]>([]);
+    const storageKey = `editor_mode_${currentBook}_${currentChapter}_${tabName}`;
+    const htmlEditorsStorageKey = `html_editors_${currentBook}_${currentChapter}_${tabName}`;
+    const richTextEditorsStorageKey = `rich_text_editors_${currentBook}_${currentChapter}_${tabName}`;
+    
+    useEffect(() => {
+        const savedMode = localStorage.getItem(storageKey);
+        if (savedMode === 'html' || savedMode === 'rich') {
+            setEditorMode(savedMode);
+        }
+        
+        // Load existing HTML editors
+        const savedHtmlEditors = localStorage.getItem(htmlEditorsStorageKey);
+        if (savedHtmlEditors) {
+            try {
+                const parsedEditors = JSON.parse(savedHtmlEditors);
+                setHtmlEditors(parsedEditors);
+            } catch (e) {
+                console.warn('Failed to parse saved HTML editors:', e);
+                setHtmlEditors([]);
+            }
+        }
+        
+        // Load existing Rich Text editors
+        const savedRichTextEditors = localStorage.getItem(richTextEditorsStorageKey);
+        if (savedRichTextEditors) {
+            try {
+                const parsedEditors = JSON.parse(savedRichTextEditors);
+                setRichTextEditors(parsedEditors);
+            } catch (e) {
+                console.warn('Failed to parse saved Rich Text editors:', e);
+                setRichTextEditors([]);
+            }
+        }
+    }, [storageKey, htmlEditorsStorageKey, richTextEditorsStorageKey]);
+    
+    const handleModeSwitch = (mode: 'rich' | 'html') => {
+        setEditorMode(mode);
+        localStorage.setItem(storageKey, mode);
+    };
+    
+    const addNewHtmlEditor = () => {
+        const newEditor = {
+            id: Date.now().toString(),
+            title: `HTML Editor ${htmlEditors.length + 1}`
+        };
+        const updatedEditors = [...htmlEditors, newEditor];
+        setHtmlEditors(updatedEditors);
+        localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
+    };
+    
+    const removeHtmlEditor = (editorId: string) => {
+        if (htmlEditors.length <= 1) {
+            alert('Cannot remove the last HTML editor. At least one editor must remain.');
+            return;
+        }
+        
+        const updatedEditors = htmlEditors.filter(editor => editor.id !== editorId);
+        setHtmlEditors(updatedEditors);
+        localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
+        
+        // Also remove the content from localStorage
+        const contentKey = `html_editor_content_${currentBook}_${currentChapter}_${tabName}_${editorId}`;
+        localStorage.removeItem(contentKey);
+    };
+    
+    const updateHtmlEditorTitle = (editorId: string, newTitle: string) => {
+        const updatedEditors = htmlEditors.map(editor => 
+            editor.id === editorId ? { ...editor, title: newTitle } : editor
+        );
+        setHtmlEditors(updatedEditors);
+        localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
+    };
+    
+    const addNewRichTextEditor = () => {
+        const newEditor = {
+            id: Date.now().toString(),
+            title: `Rich Text Editor ${richTextEditors.length + 1}`
+        };
+        const updatedEditors = [...richTextEditors, newEditor];
+        setRichTextEditors(updatedEditors);
+        localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
+    };
+    
+    const removeRichTextEditor = (editorId: string) => {
+        if (richTextEditors.length <= 1) {
+            alert('Cannot remove the last Rich Text editor. At least one editor must remain.');
+            return;
+        }
+        
+        const updatedEditors = richTextEditors.filter(editor => editor.id !== editorId);
+        setRichTextEditors(updatedEditors);
+        localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
+        
+        // Also remove the content from localStorage
+        const contentKey = `rich_text_editor_content_${currentBook}_${currentChapter}_${tabName}_${editorId}`;
+        localStorage.removeItem(contentKey);
+    };
+    
+    const updateRichTextEditorTitle = (editorId: string, newTitle: string) => {
+        const updatedEditors = richTextEditors.map(editor => 
+            editor.id === editorId ? { ...editor, title: newTitle } : editor
+        );
+        setRichTextEditors(updatedEditors);
+        localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
+    };
+    
+    const isMobile = () => window.innerWidth <= 768;
+    
+    return (
+        <div className="w-full">
+            {/* Editor Mode Switcher */}
+            <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-4 border-b theme-border`}>
+                <div className={`flex items-center gap-2 ${isMobile() ? 'justify-center' : ''}`}>
+                    <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <h3 className="text-lg font-semibold theme-text">Custom Editor</h3>
+                </div>
+                
+                <div className={`flex ${isMobile() ? 'justify-center' : ''} gap-1 p-1 theme-surface2 rounded-lg`}>
+                    <button
+                        onClick={() => handleModeSwitch('rich')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                            editorMode === 'rich'
+                                ? 'theme-accent text-white shadow-sm'
+                                : 'theme-text hover:theme-surface2'
+                        }`}
+                    >
+                        📝 Rich Text
+                    </button>
+                    <button
+                        onClick={() => handleModeSwitch('html')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                            editorMode === 'html'
+                                ? 'theme-accent text-white shadow-sm'
+                                : 'theme-text hover:theme-surface2'
+                        }`}
+                    >
+                        💾 HTML Code
+                    </button>
+                </div>
+            </div>
+
+            {/* Rich Text Mode */}
+            {editorMode === 'rich' ? (
+                <div className="w-full space-y-6">
+                    {/* Rich Text Editors Management Header */}
+                    <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} p-4 theme-surface2 rounded-lg`}>
+                        <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14,2 14,8 20,8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                <polyline points="10,9 9,9 8,9"/>
+                            </svg>
+                            <span className="font-medium theme-text">Rich Text Editors</span>
+                            <span className="text-sm theme-text-secondary px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
+                                {richTextEditors.length}
+                            </span>
+                        </div>
+                        
+                        <button
+                            onClick={addNewRichTextEditor}
+                            className={`flex items-center gap-2 ${isMobile() ? 'w-full justify-center' : ''} px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition font-medium text-sm`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            Add Rich Text Editor
+                        </button>
+                    </div>
+                    
+                    {/* Rich Text Editors List */}
+                    <div className="space-y-6">
+                        {richTextEditors.map((editor, index) => (
+                            <div key={editor.id} className="theme-surface rounded-lg p-4 border theme-border">
+                                {/* Editor Header */}
+                                <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-3 border-b theme-border`}>
+                                    <div className="flex items-center gap-3">
+                                        <span className="w-8 h-8 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center text-sm font-medium">
+                                            {index + 1}
+                                        </span>
+                                        <input
+                                            type="text"
+                                            value={editor.title}
+                                            onChange={(e) => updateRichTextEditorTitle(editor.id, e.target.value)}
+                                            className="font-medium theme-text bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-green-500 rounded px-2 py-1"
+                                            placeholder="Editor title..."
+                                        />
+                                    </div>
+                                    
+                                    {richTextEditors.length > 1 && (
+                                        <button
+                                            onClick={() => removeRichTextEditor(editor.id)}
+                                            className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg theme-transition text-sm"
+                                            title="Remove this editor"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                                <polyline points="3,6 5,6 21,6"/>
+                                                <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/>
+                                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                                <line x1="14" y1="11" x2="14" y2="17"/>
+                                            </svg>
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                {/* Rich Text Editor Component */}
+                                <RichTextEditor
+                                    tabName={`${tabName}_${editor.id}`}
+                                    currentBook={currentBook}
+                                    currentChapter={currentChapter}
+                                    className="w-full"
+                                    customStorageKey={`rich_text_editor_content_${currentBook}_${currentChapter}_${tabName}_${editor.id}`}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    
+                    {richTextEditors.length === 0 && (
+                        <div className="text-center py-8">
+                            <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14,2 14,8 20,8"/>
+                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                    <polyline points="10,9 9,9 8,9"/>
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-medium theme-text mb-2">No Rich Text editors</h3>
+                            <p className="theme-text-secondary mb-4">Click "Add Rich Text Editor" to create your first editor</p>
+                            <button
+                                onClick={addNewRichTextEditor}
+                                className="px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
+                            >
+                                Add Rich Text Editor
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="w-full space-y-6">
+                    {/* HTML Editors Management Header */}
+                    <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} p-4 theme-surface2 rounded-lg`}>
+                        <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                <polyline points="16,18 22,12 16,6"/>
+                                <polyline points="8,6 2,12 8,18"/>
+                            </svg>
+                            <span className="font-medium theme-text">HTML Code Editors</span>
+                            <span className="text-sm theme-text-secondary px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
+                                {htmlEditors.length}
+                            </span>
+                        </div>
+                        
+                        <button
+                            onClick={addNewHtmlEditor}
+                            className={`flex items-center gap-2 ${isMobile() ? 'w-full justify-center' : ''} px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition font-medium text-sm`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            Add HTML Editor
+                        </button>
+                    </div>
+                    
+                    {/* HTML Editors List */}
+                    <div className="space-y-6">
+                        {htmlEditors.map((editor, index) => (
+                            <div key={editor.id} className="theme-surface rounded-lg p-4 border theme-border">
+                                {/* Editor Header */}
+                                <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-3 border-b theme-border`}>
+                                    <div className="flex items-center gap-3">
+                                        <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-sm font-medium">
+                                            {index + 1}
+                                        </span>
+                                        <input
+                                            type="text"
+                                            value={editor.title}
+                                            onChange={(e) => updateHtmlEditorTitle(editor.id, e.target.value)}
+                                            className="font-medium theme-text bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+                                            placeholder="Editor title..."
+                                        />
+                                    </div>
+                                    
+                                    {htmlEditors.length > 1 && (
+                                        <button
+                                            onClick={() => removeHtmlEditor(editor.id)}
+                                            className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg theme-transition text-sm"
+                                            title="Remove this editor"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                                <polyline points="3,6 5,6 21,6"/>
+                                                <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/>
+                                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                                <line x1="14" y1="11" x2="14" y2="17"/>
+                                            </svg>
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                {/* HTML Editor Component */}
+                                <HTMLCodeEditor
+                                    tabName={`${tabName}_${editor.id}`}
+                                    currentBook={currentBook}
+                                    currentChapter={currentChapter}
+                                    className="w-full"
+                                    customStorageKey={`html_editor_content_${currentBook}_${currentChapter}_${tabName}_${editor.id}`}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    
+                    {htmlEditors.length === 0 && (
+                        <div className="text-center py-8">
+                            <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
+                                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                    <polyline points="16,18 22,12 16,6"/>
+                                    <polyline points="8,6 2,12 8,18"/>
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-medium theme-text mb-2">No HTML editors</h3>
+                            <p className="theme-text-secondary mb-4">Click "Add HTML Editor" to create your first editor</p>
+                            <button
+                                onClick={addNewHtmlEditor}
+                                className="px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
+                            >
+                                Add HTML Editor
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({ 
     openAIGuru, 
     highlights, 
@@ -190,6 +538,13 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
     const [customSubtopics, setCustomSubtopics] = useState<SubtopicData[]>([]);
     const [isCustomChapter, setIsCustomChapter] = useState(false);
     const [isLoadingSubtopics, setIsLoadingSubtopics] = useState(false);
+    
+    // Chapter Data Loading States
+    const [isLoadingChapterData, setIsLoadingChapterData] = useState(true);
+    const [chapterDataProgress, setChapterDataProgress] = useState(0);
+    const [loadingMessage, setLoadingMessage] = useState('Initializing chapter...');
+    const [smallFilesLoaded, setSmallFilesLoaded] = useState(false);
+    
     const [editingSubtopic, setEditingSubtopic] = useState<string | null>(null);
     const [showAddSubtopic, setShowAddSubtopic] = useState(false);
     const [newSubtopicTitle, setNewSubtopicTitle] = useState('');
@@ -246,9 +601,107 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
         ? chapterSubtopics[currentBook][currentChapter] || []
         : [];
 
-    // Check if this is a custom chapter
+    // PROGRESSIVE CHAPTER DATA LOADING
+    const loadChapterDataProgressively = async () => {
+        try {
+            setIsLoadingChapterData(true);
+            setChapterDataProgress(0);
+            setSmallFilesLoaded(false);
+            
+            console.log('🔄 Starting progressive chapter data loading...');
+            
+            // PHASE 1: Load small essential data (<100KB) - FAST
+            setLoadingMessage('Loading essential data...');
+            const smallDataTypes = ['NOTES', 'MCQ', 'QA', 'FLASHCARD'];
+            const smallDataPromises = [];
+            
+            for (const dataType of smallDataTypes) {
+                const key = `${dataType}_${currentBook.replace(/\s+/g, '_')}_${currentChapter.replace(/\s+/g, '_')}`;
+                const data = localStorage.getItem(key);
+                
+                if (data) {
+                    const size = new Blob([data]).size;
+                    if (size < 100 * 1024) { // Less than 100KB
+                        console.log(`📄 ${dataType}: ${(size/1024).toFixed(1)}KB (small - loading now)`);
+                        smallDataPromises.push(Promise.resolve({ type: dataType, data }));
+                    }
+                }
+            }
+            
+            // Wait for all small files
+            await Promise.all(smallDataPromises);
+            setChapterDataProgress(50);
+            setSmallFilesLoaded(true);
+            
+            console.log('✅ PHASE 1 COMPLETE: Small files loaded, UI ready');
+            
+            // PHASE 2: Load medium files in background (100KB-1MB)
+            setLoadingMessage('Loading media content...');
+            setTimeout(async () => {
+                const mediumDataTypes = ['MINDMAP', 'VIDEOS'];
+                
+                for (const dataType of mediumDataTypes) {
+                    const key = `${dataType}_${currentBook.replace(/\s+/g, '_')}_${currentChapter.replace(/\s+/g, '_')}`;
+                    const data = localStorage.getItem(key);
+                    
+                    if (data) {
+                        const size = new Blob([data]).size;
+                        if (size >= 100 * 1024 && size < 1024 * 1024) { // 100KB-1MB
+                            console.log(`📊 ${dataType}: ${(size/1024).toFixed(1)}KB (medium - background loading)`);
+                            // Simulate processing time
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                    }
+                }
+                
+                setChapterDataProgress(80);
+                console.log('✅ PHASE 2 COMPLETE: Medium files loaded');
+                
+                // PHASE 3: Load large files (>1MB) - BACKGROUND
+                setTimeout(async () => {
+                    const allKeys = Object.keys(localStorage);
+                    const chapterKeys = allKeys.filter(key => 
+                        key.includes(currentBook.replace(/\s+/g, '_')) && 
+                        key.includes(currentChapter.replace(/\s+/g, '_'))
+                    );
+                    
+                    for (const key of chapterKeys) {
+                        const data = localStorage.getItem(key);
+                        if (data) {
+                            const size = new Blob([data]).size;
+                            if (size >= 1024 * 1024) { // >1MB
+                                console.log(`📚 ${key}: ${(size/1024/1024).toFixed(2)}MB (large - background loading)`);
+                                // Process in chunks to avoid blocking
+                                await new Promise(resolve => setTimeout(resolve, 50));
+                            }
+                        }
+                    }
+                    
+                    setChapterDataProgress(100);
+                    setIsLoadingChapterData(false);
+                    console.log('🎉 PHASE 3 COMPLETE: All chapter data loaded');
+                }, 500);
+                
+            }, 200);
+            
+        } catch (error) {
+            console.error('❌ Chapter data loading failed:', error);
+            setIsLoadingChapterData(false);
+            setSmallFilesLoaded(true); // Allow entry even if some loading fails
+        }
+    };
+
+    // MAIN CHAPTER INITIALIZATION - with progressive loading
     useEffect(() => {
-        const checkAndLoadCustomChapter = async () => {
+        const initializeChapter = async () => {
+            if (!currentBook || !currentChapter) return;
+            
+            console.log(`🚀 Initializing chapter: ${currentBook} → ${currentChapter}`);
+            
+            // Start progressive data loading
+            await loadChapterDataProgressively();
+            
+            // Check if custom chapter
             const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
             const customBook = savedBooks.find((book: any) => book.name === currentBook);
             
@@ -263,7 +716,7 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
             }
         };
         
-        checkAndLoadCustomChapter();
+        initializeChapter();
     }, [currentBook, currentChapter]);
 
     // Detect existing templates and restore tabs
@@ -1996,361 +2449,17 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
         );
     };
 
-    // Custom Tab with Editor Switching Component
-    const CustomTabWithEditorSwitching: React.FC<{ tabName: string; currentBook: string; currentChapter: string }> = ({ tabName, currentBook, currentChapter }) => {
-        const [editorMode, setEditorMode] = useState<'rich' | 'html'>('rich');
-        const [htmlEditors, setHtmlEditors] = useState<{ id: string; title: string }[]>([]);
-        const [richTextEditors, setRichTextEditors] = useState<{ id: string; title: string }[]>([]);
-        const storageKey = `editor_mode_${currentBook}_${currentChapter}_${tabName}`;
-        const htmlEditorsStorageKey = `html_editors_${currentBook}_${currentChapter}_${tabName}`;
-        const richTextEditorsStorageKey = `rich_text_editors_${currentBook}_${currentChapter}_${tabName}`;
-        
-        useEffect(() => {
-            const savedMode = localStorage.getItem(storageKey);
-            if (savedMode === 'html' || savedMode === 'rich') {
-                setEditorMode(savedMode);
-            }
-            
-            // Load existing HTML editors
-            const savedHtmlEditors = localStorage.getItem(htmlEditorsStorageKey);
-            if (savedHtmlEditors) {
-                try {
-                    const parsedEditors = JSON.parse(savedHtmlEditors);
-                    setHtmlEditors(parsedEditors);
-                } catch (e) {
-                    console.warn('Failed to parse saved HTML editors:', e);
-                    setHtmlEditors([]);
-                }
-            }
-            
-            // Load existing Rich Text editors
-            const savedRichTextEditors = localStorage.getItem(richTextEditorsStorageKey);
-            if (savedRichTextEditors) {
-                try {
-                    const parsedEditors = JSON.parse(savedRichTextEditors);
-                    setRichTextEditors(parsedEditors);
-                } catch (e) {
-                    console.warn('Failed to parse saved Rich Text editors:', e);
-                    setRichTextEditors([]);
-                }
-            }
-        }, [storageKey, htmlEditorsStorageKey, richTextEditorsStorageKey]);
-        
-        const handleModeSwitch = (mode: 'rich' | 'html') => {
-            setEditorMode(mode);
-            localStorage.setItem(storageKey, mode);
-        };
-        
-        const addNewHtmlEditor = () => {
-            const newEditor = {
-                id: Date.now().toString(),
-                title: `HTML Editor ${htmlEditors.length + 1}`
-            };
-            const updatedEditors = [...htmlEditors, newEditor];
-            setHtmlEditors(updatedEditors);
-            localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
-        };
-        
-        const removeHtmlEditor = (editorId: string) => {
-            if (htmlEditors.length <= 1) {
-                alert('Cannot remove the last HTML editor. At least one editor must remain.');
-                return;
-            }
-            
-            const updatedEditors = htmlEditors.filter(editor => editor.id !== editorId);
-            setHtmlEditors(updatedEditors);
-            localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
-            
-            // Also remove the content from localStorage
-            const contentKey = `html_editor_content_${currentBook}_${currentChapter}_${tabName}_${editorId}`;
-            localStorage.removeItem(contentKey);
-        };
-        
-        const updateHtmlEditorTitle = (editorId: string, newTitle: string) => {
-            const updatedEditors = htmlEditors.map(editor => 
-                editor.id === editorId ? { ...editor, title: newTitle } : editor
-            );
-            setHtmlEditors(updatedEditors);
-            localStorage.setItem(htmlEditorsStorageKey, JSON.stringify(updatedEditors));
-        };
-        
-        const addNewRichTextEditor = () => {
-            const newEditor = {
-                id: Date.now().toString(),
-                title: `Rich Text Editor ${richTextEditors.length + 1}`
-            };
-            const updatedEditors = [...richTextEditors, newEditor];
-            setRichTextEditors(updatedEditors);
-            localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
-        };
-        
-        const removeRichTextEditor = (editorId: string) => {
-            if (richTextEditors.length <= 1) {
-                alert('Cannot remove the last Rich Text editor. At least one editor must remain.');
-                return;
-            }
-            
-            const updatedEditors = richTextEditors.filter(editor => editor.id !== editorId);
-            setRichTextEditors(updatedEditors);
-            localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
-            
-            // Also remove the content from localStorage
-            const contentKey = `rich_text_editor_content_${currentBook}_${currentChapter}_${tabName}_${editorId}`;
-            localStorage.removeItem(contentKey);
-        };
-        
-        const updateRichTextEditorTitle = (editorId: string, newTitle: string) => {
-            const updatedEditors = richTextEditors.map(editor => 
-                editor.id === editorId ? { ...editor, title: newTitle } : editor
-            );
-            setRichTextEditors(updatedEditors);
-            localStorage.setItem(richTextEditorsStorageKey, JSON.stringify(updatedEditors));
-        };
-        
-        const isMobile = () => window.innerWidth <= 768;
-        
+    // Custom Tab with Editor Switching Component - MOVED OUTSIDE TO FIX HOOKS ISSUE
+    // See CustomTabWithEditorSwitching component defined outside of this component
+    
+    // Placeholder for the inline component (now moved outside)
+    const renderCustomTabWithEditorSwitching = (tabName: string, currentBook: string, currentChapter: string) => {
         return (
-            <div className="w-full">
-                {/* Editor Mode Switcher */}
-                <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-4 border-b theme-border`}>
-                    <div className={`flex items-center gap-2 ${isMobile() ? 'justify-center' : ''}`}>
-                        <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                        </svg>
-                        <h3 className="text-lg font-semibold theme-text">Custom Editor</h3>
-                    </div>
-                    
-                    <div className={`flex ${isMobile() ? 'justify-center' : ''} gap-1 p-1 theme-surface2 rounded-lg`}>
-                        <button
-                            onClick={() => handleModeSwitch('rich')}
-                            className={`flex items-center gap-2 ${isMobile() ? 'px-3 py-2 text-sm' : 'px-4 py-2'} rounded-md transition-all ${
-                                editorMode === 'rich'
-                                    ? 'theme-accent text-white shadow-sm'
-                                    : 'theme-text hover:theme-surface hover:theme-text'
-                            }`}
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14,2 14,8 20,8"/>
-                                <line x1="16" y1="13" x2="8" y2="13"/>
-                                <line x1="16" y1="17" x2="8" y2="17"/>
-                                <polyline points="10,9 9,9 8,9"/>
-                            </svg>
-                            Rich Text
-                        </button>
-                        <button
-                            onClick={() => handleModeSwitch('html')}
-                            className={`flex items-center gap-2 ${isMobile() ? 'px-3 py-2 text-sm' : 'px-4 py-2'} rounded-md transition-all ${
-                                editorMode === 'html'
-                                    ? 'theme-accent text-white shadow-sm'
-                                    : 'theme-text hover:theme-surface hover:theme-text'
-                            }`}
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                <polyline points="16,18 22,12 16,6"/>
-                                <polyline points="8,6 2,12 8,18"/>
-                            </svg>
-                            HTML Code
-                        </button>
-                    </div>
-                </div>
-                
-                {/* Editor Content */}
-                {editorMode === 'rich' ? (
-                    <div className="w-full space-y-6">
-                        {/* Rich Text Editors Management Header */}
-                        <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} p-4 theme-surface2 rounded-lg`}>
-                            <div className="flex items-center gap-2">
-                                <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                    <polyline points="14,2 14,8 20,8"/>
-                                    <line x1="16" y1="13" x2="8" y2="13"/>
-                                    <line x1="16" y1="17" x2="8" y2="17"/>
-                                    <polyline points="10,9 9,9 8,9"/>
-                                </svg>
-                                <span className="font-medium theme-text">Rich Text Editors</span>
-                                <span className="text-sm theme-text-secondary px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
-                                    {richTextEditors.length}
-                                </span>
-                            </div>
-                            
-                            <button
-                                onClick={addNewRichTextEditor}
-                                className={`flex items-center gap-2 ${isMobile() ? 'w-full justify-center' : ''} px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition font-medium text-sm`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                    <line x1="12" y1="5" x2="12" y2="19"/>
-                                    <line x1="5" y1="12" x2="19" y2="12"/>
-                                </svg>
-                                Add Rich Text Editor
-                            </button>
-                        </div>
-                        
-                        {/* Rich Text Editors List */}
-                        <div className="space-y-6">
-                            {richTextEditors.map((editor, index) => (
-                                <div key={editor.id} className="theme-surface rounded-lg p-4 border theme-border">
-                                    {/* Editor Header */}
-                                    <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-3 border-b theme-border`}>
-                                        <div className="flex items-center gap-3">
-                                            <span className="w-8 h-8 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center text-sm font-medium">
-                                                {index + 1}
-                                            </span>
-                                            <input
-                                                type="text"
-                                                value={editor.title}
-                                                onChange={(e) => updateRichTextEditorTitle(editor.id, e.target.value)}
-                                                className="font-medium theme-text bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-green-500 rounded px-2 py-1"
-                                                placeholder="Editor title..."
-                                            />
-                                        </div>
-                                        
-                                        {richTextEditors.length > 1 && (
-                                            <button
-                                                onClick={() => removeRichTextEditor(editor.id)}
-                                                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg theme-transition text-sm"
-                                                title="Remove this editor"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                                    <polyline points="3,6 5,6 21,6"/>
-                                                    <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/>
-                                                    <line x1="10" y1="11" x2="10" y2="17"/>
-                                                    <line x1="14" y1="11" x2="14" y2="17"/>
-                                                </svg>
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Rich Text Editor Component */}
-                                    <RichTextEditor
-                                        tabName={`${tabName}_richtext_${editor.id}`}
-                                        currentBook={currentBook}
-                                        currentChapter={currentChapter}
-                                        className="w-full"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                        
-                        {richTextEditors.length === 0 && (
-                            <div className="text-center py-8">
-                                <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
-                                    <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                        <polyline points="14,2 14,8 20,8"/>
-                                        <line x1="16" y1="13" x2="8" y2="13"/>
-                                        <line x1="16" y1="17" x2="8" y2="17"/>
-                                        <polyline points="10,9 9,9 8,9"/>
-                                    </svg>
-                                </div>
-                                <h3 className="text-lg font-medium theme-text mb-2">No Rich Text editors</h3>
-                                <p className="theme-text-secondary mb-4">Click "Add Rich Text Editor" to create your first editor</p>
-                                <button
-                                    onClick={addNewRichTextEditor}
-                                    className="px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
-                                >
-                                    Add Rich Text Editor
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="w-full space-y-6">
-                        {/* HTML Editors Management Header */}
-                        <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} p-4 theme-surface2 rounded-lg`}>
-                            <div className="flex items-center gap-2">
-                                <svg className="w-5 h-5 theme-text" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                    <polyline points="16,18 22,12 16,6"/>
-                                    <polyline points="8,6 2,12 8,18"/>
-                                </svg>
-                                <span className="font-medium theme-text">HTML Code Editors</span>
-                                <span className="text-sm theme-text-secondary px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
-                                    {htmlEditors.length}
-                                </span>
-                            </div>
-                            
-                            <button
-                                onClick={addNewHtmlEditor}
-                                className={`flex items-center gap-2 ${isMobile() ? 'w-full justify-center' : ''} px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition font-medium text-sm`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                    <line x1="12" y1="5" x2="12" y2="19"/>
-                                    <line x1="5" y1="12" x2="19" y2="12"/>
-                                </svg>
-                                Add HTML Editor
-                            </button>
-                        </div>
-                        
-                        {/* HTML Editors List */}
-                        <div className="space-y-6">
-                            {htmlEditors.map((editor, index) => (
-                                <div key={editor.id} className="theme-surface rounded-lg p-4 border theme-border">
-                                    {/* Editor Header */}
-                                    <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 pb-3 border-b theme-border`}>
-                                        <div className="flex items-center gap-3">
-                                            <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-sm font-medium">
-                                                {index + 1}
-                                            </span>
-                                            <input
-                                                type="text"
-                                                value={editor.title}
-                                                onChange={(e) => updateHtmlEditorTitle(editor.id, e.target.value)}
-                                                className="font-medium theme-text bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
-                                                placeholder="Editor title..."
-                                            />
-                                        </div>
-                                        
-                                        {htmlEditors.length > 1 && (
-                                            <button
-                                                onClick={() => removeHtmlEditor(editor.id)}
-                                                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg theme-transition text-sm"
-                                                title="Remove this editor"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                                    <polyline points="3,6 5,6 21,6"/>
-                                                    <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/>
-                                                    <line x1="10" y1="11" x2="10" y2="17"/>
-                                                    <line x1="14" y1="11" x2="14" y2="17"/>
-                                                </svg>
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
-                                    
-                                    {/* HTML Editor Component */}
-                                    <HTMLCodeEditor
-                                        tabName={`${tabName}_${editor.id}`}
-                                        currentBook={currentBook}
-                                        currentChapter={currentChapter}
-                                        className="w-full"
-                                        customStorageKey={`html_editor_content_${currentBook}_${currentChapter}_${tabName}_${editor.id}`}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                        
-                        {htmlEditors.length === 0 && (
-                            <div className="text-center py-8">
-                                <div className="w-16 h-16 mx-auto mb-4 theme-text-secondary">
-                                    <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                        <polyline points="16,18 22,12 16,6"/>
-                                        <polyline points="8,6 2,12 8,18"/>
-                                    </svg>
-                                </div>
-                                <h3 className="text-lg font-medium theme-text mb-2">No HTML editors</h3>
-                                <p className="theme-text-secondary mb-4">Click "Add HTML Editor" to create your first editor</p>
-                                <button
-                                    onClick={addNewHtmlEditor}
-                                    className="px-4 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition"
-                                >
-                                    Add HTML Editor
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+            <CustomTabWithEditorSwitching 
+                tabName={tabName} 
+                currentBook={currentBook} 
+                currentChapter={currentChapter} 
+            />
         );
     };
 
@@ -2456,17 +2565,97 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
         );
     }
 
-    // Combine legacy and custom subtopics for display
-    const allSubtopics = isCustomChapter 
-        ? customSubtopics.map(sub => sub.title)
-        : currentSubtopics;
-
-    // Initialize loading state properly for new chapters
+    // Initialize loading state properly for new chapters - MOVED BEFORE EARLY RETURN
     useEffect(() => {
         if (!isCustomChapter && currentSubtopics.length === 0) {
             setIsLoadingSubtopics(false); // Non-custom chapters don't need loading
         }
     }, [isCustomChapter, currentSubtopics]);
+
+    // Combine legacy and custom subtopics for display
+    const allSubtopics = isCustomChapter 
+        ? customSubtopics.map(sub => sub.title)
+        : currentSubtopics;
+
+    // PROGRESSIVE LOADING SCREEN - Show until small files are loaded
+    if (isLoadingChapterData && !smallFilesLoaded) {
+        return (
+            <div className="theme-bg min-h-screen theme-text">
+                {/* Header */}
+                <header className="sticky top-0 theme-surface backdrop-blur-sm z-10 p-3 sm:p-4">
+                    <div className="max-w-7xl mx-auto flex items-center justify-between">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                            <button 
+                                onClick={() => navigate(`/subject/${encodeURIComponent(currentBook)}`)}
+                                className="p-2 rounded-lg hover:theme-surface2 theme-transition"
+                                style={{ minWidth: '44px', minHeight: '44px' }}
+                            >
+                                <BackIcon />
+                            </button>
+                            <h1 className="font-semibold text-base sm:text-lg theme-text truncate">
+                                {currentChapter}
+                            </h1>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Loading Content */}
+                <div className="flex items-center justify-center min-h-[60vh] px-4">
+                    <div className="text-center max-w-md mx-auto">
+                        {/* Animated Loading Spinner */}
+                        <div className="relative w-16 h-16 mx-auto mb-6">
+                            <div className="absolute top-0 left-0 w-full h-full border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
+                            <div 
+                                className="absolute top-0 left-0 w-full h-full border-4 border-blue-500 rounded-full animate-spin"
+                                style={{ 
+                                    borderTopColor: 'transparent',
+                                    animation: 'spin 1s linear infinite'
+                                }}
+                            ></div>
+                        </div>
+                        
+                        {/* Loading Message */}
+                        <h2 className="text-lg font-semibold mb-3 theme-text">
+                            Loading Chapter Data
+                        </h2>
+                        <p className="text-sm theme-text opacity-75 mb-4">
+                            {loadingMessage}
+                        </p>
+                        
+                        {/* Progress Bar */}
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+                            <div 
+                                className="bg-blue-500 h-2 rounded-full transition-all duration-300 ease-out"
+                                style={{ width: `${chapterDataProgress}%` }}
+                            ></div>
+                        </div>
+                        <p className="text-xs theme-text opacity-50">
+                            {chapterDataProgress}% loaded
+                        </p>
+                        
+                        {/* Loading Details */}
+                        <div className="mt-6 text-left theme-surface rounded-lg p-4">
+                            <h3 className="text-sm font-medium mb-2 theme-text">Smart Loading Strategy:</h3>
+                            <div className="space-y-1 text-xs theme-text opacity-75">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${chapterDataProgress >= 10 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                    <span>Essential data (&lt;100KB)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${chapterDataProgress >= 50 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                    <span>Template content</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${chapterDataProgress >= 80 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                    <span>Media files (background)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="theme-bg min-h-screen theme-text theme-transition">
