@@ -694,18 +694,43 @@ export class BookSyncService {
    * Check if localStorage key is related to a specific book
    */
   private static isBookRelatedKey(key: string, bookId: string, normalizedBookName: string): boolean {
+    // Get the original book name with spaces (reverse normalize)
+    const originalBookName = normalizedBookName.replace(/_/g, ' ');
+    
     return (
       key.includes(`_${bookId}_`) ||
       key.startsWith(`chapters_${bookId}`) ||
+      // Support both normalized (underscore) and original (space) patterns
       key.includes(`_${normalizedBookName}_`) ||
+      key.includes(`_${originalBookName}_`) ||
       key.startsWith(`flashcards_${normalizedBookName}`) ||
+      key.startsWith(`flashcards_${originalBookName}`) ||
       key.startsWith(`mcq_${normalizedBookName}`) ||
+      key.startsWith(`mcq_${originalBookName}`) ||
       key.startsWith(`qa_${normalizedBookName}`) ||
+      key.startsWith(`qa_${originalBookName}`) ||
       key.startsWith(`notes_${normalizedBookName}`) ||
+      key.startsWith(`notes_${originalBookName}`) ||
       key.startsWith(`mindmaps_${normalizedBookName}`) ||
+      key.startsWith(`mindmaps_${originalBookName}`) ||
       key.startsWith(`videos_${normalizedBookName}`) ||
+      key.startsWith(`videos_${originalBookName}`) ||
       key.startsWith(`highlights_${normalizedBookName}`) ||
-      (key.includes(`customtab_`) && key.includes(`_${normalizedBookName}_`))
+      key.startsWith(`highlights_${originalBookName}`) ||
+      key.startsWith(`html_editor_content_${normalizedBookName}`) ||
+      key.startsWith(`html_editor_content_${originalBookName}`) ||
+      key.startsWith(`rich_text_editor_content_${normalizedBookName}`) ||
+      key.startsWith(`rich_text_editor_content_${originalBookName}`) ||
+      key.startsWith(`html_editors_${normalizedBookName}`) ||
+      key.startsWith(`html_editors_${originalBookName}`) ||
+      key.startsWith(`rich_text_editors_${normalizedBookName}`) ||
+      key.startsWith(`rich_text_editors_${originalBookName}`) ||
+      key.startsWith(`questionPapers_${normalizedBookName}`) ||
+      key.startsWith(`questionPapers_${originalBookName}`) ||
+      // Handle space-separated chapter names in questionPapers keys
+      key.startsWith(`questionPapers_${originalBookName} `) ||
+      key.startsWith(`questionPapers_${normalizedBookName} `) ||
+      (key.includes(`customtab_`) && (key.includes(`_${normalizedBookName}_`) || key.includes(`_${originalBookName}_`)))
     );
   }
 

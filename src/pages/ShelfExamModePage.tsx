@@ -7,6 +7,10 @@ import DetailedEvaluationModal from '../components/DetailedEvaluationModal';
 import EvaluationReportsModal, { EvaluationReport } from '../components/EvaluationReportsModal';
 import ExamModeLoadingScreen from '../components/ExamModeLoadingScreen';
 import { ChapterDataLoader } from '../services/ChapterDataLoader';
+import QuestionPaperService from '../services/QuestionPaperService';
+import UnifiedBookAdapter from '../services/UnifiedBookAdapter';
+import EvaluationReportsService from '../services/EvaluationReportsService';
+import { BookIdResolver } from '../utils/BookIdResolver';
 // import { generateAIGuruResponse } from '../services/githubModelsService';
 import Groq from 'groq-sdk';
 
@@ -19,6 +23,7 @@ interface QuestionPaper {
     sections: Section[];
     duration: number; // in minutes
     createdAt: Date;
+    cloudId?: string; // Cloud database ID for sync operations
 }
 
 interface Section {
@@ -117,6 +122,74 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
 
     const currentBook = subjectName ? decodeURIComponent(subjectName) : '';
     const currentChapter = chapterName ? decodeURIComponent(chapterName) : '';
+    
+    // Normalize book and chapter names for consistent localStorage keys
+    const normalizedBookName = currentBook.trim().replace(/\s+/g, '_');
+    const normalizedChapterName = currentChapter.trim().replace(/\s+/g, '_');
+    
+    // Migrate localStorage keys to normalized format
+    const migrateLocalStorageKeys = () => {
+        const normalizedKey = `questionPapers_${normalizedBookName}_${normalizedChapterName}`;
+        const potentialKeys = [
+            `questionPapers_${currentBook}_${currentChapter}`, // Original with spaces
+            `questionPapers_${currentBook.replace(/\s+/g, '_')}_${currentChapter.replace(/\s+/g, '_')}`, // Basic normalization
+            `questionPapers_${currentBook.trim()}_${currentChapter.trim()}`, // Just trimmed
+        ];
+        
+        console.log(`🔄 Migrating localStorage keys to normalized format: "${normalizedKey}"`);
+        
+        let mergedData: QuestionPaper[] = [];
+        let hasExistingData = false;
+        
+        // Check if normalized key already has data
+        const existingNormalized = localStorage.getItem(normalizedKey);
+        if (existingNormalized) {
+            try {
+                mergedData = JSON.parse(existingNormalized);
+                hasExistingData = true;
+                console.log(`✅ Found ${mergedData.length} papers in normalized key`);
+            } catch (error) {
+                console.warn('⚠️ Failed to parse normalized key data:', error);
+            }
+        }
+        
+        // Migrate data from old keys
+        for (const oldKey of potentialKeys) {
+            if (oldKey !== normalizedKey && localStorage.getItem(oldKey)) {
+                try {
+                    const oldData = JSON.parse(localStorage.getItem(oldKey)!);
+                    console.log(`🔍 Found ${oldData.length} papers in old key: "${oldKey}"`);
+                    
+                    // Merge unique papers (avoid duplicates by ID)
+                    for (const paper of oldData) {
+                        if (!mergedData.find(p => p.id === paper.id)) {
+                            mergedData.push(paper);
+                            console.log(`📝 Migrated paper: "${paper.title}"`);
+                        }
+                    }
+                    
+                    // Remove old key after migration
+                    localStorage.removeItem(oldKey);
+                    console.log(`🗑️ Removed old key: "${oldKey}"`);
+                } catch (error) {
+                    console.warn(`⚠️ Failed to migrate from key "${oldKey}":`, error);
+                }
+            }
+        }
+        
+        // Save merged data to normalized key
+        if (mergedData.length > 0 && (!hasExistingData || mergedData.length > JSON.parse(existingNormalized || '[]').length)) {
+            localStorage.setItem(normalizedKey, JSON.stringify(mergedData));
+            console.log(`✅ Migration complete: ${mergedData.length} papers saved to normalized key`);
+        }
+        
+        return mergedData;
+    };
+    
+    // Run migration on component mount
+    useEffect(() => {
+        migrateLocalStorageKeys();
+    }, [normalizedBookName, normalizedChapterName]);
 
     // Generate year options (current year to 10 years back)
     const yearOptions = Array.from({ length: 11 }, (_, i) => {
@@ -128,7 +201,7 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         navigate(`/shelf/reader/${encodeURIComponent(currentBook)}/${encodeURIComponent(currentChapter)}`);
     };
 
-    const handleAddPaper = () => {
+    const handleAddPaper = async () => {
         if (!paperTitle.trim()) return;
         
         if (selectedCategory === 'previous-year' && !selectedYear) return;
@@ -153,7 +226,33 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
             createdAt: new Date()
         };
 
+        // Add to local state first (for immediate UI update)
         setQuestionPapers(prev => [...prev, newPaper]);
+        
+        // Save to cloud in background
+        try {
+            console.log('🔄 Saving question paper to cloud...');
+            const result = await QuestionPaperService.createQuestionPaper(
+                currentBook,
+                currentChapter,
+                newPaper
+            );
+            
+            if (result.success && result.id) {
+                console.log(`✅ Question paper "${newPaper.title}" saved to cloud with ID: ${result.id}`);
+                
+                // Update the paper with cloud ID for future operations
+                setQuestionPapers(prev => prev.map(paper => 
+                    paper.id === newPaper.id 
+                        ? { ...paper, cloudId: result.id } 
+                        : paper
+                ));
+            } else {
+                console.warn('⚠️ Failed to save question paper to cloud:', result.error);
+            }
+        } catch (error) {
+            console.error('❌ Exception saving question paper to cloud:', error);
+        }
         
         // Reset form
         setPaperTitle('');
@@ -163,8 +262,29 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         setShowAddPaper(false);
     };
 
-    const handleDeletePaper = (paperId: string) => {
+    const handleDeletePaper = async (paperId: string) => {
+        const paperToDelete = questionPapers.find(paper => paper.id === paperId);
+        
+        // Remove from local state immediately (for immediate UI update)
         setQuestionPapers(prev => prev.filter(paper => paper.id !== paperId));
+        
+        // Delete from cloud in background
+        if (paperToDelete && (paperToDelete as any).cloudId) {
+            try {
+                console.log('🔄 Deleting question paper from cloud...');
+                const result = await QuestionPaperService.deleteQuestionPaper((paperToDelete as any).cloudId);
+                
+                if (result.success) {
+                    console.log(`✅ Question paper "${paperToDelete.title}" deleted from cloud`);
+                } else {
+                    console.warn('⚠️ Failed to delete question paper from cloud:', result.error);
+                }
+            } catch (error) {
+                console.error('❌ Exception deleting question paper from cloud:', error);
+            }
+        } else {
+            console.log('📝 Paper has no cloudId, only deleted locally');
+        }
     };
 
     const handleEditQuestions = (paper: QuestionPaper) => {
@@ -256,65 +376,187 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         }
     }, [currentBook, currentChapter, isInitialLoad]);
 
-    // Load evaluation reports from localStorage AFTER cloud sync
+    // Load evaluation reports with cloud sync
     useEffect(() => {
         if (!examDataLoaded) return; // Wait for cloud data to be synced first
         
-        const savedReports = localStorage.getItem(`evaluationReports_${currentBook}_${currentChapter}`);
-        if (savedReports) {
+        const loadEvaluationReports = async () => {
             try {
-                const reports = JSON.parse(savedReports);
-                setEvaluationReports(reports.map((report: any) => ({
-                    ...report,
-                    submittedAt: new Date(report.submittedAt)
-                })));
-                console.log(`📊 Loaded ${reports.length} evaluation reports from localStorage`);
+                console.log('📊 SHELF: Loading evaluation reports with cloud sync...');
+                
+                // 1. Try loading from localStorage first (immediate load)
+                const localStorageKey = `evaluationReports_${currentBook}_${currentChapter}`;
+                const savedReports = localStorage.getItem(localStorageKey);
+                if (savedReports) {
+                    const reports = JSON.parse(savedReports);
+                    setEvaluationReports(reports.map((report: any) => ({
+                        ...report,
+                        submittedAt: new Date(report.submittedAt)
+                    })));
+                    console.log(`📊 SHELF: Loaded ${reports.length} evaluation reports from localStorage`);
+                }
+
+                // 2. Get current book ID for cloud sync
+                const bookIdContext = BookIdResolver.resolveBookId(currentBook);
+                const bookId = bookIdContext.bookId;
+
+                if (bookId && bookIdContext.isValidBook) {
+                    // 3. Load from cloud and merge with local
+                    const cloudResult = await EvaluationReportsService.loadEvaluationReports(
+                        bookId, 
+                        currentChapter
+                    );
+                    
+                    if (cloudResult.success && cloudResult.reports && cloudResult.reports.length > 0) {
+                        console.log(`📊 SHELF: Loaded ${cloudResult.reports.length} evaluation reports from cloud`);
+                        
+                        // 4. Merge cloud and local data (cloud takes precedence for conflicts)
+                        const mergedReports = [...cloudResult.reports];
+                        if (savedReports) {
+                            const localReports = JSON.parse(savedReports);
+                            localReports.forEach((localReport: any) => {
+                                if (!mergedReports.find(cloudReport => cloudReport.id === localReport.id)) {
+                                    mergedReports.push({
+                                        ...localReport,
+                                        submittedAt: new Date(localReport.submittedAt)
+                                    });
+                                }
+                            });
+                        }
+
+                        // 5. Update state and localStorage with merged data
+                        setEvaluationReports(mergedReports);
+                        localStorage.setItem(localStorageKey, JSON.stringify(mergedReports));
+                        console.log(`📊 SHELF: Merged and cached ${mergedReports.length} total evaluation reports`);
+                    }
+                } else {
+                    console.warn('⚠️ SHELF: No valid book ID found for cloud sync, using localStorage only');
+                }
             } catch (error) {
-                console.error('Error loading evaluation reports:', error);
+                console.error('❌ SHELF: Error loading evaluation reports:', error);
+                // Fallback to localStorage only if cloud sync fails
+                const savedReports = localStorage.getItem(`evaluationReports_${normalizedBookName}_${normalizedChapterName}`);
+                if (savedReports) {
+                    const reports = JSON.parse(savedReports);
+                    setEvaluationReports(reports.map((report: any) => ({
+                        ...report,
+                        submittedAt: new Date(report.submittedAt)
+                    })));
+                }
             }
-        }
+        };
+
+        loadEvaluationReports();
     }, [currentBook, currentChapter, examDataLoaded]);
 
-    // Save evaluation reports to localStorage whenever they change
+    // Save evaluation reports to localStorage and cloud whenever they change
     useEffect(() => {
         if (evaluationReports.length > 0) {
+            // 1. Save to localStorage immediately (for offline access)
             localStorage.setItem(
-                `evaluationReports_${currentBook}_${currentChapter}`,
+                `evaluationReports_${normalizedBookName}_${normalizedChapterName}`,
                 JSON.stringify(evaluationReports)
             );
+            
+            // 2. Save to cloud in background
+            const saveToCloud = async () => {
+                try {
+                    const bookIdContext = BookIdResolver.resolveBookId(currentBook);
+                    const bookId = bookIdContext.bookId;
+                    const bookAdapter = UnifiedBookAdapter.getInstance();
+                    
+                    if (bookId) {
+                        // Use UnifiedBookAdapter for comprehensive sync
+                        await bookAdapter.saveTemplateData(
+                            currentBook, 
+                            currentChapter, 
+                            'evaluationReports', 
+                            evaluationReports
+                        );
+                        console.log('✅ SHELF: Evaluation reports synced to cloud via UnifiedBookAdapter');
+                    }
+                } catch (error) {
+                    console.error('❌ SHELF: Error saving evaluation reports to cloud:', error);
+                }
+            };
+            
+            // Debounce cloud save (avoid excessive API calls)
+            const timer = setTimeout(saveToCloud, 1000);
+            return () => clearTimeout(timer);
         }
-    }, [evaluationReports, currentBook, currentChapter]);
+    }, [evaluationReports, normalizedBookName, normalizedChapterName]);
 
-    // Load question papers from localStorage AFTER cloud sync
+    // Load and sync question papers from cloud + localStorage
     useEffect(() => {
         if (!examDataLoaded) return; // Wait for cloud data to be synced first
         
-        const savedPapers = localStorage.getItem(`questionPapers_${currentBook}_${currentChapter}`);
-        if (savedPapers) {
+        const syncQuestionPapers = async () => {
             try {
-                const parsedPapers = JSON.parse(savedPapers);
-                // Convert date strings back to Date objects
-                const papersWithDates = parsedPapers.map((paper: any) => ({
-                    ...paper,
-                    createdAt: new Date(paper.createdAt)
-                }));
-                setQuestionPapers(papersWithDates);
-                console.log(`📝 Loaded ${papersWithDates.length} question papers from localStorage`);
+                console.log('🔄 Starting question paper sync...');
+                
+                // 1. Load existing localStorage papers
+                const savedPapers = localStorage.getItem(`questionPapers_${normalizedBookName}_${normalizedChapterName}`);
+                let localPapers: QuestionPaper[] = [];
+                
+                if (savedPapers) {
+                    const parsedPapers = JSON.parse(savedPapers);
+                    localPapers = parsedPapers.map((paper: any) => ({
+                        ...paper,
+                        createdAt: new Date(paper.createdAt)
+                    }));
+                }
+
+                // 2. Sync with cloud (this will migrate local papers and return cloud papers)
+                const syncResult = await QuestionPaperService.syncQuestionPapers(
+                    currentBook,
+                    currentChapter,
+                    localPapers
+                );
+
+                if (syncResult.success && syncResult.syncedPapers) {
+                    // 3. Update state with synced papers from cloud
+                    setQuestionPapers(syncResult.syncedPapers);
+                    
+                    // 4. Update localStorage with cloud data (to keep in sync)
+                    localStorage.setItem(
+                        `questionPapers_${normalizedBookName}_${normalizedChapterName}`,
+                        JSON.stringify(syncResult.syncedPapers)
+                    );
+                    
+                    console.log(`✅ Synced ${syncResult.syncedPapers.length} question papers`);
+                } else {
+                    // Fallback to localStorage if cloud sync fails
+                    setQuestionPapers(localPapers);
+                    console.warn('⚠️ Cloud sync failed, using localStorage data:', syncResult.error);
+                }
             } catch (error) {
-                console.error('Error loading question papers:', error);
+                console.error('❌ Error during question paper sync:', error);
+                
+                // Fallback to localStorage
+                const savedPapers = localStorage.getItem(`questionPapers_${normalizedBookName}_${normalizedChapterName}`);
+                if (savedPapers) {
+                    const parsedPapers = JSON.parse(savedPapers);
+                    const papersWithDates = parsedPapers.map((paper: any) => ({
+                        ...paper,
+                        createdAt: new Date(paper.createdAt)
+                    }));
+                    setQuestionPapers(papersWithDates);
+                }
             }
-        }
+        };
+
+        syncQuestionPapers();
     }, [currentBook, currentChapter, examDataLoaded]);
 
-    // Save question papers to localStorage whenever they change
+    // Save question papers to localStorage whenever they change (for immediate local backup)
     useEffect(() => {
         if (questionPapers.length > 0) {
             localStorage.setItem(
-                `questionPapers_${currentBook}_${currentChapter}`,
+                `questionPapers_${normalizedBookName}_${normalizedChapterName}`,
                 JSON.stringify(questionPapers)
             );
         }
-    }, [questionPapers, currentBook, currentChapter]);
+    }, [questionPapers, normalizedBookName, normalizedChapterName]);
 
     // Background evaluation checker
     useEffect(() => {

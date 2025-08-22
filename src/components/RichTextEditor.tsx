@@ -6,6 +6,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { PencilIcon, EyeIcon, BookOpenIcon } from './icons';
 import { BookTabManager } from '../utils/BookTabManager';
+import { BookSyncService } from '../services/BookSyncService';
 import 'katex/dist/katex.min.css';
 
 interface RichTextEditorProps {
@@ -13,40 +14,83 @@ interface RichTextEditorProps {
     currentBook: string;
     currentChapter: string;
     className?: string;
+    customStorageKey?: string;
 }
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
     tabName,
     currentBook,
     currentChapter,
-    className = ''
+    className = '',
+    customStorageKey
 }) => {
     const [content, setContent] = useState('');
     const [isEditing, setIsEditing] = useState(true);
 
-    // Load content using BookTabManager
+    // Load content using either custom storage key or BookTabManager
     useEffect(() => {
-        const savedContent = BookTabManager.loadCustomTabData(currentBook, currentChapter, tabName);
-        if (savedContent) {
-            setContent(savedContent);
+        if (customStorageKey) {
+            const savedContent = localStorage.getItem(customStorageKey);
+            if (savedContent) {
+                setContent(savedContent);
+            }
+        } else {
+            const savedContent = BookTabManager.loadCustomTabData(currentBook, currentChapter, tabName);
+            if (savedContent) {
+                setContent(savedContent);
+            }
         }
-    }, [currentBook, currentChapter, tabName]);
+    }, [currentBook, currentChapter, tabName, customStorageKey]);
 
-    // Save content using BookTabManager
+    // Save content using either custom storage key or BookTabManager
     const handleSave = () => {
-        BookTabManager.saveCustomTabData(currentBook, currentChapter, tabName, content);
+        if (customStorageKey) {
+            localStorage.setItem(customStorageKey, content);
+        } else {
+            BookTabManager.saveCustomTabData(currentBook, currentChapter, tabName, content);
+        }
+        
+        // Trigger immediate cloud sync
+        triggerBackgroundSync();
     };
 
     // Auto-save on content change (with debouncing)
     useEffect(() => {
         const timer = setTimeout(() => {
             if (content.trim()) {
-                BookTabManager.saveCustomTabData(currentBook, currentChapter, tabName, content);
+                console.log(`🔄 Auto-saving Rich Text content for ${tabName}...`);
+                if (customStorageKey) {
+                    localStorage.setItem(customStorageKey, content);
+                } else {
+                    BookTabManager.saveCustomTabData(currentBook, currentChapter, tabName, content);
+                }
+                
+                // Trigger cloud sync in background
+                setTimeout(() => {
+                    triggerBackgroundSync();
+                }, 1000); // Delay sync by 1 second to batch multiple saves
             }
         }, 1000); // Save after 1 second of inactivity
 
         return () => clearTimeout(timer);
-    }, [content, currentBook, currentChapter, tabName]);
+    }, [content, currentBook, currentChapter, tabName, customStorageKey]);
+
+    // Trigger background cloud sync
+    const triggerBackgroundSync = async () => {
+        try {
+            const books = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+            const currentBookData = books.find((book: any) => book.name === currentBook);
+            
+            if (currentBookData) {
+                console.log(`🌐 Triggering background sync for book: ${currentBook}`);
+                await BookSyncService.collectAllBookDataTemp(currentBook, currentBookData.id);
+                console.log(`✅ Background sync completed for: ${currentBook}`);
+            }
+        } catch (error) {
+            console.warn(`⚠️ Background sync failed for ${currentBook}:`, error);
+            // Don't show error to user - background sync failures should be silent
+        }
+    };
 
     const placeholder = `# ${tabName}
 

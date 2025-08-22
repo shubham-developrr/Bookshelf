@@ -95,6 +95,9 @@ export class ChapterDataLoader {
 
       const syncResult = await this.syncChapterFromCloud(bookName, chapterName, user.id);
 
+      // Apply editor content key transformations to handle any synced or local data
+      this.transformAllEditorKeys(bookName, chapterName);
+
       // PHASE 3: Load small files from localStorage (now populated from cloud)
       this.notifyListeners({
         phase: 'localStorage',
@@ -211,6 +214,10 @@ export class ChapterDataLoader {
         for (const [key, value] of Object.entries(contentData)) {
           if (key.includes(normalizedBookName) && key.includes(normalizedChapterName)) {
             localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+            
+            // AUTOMATIC EDITOR CONTENT KEY TRANSFORMATION
+            // Fix storage key mismatch between synced data and component expectations
+            this.transformEditorContentKeys(key, value, bookName, chapterName);
             
             // Count different types
             if (key.startsWith('customtab_')) {
@@ -351,6 +358,9 @@ export class ChapterDataLoader {
   private async loadFromLocalStorageOnly(bookName: string, chapterName: string): Promise<ChapterDataResult> {
     console.log('📦 Loading from localStorage only...');
     
+    // Apply editor content key transformations to any existing localStorage data
+    this.transformAllEditorKeys(bookName, chapterName);
+    
     const result = await this.loadSmallFiles(bookName, chapterName);
     
     this.notifyListeners({
@@ -420,6 +430,175 @@ export class ChapterDataLoader {
 
     chapterKeys.forEach(key => localStorage.removeItem(key));
     console.log(`🗑️ Cleared ${chapterKeys.length} cached items for ${bookName}/${chapterName}`);
+  }
+
+  /**
+   * Scan all localStorage keys for this chapter and apply editor content transformations
+   * This ensures offline/local-only loading also gets the transformation benefits
+   */
+  private transformAllEditorKeys(bookName: string, chapterName: string): void {
+    console.log(`🔍 TRANSFORM DEBUG: Starting transformation for ${bookName} → ${chapterName}`);
+    
+    const normalizedBookName = bookName.replace(/\s+/g, '_');
+    const normalizedChapterName = chapterName.replace(/\s+/g, '_');
+    
+    console.log(`🔍 TRANSFORM DEBUG: Normalized names: book="${normalizedBookName}" chapter="${normalizedChapterName}"`);
+    
+    // Get all localStorage keys that might need transformation for this chapter
+    const allKeys = Object.keys(localStorage);
+    const chapterKeys = allKeys.filter(key => 
+      key.includes(normalizedBookName) && key.includes(normalizedChapterName) &&
+      (key.startsWith('html_editors_') || key.startsWith('rich_text_editors_'))
+    );
+    
+    console.log(`🔍 TRANSFORM DEBUG: Found ${chapterKeys.length} editor keys:`, chapterKeys);
+    
+    for (const key of chapterKeys) {
+      const value = localStorage.getItem(key);
+      if (value) {
+        console.log(`🔄 TRANSFORM DEBUG: Processing key: ${key}`);
+        try {
+          const parsedValue = JSON.parse(value);
+          this.transformEditorContentKeys(key, parsedValue, bookName, chapterName);
+        } catch (e) {
+          // If it's not JSON, pass as string
+          console.log(`🔄 TRANSFORM DEBUG: Key contains non-JSON value, treating as string`);
+          this.transformEditorContentKeys(key, value, bookName, chapterName);
+        }
+      }
+    }
+  }
+
+  /**
+   * Transforms synced editor content keys to match component expectations
+   * Fixes storage key mismatch between cloud sync and UI components
+   */
+  private transformEditorContentKeys(key: string, value: any, bookName: string, chapterName: string): void {
+    try {
+      // Handle HTML editor content keys
+      if (key.startsWith('html_editors_') && key.includes('_CustomTab')) {
+        const tabMatch = key.match(/CustomTab(\d+|[a-zA-Z]+)/);
+        if (tabMatch && tabMatch[1]) {
+          const tabId = tabMatch[1];
+          
+          // Extract tab name from existing tab data
+          const normalizedBook = bookName.replace(/\s+/g, '_');
+          const normalizedChapter = chapterName.replace(/\s+/g, '_');
+          
+          // Try to find the actual tab name from the tabs cache
+          const tabsCacheKey = `tabs_cache_a1c35782-6147-452f-9f00-512b3611131b_${chapterName.replace(/\s+/g, '_')}`;
+          const tabsCache = localStorage.getItem(tabsCacheKey);
+          let tabName = 'hhhhhhhhhhhhh'; // fallback
+          
+          if (tabsCache) {
+            try {
+              const tabsData = JSON.parse(tabsCache);
+              const matchingTab = tabsData.tabs?.find((tab: any) => tab.id.includes('CustomTab'));
+              if (matchingTab) {
+                tabName = matchingTab.title;
+              }
+            } catch (e) {
+              console.warn('Error parsing tabs cache:', e);
+            }
+          }
+          
+          // Create the expected content key that HTMLCodeEditor looks for
+          const expectedContentKey = `html_editor_content_${normalizedBook}_${normalizedChapter}_${tabName}_1`;
+          
+          // Create the expected metadata list key that CustomTabWithEditorSwitching looks for
+          const metadataListKey = `html_editors_${normalizedBook}_${normalizedChapter}_${tabName}`;
+          
+          // Extract the HTML content from the synced data
+          let htmlContent = '';
+          if (typeof value === 'string') {
+            htmlContent = value;
+          } else if (value && value.content) {
+            htmlContent = value.content;
+          }
+          
+          if (htmlContent) {
+            // Create the individual content key
+            localStorage.setItem(expectedContentKey, htmlContent);
+            
+            // Create/update the metadata list that components expect
+            const editorMetadata = [{
+              id: 1,
+              title: 'Editor 1',
+              createdAt: new Date().toISOString()
+            }];
+            localStorage.setItem(metadataListKey, JSON.stringify(editorMetadata));
+            
+            console.log(`🔄 Transformed HTML editor key: ${key} → ${expectedContentKey} + ${metadataListKey}`);
+          }
+        }
+      }
+      
+      // Handle Rich Text editor content keys
+      if (key.startsWith('rich_text_editors_') && (key.includes('_CustomTab') || key.includes('_Notes'))) {
+        let editorId = '';
+        let tabName = 'hhhhhhhhhhhhh'; // default fallback
+        
+        const normalizedBook = bookName.replace(/\s+/g, '_');
+        const normalizedChapter = chapterName.replace(/\s+/g, '_');
+        
+        if (key.includes('_CustomTab')) {
+          const tabMatch = key.match(/CustomTab(\d+|[a-zA-Z]+)/);
+          editorId = tabMatch ? `CustomTab${tabMatch[1]}` : '';
+          
+          // Try to find the actual tab name from the tabs cache
+          const tabsCacheKey = `tabs_cache_a1c35782-6147-452f-9f00-512b3611131b_${chapterName.replace(/\s+/g, '_')}`;
+          const tabsCache = localStorage.getItem(tabsCacheKey);
+          
+          if (tabsCache) {
+            try {
+              const tabsData = JSON.parse(tabsCache);
+              const matchingTab = tabsData.tabs?.find((tab: any) => tab.id.includes('CustomTab'));
+              if (matchingTab) {
+                tabName = matchingTab.title;
+              }
+            } catch (e) {
+              console.warn('Error parsing tabs cache:', e);
+            }
+          }
+        } else if (key.includes('_Notes')) {
+          editorId = 'Notes';
+          tabName = 'Notes';
+        }
+        
+        if (editorId) {
+          // Create the expected content key for rich text editors
+          const expectedContentKey = `rich_text_editor_content_${normalizedBook}_${normalizedChapter}_${tabName}_1`;
+          
+          // Create the expected metadata list key
+          const metadataListKey = `rich_text_editors_${normalizedBook}_${normalizedChapter}_${tabName}`;
+          
+          // Extract the rich text content from the synced data
+          let richTextContent = '';
+          if (typeof value === 'string') {
+            richTextContent = value;
+          } else if (value && value.content) {
+            richTextContent = value.content;
+          }
+          
+          if (richTextContent) {
+            // Create the individual content key
+            localStorage.setItem(expectedContentKey, richTextContent);
+            
+            // Create/update the metadata list that components expect
+            const editorMetadata = [{
+              id: 1,
+              title: 'Editor 1',
+              createdAt: new Date().toISOString()
+            }];
+            localStorage.setItem(metadataListKey, JSON.stringify(editorMetadata));
+            
+            console.log(`🔄 Transformed Rich Text editor key: ${key} → ${expectedContentKey} + ${metadataListKey}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ Failed to transform editor content key: ${key}`, error);
+    }
   }
 }
 

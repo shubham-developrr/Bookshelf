@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BookSyncService } from '../services/BookSyncService';
 
 interface HTMLCodeEditorProps {
     tabName: string;
@@ -109,10 +110,29 @@ const HTMLCodeEditor: React.FC<HTMLCodeEditorProps> = ({
         }
     }, [storageKey]);
 
-    // Save content to localStorage
+    // Auto-save functionality (saves content after 2 seconds of inactivity)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (htmlCode.trim() && htmlCode !== savedContent) {
+                console.log(`🔄 Auto-saving HTML content for ${tabName}...`);
+                localStorage.setItem(storageKey, htmlCode);
+                setSavedContent(htmlCode);
+                
+                // Trigger cloud sync in background
+                setTimeout(() => {
+                    triggerBackgroundSync();
+                }, 1000); // Delay sync by 1 second to batch multiple saves
+            }
+        }, 2000); // Auto-save after 2 seconds of inactivity
+
+        return () => clearTimeout(timer);
+    }, [htmlCode, savedContent, storageKey, tabName]);
+
+    // Manual save content to localStorage and trigger sync
     const handleSave = () => {
         localStorage.setItem(storageKey, htmlCode);
         setSavedContent(htmlCode);
+        
         // Show a brief success indication
         const originalText = 'Save';
         const saveButton = document.querySelector('[data-save-btn]') as HTMLButtonElement;
@@ -123,6 +143,26 @@ const HTMLCodeEditor: React.FC<HTMLCodeEditorProps> = ({
                 saveButton.textContent = originalText;
                 saveButton.style.background = '';
             }, 1000);
+        }
+
+        // Trigger immediate cloud sync
+        triggerBackgroundSync();
+    };
+
+    // Trigger background cloud sync
+    const triggerBackgroundSync = async () => {
+        try {
+            const books = JSON.parse(localStorage.getItem('createdBooks') || '[]');
+            const currentBookData = books.find((book: any) => book.name === currentBook);
+            
+            if (currentBookData) {
+                console.log(`🌐 Triggering background sync for book: ${currentBook}`);
+                await BookSyncService.collectAllBookDataTemp(currentBook, currentBookData.id);
+                console.log(`✅ Background sync completed for: ${currentBook}`);
+            }
+        } catch (error) {
+            console.warn(`⚠️ Background sync failed for ${currentBook}:`, error);
+            // Don't show error to user - background sync failures should be silent
         }
     };
 
@@ -269,7 +309,7 @@ const HTMLCodeEditor: React.FC<HTMLCodeEditorProps> = ({
                     💡 Write complete HTML documents with CSS and JavaScript
                 </div>
                 <div className={`text-xs theme-text-secondary ${isMobile() ? '' : 'text-right'}`}>
-                    Auto-saves to: {tabName} - {currentBook}/{currentChapter}
+                    ✅ Auto-saves every 2s to: {tabName} - {currentBook}/{currentChapter}
                 </div>
             </div>
         </div>

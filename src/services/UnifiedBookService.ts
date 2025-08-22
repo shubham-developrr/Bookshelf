@@ -386,21 +386,35 @@ export class UnifiedBookService {
     const data: ContentData = {};
     const normalizedBookName = bookName.replace(/\s+/g, '_');
 
+    console.log(`🔍 SYNC DEBUG: Collecting content for book "${bookName}" (ID: ${bookId})`);
+    console.log(`📊 Normalized book name: "${normalizedBookName}"`);
+
     // Scan localStorage for all book-related content
+    let totalScanned = 0;
+    let totalMatched = 0;
+    
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
+      totalScanned++;
+      
       if (key && this.isBookRelatedKey(key, bookId, normalizedBookName)) {
+        totalMatched++;
         const value = localStorage.getItem(key);
         if (value && value !== 'null') {
           try {
             data[key] = JSON.parse(value);
+            console.log(`✅ COLLECTED: ${key}`);
           } catch {
             data[key] = value; // Store as string if not JSON
+            console.log(`✅ COLLECTED (string): ${key}`);
           }
         }
       }
     }
 
+    console.log(`📊 SYNC SUMMARY: Scanned ${totalScanned} keys, collected ${totalMatched} keys for "${bookName}"`);
+    console.log(`🔍 Collected key types:`, Object.keys(data).map(k => k.split('_')[0]).filter((v, i, a) => a.indexOf(v) === i));
+    
     return data;
   }
 
@@ -415,33 +429,47 @@ export class UnifiedBookService {
   }
 
   private isBookRelatedKey(key: string, bookId: string, normalizedBookName: string): boolean {
+    // Clean normalized book name to handle trailing spaces/underscores
+    const cleanBookName = normalizedBookName.replace(/[_\s]+$/, '').replace(/\s+/g, '_');
+    
     return (
       key.includes(`_${bookId}_`) ||
       key.startsWith(`chapters_${bookId}`) ||
-      key.includes(`_${normalizedBookName}_`) ||
-      key.startsWith(`flashcards_${normalizedBookName}`) ||
-      key.startsWith(`mcq_${normalizedBookName}`) ||
-      key.startsWith(`qa_${normalizedBookName}`) ||
-      key.startsWith(`notes_${normalizedBookName}`) ||
-      key.startsWith(`mindmaps_${normalizedBookName}`) ||
-      key.startsWith(`videos_${normalizedBookName}`) ||
-      key.startsWith(`questionPapers_${normalizedBookName}`) ||   // EXAM MODE: Question papers
-      key.startsWith(`evaluationReports_${normalizedBookName}`) || // EXAM MODE: Evaluation reports
+      key.includes(`_${cleanBookName}_`) ||
+      key.startsWith(`flashcards_${cleanBookName}`) ||
+      key.startsWith(`mcq_${cleanBookName}`) ||
+      key.startsWith(`qa_${cleanBookName}`) ||
+      key.startsWith(`notes_${cleanBookName}`) ||
+      key.startsWith(`mindmaps_${cleanBookName}`) ||
+      key.startsWith(`videos_${cleanBookName}`) ||
+      key.startsWith(`questionPapers_${cleanBookName}`) ||   // EXAM MODE: Question papers
+      key.startsWith(`evaluationReports_${cleanBookName}`) || // EXAM MODE: Evaluation reports
       key.startsWith(`subtopics_${bookId}_`) ||  // READ TAB: Subtopics content
-      key.startsWith(`html_editors_${normalizedBookName}_`) ||  // CUSTOM TABS: HTML editors content
-      key.startsWith(`rich_text_editors_${normalizedBookName}_`) ||  // CUSTOM TABS: Rich text editors content
-      // FIXED: Better highlights matching - highlights_BookName_ChapterName pattern
-      (key.startsWith('highlights_') && key.includes(`_${normalizedBookName}_`)) ||
-      // FIXED: Better custom tab matching - customtab_TabName_BookName_ChapterName pattern
-      (key.includes('customtab_') && key.includes(`_${normalizedBookName}_`)) ||
+      key.startsWith(`html_editors_${cleanBookName}_`) ||  // CUSTOM TABS: HTML editors content
+      key.startsWith(`rich_text_editors_${cleanBookName}_`) ||  // CUSTOM TABS: Rich text editors content
+      // ENHANCED: Better highlights matching - highlights_BookName_ChapterName pattern
+      (key.startsWith('highlights_') && (
+        key.includes(`_${cleanBookName}_`) || 
+        key.startsWith(`highlights_${cleanBookName}_`)
+      )) ||
+      // ENHANCED: Better custom tab matching - customtab_TabName_BookName_ChapterName pattern  
+      (key.includes('customtab_') && (
+        key.includes(`_${cleanBookName}_`) ||
+        key.includes(`${cleanBookName}_`)
+      )) ||
       // ADDITIONAL: Tab-isolated template data (with tabId suffix)
-      key.includes(`_${normalizedBookName}_`) && key.includes('_tab_') ||
+      key.includes(`_${cleanBookName}_`) && key.includes('_tab_') ||
       // ADDITIONAL: Exam mode with different patterns
-      (key.includes('exam_') && key.includes(`_${normalizedBookName}_`)) ||
-      (key.includes('evaluation_') && key.includes(`_${normalizedBookName}_`)) ||
+      (key.includes('exam_') && key.includes(`_${cleanBookName}_`)) ||
+      (key.includes('evaluation_') && key.includes(`_${cleanBookName}_`)) ||
       // ADDITIONAL: User progress and settings
-      (key.includes('progress_') && key.includes(`_${normalizedBookName}_`)) ||
-      (key.includes('settings_') && key.includes(`_${normalizedBookName}_`))
+      (key.includes('progress_') && key.includes(`_${cleanBookName}_`)) ||
+      (key.includes('settings_') && key.includes(`_${cleanBookName}_`)) ||
+      // ENHANCED: More flexible matching for edge cases
+      (key.includes(cleanBookName) && (
+        key.includes('highlight') || key.includes('editor') || key.includes('question') ||
+        key.includes('evaluation') || key.includes('custom') || key.includes('template')
+      ))
     );
   }
 
