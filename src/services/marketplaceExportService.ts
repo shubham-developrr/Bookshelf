@@ -1,4 +1,6 @@
 import JSZip from 'jszip';
+import { BookBasedAssetService } from './BookBasedAssetService';
+import { AssetSyncService } from './AssetSyncService';
 
 /**
  * MARKETPLACE BOOK MODULE SYSTEM
@@ -268,6 +270,41 @@ export class MarketplaceBookExportService {
     /**
      * Export a book as a marketplace-ready module
      */
+    /**
+     * Create book package blob for upload (without triggering download)
+     * Used by marketplace backend integration
+     */
+    static async createBookPackageBlob(
+        bookName: string, 
+        bookId: string,
+        marketplaceMetadata?: Partial<BookModuleMetadata>
+    ): Promise<Blob> {
+        try {
+            console.log(`🚀 Creating book package blob for: ${bookName}`);
+            
+            // Step 1: Gather complete book data
+            const bookModule = await this.gatherCompleteBookData(bookName, bookId, marketplaceMetadata);
+            
+            // Step 2: Generate assets and thumbnails
+            await this.processAssets(bookModule);
+            
+            // Step 3: Generate integrity data
+            this.generateIntegrityData(bookModule);
+            
+            // Step 4: Create marketplace ZIP package and return blob
+            const zipBlob = await this.createMarketplacePackage(bookModule);
+            
+            console.log(`✅ Book package blob created successfully: ${(zipBlob.size / 1024 / 1024).toFixed(2)} MB`);
+            return zipBlob;
+        } catch (error) {
+            console.error('❌ Book package creation failed:', error);
+            throw new Error(`Failed to create book package: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Export book module (original method - downloads file)
+     */
     static async exportBookModule(
         bookName: string, 
         bookId: string,
@@ -299,7 +336,7 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Gather complete book data with 100% accuracy
+     * Gather complete book data with 100% accuracy - FIXED VERSION
      */
     private static async gatherCompleteBookData(
         bookName: string, 
@@ -308,30 +345,66 @@ export class MarketplaceBookExportService {
     ): Promise<MarketplaceBookModule> {
         console.log(`📊 Gathering complete data for: ${bookName}`);
 
-        // Get book information
+        // STEP 1: Get book information from localStorage (not from ZIP!)
         const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
         const book = savedBooks.find((b: any) => b.id === bookId || b.name === bookName);
         
         if (!book) {
-            throw new Error(`Book not found: ${bookName} (${bookId})`);
+            // Try alternative storage locations
+            const alternativeBooks = JSON.parse(localStorage.getItem('books') || '[]');
+            const altBook = alternativeBooks.find((b: any) => b.id === bookId || b.name === bookName);
+            if (!altBook) {
+                throw new Error(`Book not found in localStorage: ${bookName} (${bookId})`);
+            }
+            console.log('📚 Found book in alternative storage location');
         }
 
-        // Get all chapters
-        const chapters = JSON.parse(localStorage.getItem(`chapters_${bookId}`) || '[]');
-        console.log(`📚 Found ${chapters.length} chapters`);
+        // STEP 2: Get actual chapters from localStorage (not from ZIP!)
+        let chapters: any[] = [];
+        
+        // Try multiple possible chapter storage keys
+        const possibleChapterKeys = [
+            `chapters_${bookId}`,
+            `chapters_${bookName}`,
+            `chapters_${bookName.replace(/\s+/g, '_')}`,
+        ];
+        
+        for (const key of possibleChapterKeys) {
+            const chapterData = localStorage.getItem(key);
+            if (chapterData && chapterData !== '[]' && chapterData !== 'null') {
+                try {
+                    chapters = JSON.parse(chapterData);
+                    if (chapters.length > 0) {
+                        console.log(`📚 Found ${chapters.length} chapters in ${key}`);
+                        break;
+                    }
+                } catch (err) {
+                    console.warn(`Failed to parse chapters from ${key}:`, err);
+                }
+            }
+        }
 
-        // Process each chapter with complete data collection
+        if (chapters.length === 0) {
+            console.warn('⚠️ No chapters found in localStorage, creating default chapter');
+            chapters = [{ id: 'chapter_1', name: 'Chapter 1', number: 1 }];
+        }
+
+        console.log(`📚 Processing ${chapters.length} actual chapters:`, chapters.map(ch => ch.name || ch));
+
+        // STEP 3: Process each actual chapter (not ZIP folders!)
         const chapterContent: { [chapterName: string]: ChapterModuleData } = {};
         
-        for (const chapter of chapters) {
-            const chapterName = chapter.name || chapter;
-            console.log(`📖 Processing chapter: ${chapterName}`);
+        for (let i = 0; i < chapters.length; i++) {
+            const chapter = chapters[i];
+            const chapterName = chapter.name || chapter.toString();
+            
+            console.log(`📖 Processing actual chapter ${i + 1}: "${chapterName}"`);
             
             const chapterData = await this.gatherCompleteChapterData(bookName, bookId, chapterName, chapter);
             chapterContent[chapterName] = chapterData;
         }
 
-        // Create comprehensive metadata
+        // STEP 4: Create comprehensive metadata
         const metadata: BookModuleMetadata = {
             id: bookId,
             name: bookName,
@@ -340,7 +413,7 @@ export class MarketplaceBookExportService {
                 name: 'Book Creator User',
                 id: 'user_' + Date.now(),
             },
-            description: book.description || `Interactive study book: ${bookName}`,
+            description: book?.description || `Interactive study book: ${bookName}`,
             category: 'Education',
             tags: ['study', 'education', 'interactive'],
             language: 'English',
@@ -373,15 +446,16 @@ export class MarketplaceBookExportService {
             ...marketplaceMetadata
         };
 
-        // Gather global settings
+        // STEP 5: Gather global settings from localStorage
         const globalSettings = {
-            theme: localStorage.getItem('selectedTheme') || 'light',
+            theme: localStorage.getItem('selectedTheme') || localStorage.getItem('theme-mode') || 'light',
             preferences: {},
             bookmarks: [],
             annotations: []
         };
 
-        return {
+        // STEP 6: Create complete book module
+        const bookModule: MarketplaceBookModule = {
             metadata,
             content: {
                 chapters: chapterContent,
@@ -420,6 +494,9 @@ export class MarketplaceBookExportService {
                 }
             }
         };
+
+        console.log(`✅ Book data gathering completed: ${Object.keys(chapterContent).length} chapters processed`);
+        return bookModule;
     }
 
     /**
@@ -468,28 +545,36 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get all tab instances including isolated tabs from our new system
+     * Get all tab instances including isolated tabs from localStorage - FIXED VERSION
      */
     private static getAllTabInstances(bookName: string, chapterKey: string): { [tabId: string]: TabModuleData } {
         const tabs: { [tabId: string]: TabModuleData } = {};
+        
+        console.log(`🔍 Searching for tabs: bookName="${bookName}", chapterKey="${chapterKey}"`);
         
         // Template types with their storage patterns
         const templateTypes = ['FLASHCARD', 'MCQ', 'QA', 'NOTES', 'MINDMAP', 'VIDEOS'];
         
         // Check for all tab instances (both legacy and new isolated system)
         for (const templateType of templateTypes) {
-            // Check legacy format (without tab ID)
+            // Get base storage key
             const legacyKey = this.getStorageKeyByTemplate(templateType, bookName, chapterKey);
+            
+            console.log(`🔍 Checking template ${templateType} with key: ${legacyKey}`);
+            
+            // Check legacy format (without tab ID)
             const legacyData = localStorage.getItem(legacyKey);
             
-            if (legacyData && legacyData !== 'null' && legacyData !== '[]') {
+            if (legacyData && legacyData !== 'null' && legacyData !== '[]' && legacyData.trim() !== '') {
                 try {
                     const parsed = JSON.parse(legacyData);
-                    if ((Array.isArray(parsed) && parsed.length > 0) || 
-                        (typeof parsed === 'object' && Object.keys(parsed).length > 0)) {
-                        
-                        tabs[`${templateType}_1`] = {
-                            id: `${templateType}_1`,
+                    const hasData = Array.isArray(parsed) ? parsed.length > 0 : 
+                                  (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0);
+                    
+                    if (hasData) {
+                        const tabId = `${templateType}_1`;
+                        tabs[tabId] = {
+                            id: tabId,
                             templateType: templateType,
                             displayName: this.getTemplateDisplayName(templateType),
                             data: parsed,
@@ -500,6 +585,8 @@ export class MarketplaceBookExportService {
                                 itemCount: Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length
                             }
                         };
+                        
+                        console.log(`✅ Found legacy tab: ${tabId} with ${tabs[tabId].metadata.itemCount} items`);
                     }
                 } catch (err) {
                     console.warn(`Failed to parse legacy template data for ${templateType}:`, err);
@@ -507,21 +594,23 @@ export class MarketplaceBookExportService {
             }
             
             // Check for isolated tab instances (new system)
-            let counter = 1;
-            while (true) {
+            let counter = 2; // Start from 2 since 1 is legacy
+            while (counter <= 10) { // Reasonable limit
                 const tabId = `${templateType}_${counter}`;
                 const isolatedKey = `${legacyKey}_${tabId}`;
                 const isolatedData = localStorage.getItem(isolatedKey);
                 
-                if (!isolatedData || isolatedData === 'null' || isolatedData === '[]') {
-                    break; // No more isolated tabs of this type
+                if (!isolatedData || isolatedData === 'null' || isolatedData === '[]' || isolatedData.trim() === '') {
+                    counter++;
+                    continue;
                 }
                 
                 try {
                     const parsed = JSON.parse(isolatedData);
-                    if ((Array.isArray(parsed) && parsed.length > 0) || 
-                        (typeof parsed === 'object' && Object.keys(parsed).length > 0)) {
-                        
+                    const hasData = Array.isArray(parsed) ? parsed.length > 0 : 
+                                  (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0);
+                    
+                    if (hasData) {
                         tabs[tabId] = {
                             id: tabId,
                             templateType: templateType,
@@ -534,6 +623,8 @@ export class MarketplaceBookExportService {
                                 itemCount: Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length
                             }
                         };
+                        
+                        console.log(`✅ Found isolated tab: ${tabId} with ${tabs[tabId].metadata.itemCount} items`);
                     }
                 } catch (err) {
                     console.warn(`Failed to parse isolated template data for ${tabId}:`, err);
@@ -543,10 +634,10 @@ export class MarketplaceBookExportService {
             }
         }
         
-        // Get custom tabs
+        // Get custom tabs - search all localStorage keys
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key && key.startsWith(`customtab_${bookName}_${chapterKey}_`)) {
+            if (key && key.startsWith(`customtab_`) && key.includes(`_${bookName}_${chapterKey}_`)) {
                 const tabName = key.replace(`customtab_${bookName}_${chapterKey}_`, '');
                 const content = localStorage.getItem(key);
                 if (content && content.trim() && content !== 'null') {
@@ -563,10 +654,13 @@ export class MarketplaceBookExportService {
                             itemCount: 1
                         }
                     };
+                    
+                    console.log(`✅ Found custom tab: ${customTabId}`);
                 }
             }
         }
         
+        console.log(`📊 Total tabs found: ${Object.keys(tabs).length}`);
         return tabs;
     }
 
@@ -726,30 +820,425 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Process and optimize assets
+     * Process and optimize assets - UPDATED FOR BOOK-BASED AUTHENTICATION
      */
     private static async processAssets(bookModule: MarketplaceBookModule): Promise<void> {
-        console.log('🖼️ Processing assets...');
+        console.log('🖼️ Processing assets with book-based authentication...');
         
-        // Process images from subtopics
+        // DEBUG: Show localStorage contents related to this book
+        this.debugLocalStorageContents(bookModule.metadata.name, bookModule.metadata.id);
+        
+        // STEP 1: Convert all asset URLs to book-based URLs before processing
+        console.log('🔄 Converting asset URLs to book-based authentication...');
+        const updatedContent = BookBasedAssetService.updateAssetUrlsInData(
+            bookModule.content, 
+            bookModule.metadata.name
+        );
+        bookModule.content = updatedContent;
+        
+        let totalAssets = 0;
+        
+        // 1. Process book cover image if it exists
+        await this.processBookCoverImage(bookModule);
+        
+        // 2. Process images from subtopics
         for (const chapter of Object.values(bookModule.content.chapters)) {
             for (const subtopic of chapter.subtopics) {
                 for (const image of subtopic.images) {
-                    if (image.startsWith('blob:') || image.startsWith('data:')) {
-                        const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                        bookModule.assets.images[imageId] = image;
+                    if (image && (image.startsWith('blob:') || image.startsWith('data:') || image.startsWith('http'))) {
+                        const imageId = `img_subtopic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                         
-                        // Generate thumbnail
-                        const thumbnail = await this.generateThumbnail(image);
-                        if (thumbnail) {
-                            bookModule.assets.thumbnails[imageId] = thumbnail;
+                        try {
+                            const processedImage = await this.processImageAsset(image);
+                            if (processedImage) {
+                                bookModule.assets.images[imageId] = processedImage;
+                                totalAssets++;
+                                
+                                // Generate thumbnail
+                                const thumbnail = await this.generateThumbnail(processedImage);
+                                if (thumbnail) {
+                                    bookModule.assets.thumbnails[imageId] = thumbnail;
+                                }
+                            }
+                        } catch (err) {
+                            console.warn(`Failed to process subtopic image: ${err}`);
                         }
                     }
                 }
             }
         }
         
-        console.log(`📸 Processed ${Object.keys(bookModule.assets.images).length} images`);
+        // 3. Process assets from template data (images in flashcards, notes, etc.)
+        await this.processTemplateAssets(bookModule);
+        
+        // 4. Process video assets
+        await this.processVideoAssets(bookModule);
+        
+        const finalImageCount = Object.keys(bookModule.assets.images).length;
+        const finalVideoCount = Object.keys(bookModule.assets.videos).length;
+        
+        console.log(`📸 Processed ${finalImageCount} images, ${finalVideoCount} videos (total assets processed: ${totalAssets})`);
+        console.log(`✅ All assets are now using book-based authentication for sharing`);
+        
+        if (finalImageCount === 0 && finalVideoCount === 0) {
+            console.warn('⚠️ WARNING: No assets were processed! This might indicate an issue with asset discovery.');
+        }
+    }
+    
+    /**
+     * Debug localStorage contents - HELPER METHOD
+     */
+    private static debugLocalStorageContents(bookName: string, bookId: string): void {
+        console.log('🔍 === DEBUGGING LOCALSTORAGE CONTENTS ===');
+        console.log(`📚 Book: "${bookName}" (${bookId})`);
+        
+        const relevantKeys = [];
+        const allKeys = [];
+        
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                allKeys.push(key);
+                
+                // Keys that might be relevant to this book
+                if (key.includes(bookName) || key.includes(bookId) || 
+                    key.includes('flashcards') || key.includes('mcq') || 
+                    key.includes('notes') || key.includes('qa') || 
+                    key.includes('mindmaps') || key.includes('videos') ||
+                    key.includes('image') || key.includes('cover') || 
+                    key.includes('chapters') || key.includes('books')) {
+                    
+                    const value = localStorage.getItem(key);
+                    const preview = value ? (value.length > 100 ? value.substring(0, 100) + '...' : value) : 'null';
+                    relevantKeys.push({ key, preview, length: value?.length || 0 });
+                }
+            }
+        }
+        
+        console.log(`📊 Total localStorage keys: ${allKeys.length}`);
+        console.log(`📊 Relevant keys found: ${relevantKeys.length}`);
+        
+        relevantKeys.forEach((item, index) => {
+            console.log(`${index + 1}. ${item.key} (${item.length} chars): ${item.preview}`);
+        });
+        
+        console.log('🔍 === END DEBUGGING ===');
+    }
+    
+    /**
+     * Process book cover image - ENHANCED WITH DEBUGGING
+     */
+    private static async processBookCoverImage(bookModule: MarketplaceBookModule): Promise<void> {
+        const bookName = bookModule.metadata.name;
+        const bookId = bookModule.metadata.id;
+        
+        console.log(`🔍 Searching for book cover: bookName="${bookName}", bookId="${bookId}"`);
+        
+        // Look for book cover in common storage locations
+        const possibleCoverKeys = [
+            `book_cover_${bookId}`,
+            `book_image_${bookId}`,
+            `cover_${bookName}`,
+            `bookImage_${bookName}`,
+            `book_${bookName}_cover`,
+            `bookCover_${bookName}`,
+            `${bookName}_cover`,
+            `cover_${bookName.replace(/\s+/g, '_')}`,
+            `book_${bookName.replace(/\s+/g, '_')}_image`
+        ];
+        
+        // Debug: List all localStorage keys that might contain images
+        console.log('🔍 Scanning localStorage for image keys...');
+        const allKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.includes('image') || key.includes('cover') || key.includes('Image') || 
+                       key.includes(bookName.toLowerCase()) || key.includes(bookId))) {
+                allKeys.push(key);
+            }
+        }
+        console.log('📸 Image-related keys found:', allKeys);
+        
+        for (const key of possibleCoverKeys) {
+            const coverImage = localStorage.getItem(key);
+            console.log(`🔍 Checking cover key: ${key} -> ${coverImage ? 'found' : 'not found'}`);
+            
+            if (coverImage && coverImage !== 'null' && 
+                (coverImage.startsWith('data:') || coverImage.startsWith('blob:') || coverImage.startsWith('http'))) {
+                
+                try {
+                    const processedCover = await this.processImageAsset(coverImage);
+                    if (processedCover) {
+                        bookModule.assets.images['book_cover'] = processedCover;
+                        
+                        // Generate thumbnail for cover
+                        const thumbnail = await this.generateThumbnail(processedCover);
+                        if (thumbnail) {
+                            bookModule.assets.thumbnails['book_cover'] = thumbnail;
+                        }
+                        
+                        // Update metadata with cover reference
+                        bookModule.metadata.preview.coverImage = 'book_cover';
+                        console.log(`✅ Book cover processed successfully from key: ${key}`);
+                        return;
+                    }
+                } catch (err) {
+                    console.warn(`Failed to process book cover from ${key}: ${err}`);
+                }
+            }
+        }
+        
+        console.log('⚠️ No book cover found in any expected location');
+    }
+    
+    /**
+     * Process assets from template data (flashcards, notes, etc.)
+     */
+    private static async processTemplateAssets(bookModule: MarketplaceBookModule): Promise<void> {
+        for (const chapter of Object.values(bookModule.content.chapters)) {
+            for (const [tabId, tabData] of Object.entries(chapter.tabs)) {
+                const data = tabData.data;
+                
+                if (!data) continue;
+                
+                // Process different template types
+                switch (tabData.templateType) {
+                    case 'FLASHCARD':
+                        await this.processFlashcardAssets(data, bookModule.assets);
+                        break;
+                    case 'NOTES':
+                        await this.processNotesAssets(data, bookModule.assets);
+                        break;
+                    case 'MCQ':
+                        await this.processMCQAssets(data, bookModule.assets);
+                        break;
+                    case 'QA':
+                        await this.processQAAssets(data, bookModule.assets);
+                        break;
+                    case 'MINDMAP':
+                        await this.processMindMapAssets(data, bookModule.assets);
+                        break;
+                    case 'CUSTOM':
+                        await this.processCustomAssets(data, bookModule.assets);
+                        break;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Process flashcard assets
+     */
+    private static async processFlashcardAssets(flashcards: any[], assets: BookModuleAssets): Promise<void> {
+        if (!Array.isArray(flashcards)) return;
+        
+        for (const flashcard of flashcards) {
+            if (flashcard.frontImage) {
+                await this.addImageToAssets(flashcard.frontImage, `flashcard_front_${flashcard.id || Date.now()}`, assets);
+            }
+            if (flashcard.backImage) {
+                await this.addImageToAssets(flashcard.backImage, `flashcard_back_${flashcard.id || Date.now()}`, assets);
+            }
+            
+            // Process HTML content for embedded images
+            if (flashcard.front) {
+                await this.extractHTMLImages(flashcard.front, assets);
+            }
+            if (flashcard.back) {
+                await this.extractHTMLImages(flashcard.back, assets);
+            }
+        }
+    }
+    
+    /**
+     * Process notes assets
+     */
+    private static async processNotesAssets(notes: any, assets: BookModuleAssets): Promise<void> {
+        if (typeof notes === 'string') {
+            await this.extractHTMLImages(notes, assets);
+        } else if (Array.isArray(notes)) {
+            for (const note of notes) {
+                if (note.content) {
+                    await this.extractHTMLImages(note.content, assets);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Process MCQ assets
+     */
+    private static async processMCQAssets(mcqs: any[], assets: BookModuleAssets): Promise<void> {
+        if (!Array.isArray(mcqs)) return;
+        
+        for (const mcq of mcqs) {
+            if (mcq.image) {
+                await this.addImageToAssets(mcq.image, `mcq_${mcq.id || Date.now()}`, assets);
+            }
+            
+            // Check question and options for embedded images
+            if (mcq.question) {
+                await this.extractHTMLImages(mcq.question, assets);
+            }
+            
+            if (mcq.options) {
+                for (let i = 0; i < mcq.options.length; i++) {
+                    await this.extractHTMLImages(mcq.options[i], assets);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Process Q&A assets
+     */
+    private static async processQAAssets(qas: any[], assets: BookModuleAssets): Promise<void> {
+        if (!Array.isArray(qas)) return;
+        
+        for (const qa of qas) {
+            if (qa.question) {
+                await this.extractHTMLImages(qa.question, assets);
+            }
+            if (qa.answer) {
+                await this.extractHTMLImages(qa.answer, assets);
+            }
+        }
+    }
+    
+    /**
+     * Process mindmap assets
+     */
+    private static async processMindMapAssets(mindmap: any, assets: BookModuleAssets): Promise<void> {
+        // Mind maps might contain images in node data
+        if (mindmap && mindmap.nodes) {
+            for (const node of mindmap.nodes) {
+                if (node.image) {
+                    await this.addImageToAssets(node.image, `mindmap_node_${node.id || Date.now()}`, assets);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Process custom HTML content assets
+     */
+    private static async processCustomAssets(content: any, assets: BookModuleAssets): Promise<void> {
+        if (typeof content === 'string') {
+            await this.extractHTMLImages(content, assets);
+        }
+    }
+    
+    /**
+     * Process video assets
+     */
+    private static async processVideoAssets(bookModule: MarketplaceBookModule): Promise<void> {
+        for (const chapter of Object.values(bookModule.content.chapters)) {
+            // Process videos from subtopics
+            for (const subtopic of chapter.subtopics) {
+                for (const videoLink of subtopic.videoLinks) {
+                    const videoId = `video_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    bookModule.assets.videos[videoId] = JSON.stringify(videoLink);
+                }
+            }
+            
+            // Process videos from video template tabs
+            for (const [tabId, tabData] of Object.entries(chapter.tabs)) {
+                if (tabData.templateType === 'VIDEOS' && Array.isArray(tabData.data)) {
+                    for (const video of tabData.data) {
+                        const videoId = `video_tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                        bookModule.assets.videos[videoId] = JSON.stringify(video);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Add image to assets with processing
+     */
+    private static async addImageToAssets(imageUrl: string, imageId: string, assets: BookModuleAssets): Promise<void> {
+        if (!imageUrl || (!imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:') && !imageUrl.startsWith('http'))) {
+            return;
+        }
+        
+        try {
+            const processedImage = await this.processImageAsset(imageUrl);
+            if (processedImage) {
+                assets.images[imageId] = processedImage;
+                
+                // Generate thumbnail
+                const thumbnail = await this.generateThumbnail(processedImage);
+                if (thumbnail) {
+                    assets.thumbnails[imageId] = thumbnail;
+                }
+            }
+        } catch (err) {
+            console.warn(`Failed to process image asset ${imageId}: ${err}`);
+        }
+    }
+    
+    /**
+     * Extract images from HTML content
+     */
+    private static async extractHTMLImages(htmlContent: string, assets: BookModuleAssets): Promise<void> {
+        if (!htmlContent || typeof htmlContent !== 'string') return;
+        
+        // Find img tags and data URLs
+        const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+        const dataUrlRegex = /(data:image\/[^;]+;base64,[^"'\s]+)/g;
+        
+        let match;
+        
+        // Extract from img tags
+        while ((match = imgRegex.exec(htmlContent)) !== null) {
+            const imageUrl = match[1];
+            if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:') || imageUrl.startsWith('http')) {
+                const imageId = `html_img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                await this.addImageToAssets(imageUrl, imageId, assets);
+            }
+        }
+        
+        // Extract standalone data URLs
+        while ((match = dataUrlRegex.exec(htmlContent)) !== null) {
+            const imageUrl = match[1];
+            const imageId = `html_data_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            await this.addImageToAssets(imageUrl, imageId, assets);
+        }
+    }
+    
+    /**
+     * Process image asset (convert to data URL if needed)
+     */
+    private static async processImageAsset(imageUrl: string): Promise<string> {
+        if (imageUrl.startsWith('data:')) {
+            // Already a data URL
+            return imageUrl;
+        }
+        
+        if (imageUrl.startsWith('blob:')) {
+            // Convert blob to data URL
+            try {
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } catch (err) {
+                console.warn(`Failed to convert blob URL: ${err}`);
+                return imageUrl;
+            }
+        }
+        
+        if (imageUrl.startsWith('http')) {
+            // For HTTP URLs, we'll keep them as references
+            // In a production environment, you might want to download and embed them
+            return imageUrl;
+        }
+        
+        return imageUrl;
     }
 
     /**

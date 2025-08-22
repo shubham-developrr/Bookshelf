@@ -1,0 +1,122 @@
+{
+  "project": {
+    "name": "Interactive Study Bookshelf",
+    "type": "react-typescript",
+    "framework": "vite",
+    "description": "Educational platform with AI integration, text highlighting, and mobile-first design"
+  },
+  "testSuites": [
+    {
+      "name": "AI Integration Tests",
+      "description": "Test multi-provider AI system (Gemini → Groq fallback)",
+      "files": [
+        "src/services/EnhancedAIService.ts",
+        "src/services/GeminiAPIService.ts",
+        "src/components/EnhancedAIGuruModal.tsx"
+      ],
+      "patterns": [
+        "Multi-provider fallback implementation",
+        "API key management",
+        "Error handling and provider switching",
+        "Context-aware prompt generation"
+      ]
+    },
+    {
+      "name": "Text Highlighting System Tests",
+      "description": "Test 3-engine text highlighting architecture",
+      "files": [
+        "src/components/AdvancedTextSelectionEngine.tsx",
+        "src/components/ProfessionalTextHighlighter.tsx",
+        "src/components/KindleStyleTextViewerFixed.tsx"
+      ],
+      "patterns": [
+        "Mobile touch event handling",
+        "Text selection and highlighting",
+        "Context menu positioning",
+        "Haptic feedback integration"
+      ]
+    },
+    {
+      "name": "Storage Architecture Tests",
+      "description": "Test localStorage patterns and tab isolation",
+      "files": [
+        "src/utils/BookManager.ts",
+        "src/utils/TabPersistenceManager.ts"
+      ],
+      "patterns": [
+        "Tab isolation storage keys",
+        "Auto-save with debouncing",
+        "Priority fallback patterns",
+        "Template data persistence"
+      ]
+    },
+    {
+      "name": "Mobile-First Responsive Tests",
+      "description": "Test mobile-first design patterns",
+      "files": [
+        "src/components/KindleStyleTextViewerFixed.tsx",
+        "src/components/AdvancedTextSelectionEngine.tsx"
+      ],
+      "patterns": [
+        "Responsive breakpoint detection",
+        "Touch event prevention",
+        "Mobile state management",
+        "Conditional rendering"
+      ]
+    },
+    {
+      "name": "Component Architecture Tests", 
+      "description": "Test React 19 + TypeScript patterns",
+      "files": [
+        "src/components/App.tsx",
+        "src/contexts/ThemeContext.tsx",
+        "src/contexts/UserContext.tsx"
+      ],
+      "patterns": [
+        "Context provider setup",
+        "Custom hook implementations",
+        "TypeScript interface definitions",
+        "Component lifecycle management"
+      ]
+    }
+  ],
+  "expectedKeyPatterns": {
+    "localStorage": [
+      "books",
+      "chapters_${bookId}",
+      "flashcards_${book}_${chapter}",
+      "flashcards_${book}_${chapter}_${tabId}",
+      "mcq_${book}_${chapter}",
+      "qa_${book}_${chapter}",
+      "notes_${book}_${chapter}",
+      "mindmaps_${book}_${chapter}",
+      "videos_${book}_${chapter}",
+      "highlights_${chapter}",
+      "customtab_${tabName}_${book}_${chapter}",
+      "tabs_cache_${userId}_${chapterId}",
+      "theme-mode",
+      "user_gemini_api_key",
+      "ai_guru_memory_summary"
+    ]
+  },
+  "architectureValidation": {
+    "multiProviderAI": {
+      "description": "Cascading fallback from Gemini to Groq",
+      "models": ["gemini-2.0-flash-exp", "gemini-1.5-pro", "llama-3.3-70b-versatile"]
+    },
+    "textHighlighting": {
+      "description": "3-engine architecture for different contexts",
+      "engines": ["AdvancedTextSelectionEngine", "ProfessionalTextHighlighter", "KindleStyleTextViewerFixed"]
+    },
+    "mobileFirst": {
+      "description": "Mobile-optimized with touch handling",
+      "breakpoints": ["768px", "480px"],
+      "features": ["haptic feedback", "touch prevention", "responsive rendering"]
+    },
+    "tabIsolation": {
+      "description": "Storage isolation per tab",
+      "pattern": "${templateType}_${book}_${chapter}_${tabId}",
+      "priority": "tab-specific → base → default"
+    }
+  }
+}

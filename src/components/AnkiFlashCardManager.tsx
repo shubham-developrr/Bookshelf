@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SparklesIcon, PlusIcon, TrashIcon, FileIcon } from './icons';
+import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
 
 interface AnkiCard {
     id: string;
@@ -41,25 +42,44 @@ const AnkiFlashCardManager: React.FC<AnkiFlashCardManagerProps> = ({
     const [showImportGuide, setShowImportGuide] = useState(false);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const storageKey = `anki_cards_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
 
-    // Load flashcards from localStorage
+    // Book tab context for proper data isolation
+    const tabContext: BookTabContext = React.useMemo(() => {
+        return BookTabManager.createTemplateTabContext(
+            currentBook,
+            currentChapter,
+            'flashcards'
+        );
+    }, [currentBook, currentChapter]);
+
+    // Load flashcards using book-linked tab system
     useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            const cards = JSON.parse(saved).map((card: any) => ({
-                ...card,
-                created: new Date(card.created),
-                lastReviewed: card.lastReviewed ? new Date(card.lastReviewed) : undefined
-            }));
-            setFlashCards(cards);
+        try {
+            const data = BookTabManager.loadTabData('flashcards', tabContext);
+            if (data && Array.isArray(data)) {
+                const cards = data.map((card: any) => ({
+                    ...card,
+                    created: new Date(card.created),
+                    lastReviewed: card.lastReviewed ? new Date(card.lastReviewed) : undefined
+                }));
+                setFlashCards(cards);
+            } else {
+                setFlashCards([]);
+            }
+        } catch (error) {
+            console.error('Failed to load flashcards:', error);
+            setFlashCards([]);
         }
-    }, [storageKey]);
+    }, [tabContext]);
 
-    // Save flashcards to localStorage
+    // Save flashcards using book-linked tab system
     const saveFlashCards = (cards: AnkiCard[]) => {
-        localStorage.setItem(storageKey, JSON.stringify(cards));
-        setFlashCards(cards);
+        try {
+            BookTabManager.saveTabData('flashcards', tabContext, cards);
+            setFlashCards(cards);
+        } catch (error) {
+            console.error('Failed to save flashcards:', error);
+        }
     };
 
     // Create new Anki card

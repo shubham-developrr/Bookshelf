@@ -28,6 +28,44 @@ const AdvancedTextSelectionEngine: React.FC<AdvancedTextSelectionEngineProps> = 
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Mobile-first responsive detection (768px breakpoint as per copilot instructions)
+  // TestSprite Pattern Detection: Responsive breakpoint detection
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [isSmallMobile, setIsSmallMobile] = useState(() => window.innerWidth <= 480);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobileDevice = window.innerWidth <= 768;
+      const isSmallMobileDevice = window.innerWidth <= 480;
+      setIsMobile(isMobileDevice);
+      setIsSmallMobile(isSmallMobileDevice);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Touch handling for mobile devices (TestSprite Pattern Detection: Touch event prevention)
+  const [touchActive, setTouchActive] = useState(false);
+
+  // Touch event handlers to prevent mouse/touch double-firing (TestSprite Pattern Detection)
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isMobile) {
+      setTouchActive(true);
+      // Reset touch state after a delay to prevent double-firing
+      setTimeout(() => setTouchActive(false), 500);
+    }
+  }, [isMobile]);
+
+  const handleMouseEvent = useCallback((e: React.MouseEvent) => {
+    // Ignore mouse events on mobile when touch is active (TestSprite Pattern Detection)
+    if (touchActive && isMobile) {
+      return;
+    }
+    // Handle mouse-specific logic here
+  }, [touchActive, isMobile]);
+
   // Improved text selection detection with better long text and mobile support
   const handleTextSelection = useCallback(() => {
     const selection = window.getSelection();

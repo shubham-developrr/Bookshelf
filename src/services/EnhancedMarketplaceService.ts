@@ -1,8 +1,11 @@
 import { supabase } from './supabaseClient';
 import BookManager, { BookMetadata } from '../utils/BookManager';
+import { MarketplaceBookExportService } from './marketplaceExportService';
+import { MarketplaceBookImportService } from './marketplaceImportService';
 
 /**
  * Enhanced Marketplace Service with Backend Integration
+ * Now includes complete file upload/download functionality
  */
 
 export interface MarketplaceBook {
@@ -115,31 +118,79 @@ export class EnhancedMarketplaceService {
         return { success: false, error: 'User not authenticated' };
       }
 
+      console.log(`🚀 Starting complete book publication for: ${options.title}`);
+
       // Get book metadata
       const bookMetadata = BookManager.getBookById(options.book_id);
       if (!bookMetadata) {
         return { success: false, error: 'Book not found' };
       }
 
-      // Prepare book data for publishing
+      // STEP 1: Generate complete book export using MarketplaceBookExportService
+      console.log('📦 Generating complete book package...');
+      let zipBlob: Blob;
+      
+      try {
+        // Use the marketplace export service to create a complete ZIP package
+        // We'll modify the export service to return the blob instead of downloading
+        zipBlob = await MarketplaceBookExportService.createBookPackageBlob(
+          bookMetadata.name, 
+          bookMetadata.id,
+          {
+            name: options.title,
+            description: options.description,
+            category: options.category,
+            tags: options.tags,
+            difficulty: options.difficulty,
+            estimatedDuration: `${options.estimated_hours} hours`
+          }
+        );
+        
+        console.log(`✅ Book package generated: ${(zipBlob.size / 1024 / 1024).toFixed(2)} MB`);
+      } catch (exportError) {
+        console.error('Export failed:', exportError);
+        return { 
+          success: false, 
+          error: `Failed to export book: ${exportError instanceof Error ? exportError.message : 'Unknown export error'}` 
+        };
+      }
+
+      // STEP 2: Upload ZIP file to Supabase storage
+      console.log('☁️ Uploading to storage...');
+      const uploadResult = await this.uploadFileToStorage(zipBlob, bookMetadata.id, bookMetadata.version);
+      
+      if (!uploadResult.success) {
+        return { success: false, error: uploadResult.error };
+      }
+
+      // STEP 3: Calculate file checksum for integrity
+      const checksum = await this.calculateChecksum(zipBlob);
+
+      // STEP 4: Store complete metadata in database
       const marketplaceBookData = {
         book_id: bookMetadata.id,
         title: options.title,
         description: options.description,
-        author_name: bookMetadata.creatorName,
+        author_name: bookMetadata.creatorName || user.email || 'Anonymous Author',
         author_id: user.id,
-        university: bookMetadata.university,
-        semester: bookMetadata.semester,
-        subject_code: bookMetadata.subjectCode,
-        version: bookMetadata.version,
+        university: bookMetadata.university || '',
+        semester: bookMetadata.semester || '',
+        subject_code: bookMetadata.subjectCode || '',
+        version: bookMetadata.version || '1.0.0',
         category: options.category,
         tags: options.tags,
         difficulty: options.difficulty,
         estimated_hours: options.estimated_hours,
+        file_url: uploadResult.fileUrl, // Store the actual file URL
+        file_size: zipBlob.size,
+        checksum: checksum,
         metadata: {
           chapters: options.file_data.chapters?.length || 0,
-          content_size: JSON.stringify(options.file_data).length,
-          created_with: 'bookshelf-creator'
+          content_size: zipBlob.size,
+          created_with: 'bookshelf-creator',
+          export_version: '2.0.0',
+          has_assets: true,
+          has_complete_content: true
         }
       };
 
@@ -407,7 +458,7 @@ export class EnhancedMarketplaceService {
    */
   static async downloadBook(bookId: string): Promise<{
     success: boolean;
-    downloadData?: any;
+    importResult?: any;
     error?: string;
   }> {
     try {
@@ -416,11 +467,60 @@ export class EnhancedMarketplaceService {
         return { success: false, error: 'User not authenticated' };
       }
 
-      // Get book details
+      console.log(`🚀 Starting complete book download for: ${bookId}`);
+
+      // Get book details from marketplace
       const { book, error: bookError } = await this.getBookDetails(bookId);
       if (bookError || !book) {
         return { success: false, error: bookError || 'Book not found' };
       }
+
+      // Check if book has a file URL (new system)
+      if (!book.file_url) {
+        return { 
+          success: false, 
+          error: 'This book was published with an older version and cannot be downloaded. Please contact the author for an updated version.' 
+        };
+      }
+
+      console.log('📥 Downloading book file...');
+      
+      // STEP 1: Download ZIP file from storage
+      const downloadResult = await this.downloadFileFromStorage(book.file_url);
+      
+      if (!downloadResult.success || !downloadResult.file) {
+        return { success: false, error: downloadResult.error };
+      }
+
+      console.log('📦 Importing book content...');
+
+      // STEP 2: Use MarketplaceBookImportService to restore complete content
+      const importResult = await MarketplaceBookImportService.importBookModule(
+        downloadResult.file,
+        {
+          conflictResolution: 'overwrite',
+          preserveExisting: false,
+          generateNewIds: false,
+          validateIntegrity: true
+        }
+      );
+
+      if (!importResult.success) {
+        return { success: false, error: `Import failed: ${importResult.message}` };
+      }
+
+      console.log(`✅ Book imported successfully: ${importResult.bookName} with ${importResult.imported.chapters} chapters`);
+
+      // STEP 3: Record the download in user_downloads table
+      const downloadData = {
+        user_id: user.id,
+        book_id: bookId,
+        marketplace_book_id: book.id,
+        downloaded_version: book.version,
+        current_version: book.version,
+        installation_path: `imported_books/${importResult.bookId}`,
+        import_stats: importResult.imported
+      };
 
       // Check if user already downloaded this book
       const { data: existingDownload } = await supabase
@@ -429,16 +529,6 @@ export class EnhancedMarketplaceService {
         .eq('user_id', user.id)
         .eq('book_id', bookId)
         .single();
-
-      // Record the download
-      const downloadData = {
-        user_id: user.id,
-        book_id: bookId,
-        marketplace_book_id: book.id,
-        downloaded_version: book.version,
-        current_version: book.version,
-        installation_path: `downloaded_books/${bookId}`
-      };
 
       if (existingDownload) {
         // Update existing download
@@ -453,24 +543,16 @@ export class EnhancedMarketplaceService {
           .insert(downloadData);
       }
 
-      // TODO: Implement actual file download logic
-      // For now, return the book data structure
-      const downloadPayload = {
-        metadata: book,
-        // chapters: await this.getBookChapters(bookId),
-        // content: await this.getBookContent(bookId)
-      };
-
       return { 
         success: true, 
-        downloadData: downloadPayload 
+        importResult: importResult
       };
 
     } catch (error) {
-      console.error('Error downloading book:', error);
+      console.error('❌ Book download failed:', error);
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: error instanceof Error ? error.message : 'Unknown download error' 
       };
     }
   }
@@ -735,6 +817,93 @@ export class EnhancedMarketplaceService {
         error: error instanceof Error ? error.message : 'Unknown error' 
       };
     }
+  }
+
+  // ==================== FILE STORAGE HELPERS ====================
+
+  /**
+   * Upload ZIP file to Supabase storage
+   */
+  private static async uploadFileToStorage(
+    zipBlob: Blob, 
+    bookId: string, 
+    version: string
+  ): Promise<{ success: boolean; fileUrl?: string; error?: string }> {
+    try {
+      const fileName = `${bookId}/v${version}/book-module.zip`;
+      
+      console.log(`📤 Uploading book file: ${fileName}`);
+      
+      const { data, error } = await supabase.storage
+        .from('marketplace-books')
+        .upload(fileName, zipBlob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: 'application/zip'
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('marketplace-books')
+        .getPublicUrl(fileName);
+
+      console.log(`✅ File uploaded successfully: ${publicUrlData.publicUrl}`);
+      
+      return { 
+        success: true, 
+        fileUrl: publicUrlData.publicUrl 
+      };
+    } catch (error) {
+      console.error('Upload error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown upload error' 
+      };
+    }
+  }
+
+  /**
+   * Download ZIP file from Supabase storage
+   */
+  private static async downloadFileFromStorage(
+    fileUrl: string
+  ): Promise<{ success: boolean; file?: File; error?: string }> {
+    try {
+      console.log(`📥 Downloading file: ${fileUrl}`);
+      
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const file = new File([blob], 'book-module.zip', { type: 'application/zip' });
+
+      console.log(`✅ File downloaded successfully: ${file.size} bytes`);
+      
+      return { success: true, file };
+    } catch (error) {
+      console.error('Download error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown download error' 
+      };
+    }
+  }
+
+  /**
+   * Calculate file checksum for integrity verification
+   */
+  private static async calculateChecksum(blob: Blob): Promise<string> {
+    const arrayBuffer = await blob.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
 }
 

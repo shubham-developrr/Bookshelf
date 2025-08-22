@@ -1,14 +1,21 @@
 import React, { useState, useRef } from 'react';
 import { PlusIcon, TrashIcon, FileIcon, ImageIcon } from './icons';
+import { useAssetManager } from '../hooks/useAssetManager';
+import { useBackgroundUpload } from '../hooks/useBackgroundUpload';
+import { BookBasedAssetService } from '../services/BookBasedAssetService';
+import { BookIdResolver } from '../utils/BookIdResolver';
+import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
 
 interface MindMapItem {
     id: string;
     label: string;
     type: 'image' | 'pdf';
-    fileUrl: string;
+    fileUrl: string; // Now stores cloud URL instead of blob URL
     fileName: string;
     fileSize?: string;
     timestamp: Date;
+    assetId?: string; // Cloud asset ID for management
+    isUploading?: boolean; // Upload state
 }
 
 interface MindMapManagerProps {
@@ -27,146 +34,220 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
     const [mindMaps, setMindMaps] = useState<MindMapItem[]>([]);
     const [mode, setMode] = useState<'view' | 'add'>('view');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const [newLabel, setNewLabel] = useState('');
     const [fullScreenItem, setFullScreenItem] = useState<MindMapItem | null>(null);
-    const [pendingFile, setPendingFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Create unique storage key that includes tab ID for isolation
-    const baseKey = `mindmaps_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
-    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
+    // Resolve Book ID from book name for book-based authentication
+    const bookContext = React.useMemo(() => 
+        BookIdResolver.resolveBookId(currentBook), 
+        [currentBook]
+    );
+
+    // Background upload management with book-based authentication
+    const backgroundUpload = useBackgroundUpload({
+        bookId: bookContext.bookId, // Use resolved Book ID
+        bookName: currentBook, // Pass book name for book-based authentication
+        chapterId: currentChapter,
+        tabId,
+        componentType: 'mindmap',
+        onUploadComplete: (upload) => {
+            console.log(`🎉 Background upload completed: ${upload.fileName}`);
+            console.log(`📖 Book-based asset created for Book ID: ${bookContext.bookId}`);
+            
+            // Update mind map item with the cloud URL
+            if (upload.result?.success && upload.result.url) {
+                const updatedMindMaps = mindMaps.map(item => {
+                    if (item.id.startsWith(`uploading_${upload.metadata.label}`) || 
+                        (item.label === upload.metadata.label && item.isUploading)) {
+                        return {
+                            ...item,
+                            id: `mindmap_${Date.now()}`,
+                            fileUrl: upload.result.url,
+                            assetId: upload.result.assetId,
+                            isUploading: false
+                        };
+                    }
+                    return item;
+                });
+                setMindMaps(updatedMindMaps);
+                saveMindMaps(updatedMindMaps);
+            }
+        },
+        onUploadError: (upload) => {
+            console.error(`💥 Background upload failed: ${upload.fileName} - ${upload.error}`);
+            
+            // Remove failed upload item from mind maps
+            const updatedMindMaps = mindMaps.filter(item => 
+                !item.id.startsWith(`uploading_${upload.metadata.label}`)
+            );
+            setMindMaps(updatedMindMaps);
+            saveMindMaps(updatedMindMaps);
+        }
+    });
+
+    // Asset management hook for deletion (updated for book-based authentication)
+    const assetManager = useAssetManager({
+        bookId: bookContext.bookId, // Use resolved Book ID
+        chapterId: currentChapter,
+        tabId,
+        onUploadComplete: () => {}, // Not used anymore
+        onUploadError: () => {} // Not used anymore
+    });
+
+    // Book tab context for proper data isolation
+    const tabContext: BookTabContext = React.useMemo(() => {
+        return BookTabManager.createTemplateTabContext(
+            currentBook,
+            currentChapter,
+            'mindmaps'
+        );
+    }, [currentBook, currentChapter]);
 
     // Mobile detection
     const isMobile = () => window.innerWidth <= 768;
 
-    // Load mind maps from localStorage
+    // Load mind maps using book-linked tab system
     React.useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            const mindMapData = JSON.parse(saved).map((m: any) => ({
-                ...m,
-                timestamp: new Date(m.timestamp)
-            }));
-            setMindMaps(mindMapData);
+        try {
+            const data = BookTabManager.loadTabData('mindmaps', tabContext);
+            if (data && Array.isArray(data)) {
+                const mindMapData = data.map((m: any) => ({
+                    ...m,
+                    timestamp: new Date(m.timestamp)
+                }));
+                setMindMaps(mindMapData);
+            } else {
+                setMindMaps([]);
+            }
+        } catch (error) {
+            console.error('Failed to load mind maps:', error);
+            setMindMaps([]);
         }
-    }, [storageKey]);
+    }, [tabContext]);
 
-    // Save mind maps to localStorage
+    // Save mind maps using book-linked tab system
     const saveMindMaps = (mapList: MindMapItem[]) => {
-        localStorage.setItem(storageKey, JSON.stringify(mapList));
-        setMindMaps(mapList);
+        try {
+            BookTabManager.saveTabData('mindmaps', tabContext, mapList);
+            setMindMaps(mapList);
+        } catch (error) {
+            console.error('Failed to save mind maps:', error);
+        }
     };
 
-    // Handle file upload
+    // Handle file upload with background processing
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
 
-        // Check file type
-        const fileType = file.type;
-        const isImage = fileType.startsWith('image/');
-        const isPdf = fileType === 'application/pdf';
+        Array.from(files).forEach((file) => {
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+            
+            if (!validTypes.includes(file.type)) {
+                alert('Please select a valid file type (JPEG, PNG, GIF, WebP, or PDF)');
+                return;
+            }
 
-        if (!isImage && !isPdf) {
-            alert('Please upload only images (PNG, JPG, etc.) or PDF files');
-            return;
-        }
+            const maxSize = 50 * 1024 * 1024; // 50MB
+            if (file.size > maxSize) {
+                alert('File size must be under 50MB');
+                return;
+            }
 
-        // If no label provided, store the file temporarily and ask for label
-        if (!newLabel.trim()) {
-            setPendingFile(file);
-            // Don't process file yet, let user add label first
-            return;
-        }
+            const label = file.name.split('.')[0]; // Use filename as label
+            const uploadId = `${label}_${Date.now()}`;
+            
+            // Create temporary mind map item with loading state
+            const tempMindMap: MindMapItem = {
+                id: `uploading_${uploadId}`,
+                label,
+                type: file.type.startsWith('image/') ? 'image' : 'pdf',
+                fileUrl: '',
+                fileName: file.name,
+                fileSize: `${(file.size / 1024).toFixed(1)} KB`,
+                timestamp: new Date(),
+                isUploading: true
+            };
 
-        // Process the file immediately if label is provided
-        processFileUpload(file);
-    };
+            // Add to mind maps immediately for user feedback
+            const updatedMindMaps = [...mindMaps, tempMindMap];
+            setMindMaps(updatedMindMaps);
+            saveMindMaps(updatedMindMaps);
 
-    // Process file upload with label
-    const processFileUpload = (file: File) => {
-        const fileType = file.type;
-        const isImage = fileType.startsWith('image/');
-        
-        // Create file URL
-        const fileUrl = URL.createObjectURL(file);
+            // Start background upload
+            backgroundUpload.startBackgroundUpload(file, label);
+        });
 
-        // Format file size
-        const formatFileSize = (bytes: number): string => {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        };
-
-        const newMindMap: MindMapItem = {
-            id: Date.now().toString(),
-            label: newLabel.trim(),
-            type: isImage ? 'image' : 'pdf',
-            fileUrl: fileUrl,
-            fileName: file.name,
-            fileSize: formatFileSize(file.size),
-            timestamp: new Date()
-        };
-
-        const updatedMindMaps = [...mindMaps, newMindMap];
-        saveMindMaps(updatedMindMaps);
-
-        // Reset form
-        setNewLabel('');
-        setPendingFile(null);
-        setMode('view');
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    };
-
-    // Save pending file when label is provided
-    const handleSavePendingFile = () => {
-        if (pendingFile && newLabel.trim()) {
-            processFileUpload(pendingFile);
-        }
+        // Reset file input
+        event.target.value = '';
     };
 
     // Delete mind map
-    const deleteMindMap = (id: string) => {
+    const deleteMindMap = async (id: string) => {
         const mapToDelete = mindMaps.find(m => m.id === id);
         if (mapToDelete) {
-            // Revoke the object URL to free memory
-            URL.revokeObjectURL(mapToDelete.fileUrl);
+            // If it has an asset ID, delete from cloud storage
+            if (mapToDelete.assetId) {
+                const success = await assetManager.deleteAsset(mapToDelete.assetId);
+                if (!success) {
+                    console.warn('Failed to delete asset from cloud storage, but removing from local list');
+                }
+            }
+            
+            // Remove from local state
             const updatedMindMaps = mindMaps.filter(m => m.id !== id);
             saveMindMaps(updatedMindMaps);
         }
     };
 
-    // Open full screen view
+    // Handle full screen view
     const openFullScreen = (item: MindMapItem) => {
         setFullScreenItem(item);
-        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        document.body.style.overflow = 'hidden';
     };
 
-    // Close full screen view
     const closeFullScreen = () => {
         setFullScreenItem(null);
-        document.body.style.overflow = 'auto'; // Restore scrolling
+        document.body.style.overflow = 'unset';
     };
 
-    // Handle ESC key for closing full screen
-    React.useEffect(() => {
-        const handleEscape = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && fullScreenItem) {
-                closeFullScreen();
-            }
-        };
+    // Full screen view
+    if (fullScreenItem) {
+        return (
+            <div className="fixed inset-0 z-50 theme-bg flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/70" onClick={closeFullScreen}></div>
+                <div className="relative max-w-[95vw] max-h-[95vh] bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
+                    <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b p-4 flex justify-between items-center">
+                        <h3 className="text-lg font-semibold theme-text">{fullScreenItem.label}</h3>
+                        <button
+                            onClick={closeFullScreen}
+                            className="text-2xl theme-text-secondary hover:theme-text p-1"
+                            aria-label="Close"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <div className="p-4">
+                        {fullScreenItem.type === 'image' ? (
+                            <img
+                                src={fullScreenItem.fileUrl}
+                                alt={fullScreenItem.label}
+                                className="max-w-full max-h-[80vh] object-contain mx-auto"
+                            />
+                        ) : (
+                            <iframe
+                                src={fullScreenItem.fileUrl}
+                                className="w-full h-[80vh]"
+                                title={fullScreenItem.label}
+                            />
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
-        document.addEventListener('keydown', handleEscape);
-        return () => {
-            document.removeEventListener('keydown', handleEscape);
-        };
-    }, [fullScreenItem]);
-
-    // Add mode view
+    // Add mind map mode
     if (mode === 'add') {
         return (
             <div className={`theme-surface rounded-lg p-6 ${className}`}>
@@ -177,87 +258,65 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
                     </h2>
                     <button
                         onClick={() => {
+                            // Save current state and allow background uploads to continue
                             setMode('view');
-                            setNewLabel('');
+                            
+                            // Optional: Show confirmation that uploads continue in background
+                            if (backgroundUpload.hasActiveUploads) {
+                                console.log(`✅ ${backgroundUpload.activeUploads} uploads continuing in background`);
+                            }
                         }}
-                        className="btn-secondary text-sm"
+                        className="btn-secondary text-sm flex items-center gap-2"
                     >
-                        Back to Mind Maps
+                        <span>💾</span>
+                        Save & Continue
+                        {backgroundUpload.hasActiveUploads && (
+                            <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">
+                                {backgroundUpload.activeUploads}
+                            </span>
+                        )}
                     </button>
                 </div>
 
                 <div className="space-y-4 max-w-2xl">
-                    {pendingFile && (
-                        <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                            <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-2">
-                                📁 File Ready to Upload
-                            </h4>
-                            <p className="text-sm text-orange-700 dark:text-orange-300 mb-2">
-                                <strong>File:</strong> {pendingFile.name} ({(pendingFile.size / 1024).toFixed(1)} KB)
-                            </p>
-                            <p className="text-sm text-orange-700 dark:text-orange-300 mb-3">
-                                Please enter a label below and click "Save Mind Map" to complete the upload.
-                            </p>
+                    {/* Upload Progress Indicator */}
+                    {backgroundUpload.hasActiveUploads && (
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="animate-spin text-blue-500">⏳</div>
+                                <div className="font-medium text-blue-800 dark:text-blue-200">
+                                    {backgroundUpload.activeUploads} file{backgroundUpload.activeUploads > 1 ? 's' : ''} uploading...
+                                </div>
+                            </div>
+                            <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                <div 
+                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${Math.round(backgroundUpload.totalProgress)}%` }}
+                                ></div>
+                            </div>
+                            <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                {Math.round(backgroundUpload.totalProgress)}% complete • Uploads continue in background
+                            </div>
                         </div>
                     )}
-                    
+
+                    {/* File Upload Section */}
                     <div>
                         <label className="block text-sm font-medium theme-text mb-2">
-                            Mind Map Label: {pendingFile && <span className="text-red-500">*Required</span>}
+                            Upload File(s):
                         </label>
                         <input
-                            type="text"
-                            value={newLabel}
-                            onChange={(e) => setNewLabel(e.target.value)}
-                            placeholder="Enter a descriptive label (e.g., Chapter Overview, Key Concepts)"
-                            className="w-full p-3 theme-surface border rounded-lg theme-text"
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*,.pdf"
+                            multiple
+                            onChange={handleFileUpload}
+                            className="w-full p-3 theme-surface border rounded-lg theme-text file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                         />
                         <p className="text-xs theme-text-secondary mt-1">
-                            This label will help you identify the mind map later
+                            Supported formats: Images (PNG, JPG, GIF, etc.) and PDF files. Multiple files supported. Files will upload in background.
                         </p>
                     </div>
-
-                    {pendingFile ? (
-                        // Show save option for pending file
-                        <div className="flex gap-3">
-                            <button
-                                onClick={handleSavePendingFile}
-                                disabled={!newLabel.trim()}
-                                className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                💾 Save Mind Map
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setPendingFile(null);
-                                    setNewLabel('');
-                                    if (fileInputRef.current) {
-                                        fileInputRef.current.value = '';
-                                    }
-                                }}
-                                className="btn-secondary"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    ) : (
-                        // Show file upload option
-                        <div>
-                            <label className="block text-sm font-medium theme-text mb-2">
-                                Upload File:
-                            </label>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*,.pdf"
-                                onChange={handleFileUpload}
-                                className="w-full p-3 theme-surface border rounded-lg theme-text file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                            />
-                            <p className="text-xs theme-text-secondary mt-1">
-                                Supported formats: Images (PNG, JPG, GIF, etc.) and PDF files. You can upload first, then add label.
-                            </p>
-                        </div>
-                    )}
 
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                         <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
@@ -267,6 +326,8 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
                             <li>• Full-screen viewing with zoom capabilities</li>
                             <li>• Support for images and PDF documents</li>
                             <li>• Easy organization with custom labels</li>
+                            <li>• Multiple file uploads with background processing</li>
+                            <li>• Files upload even if you navigate away</li>
                             <li>• Click any mind map to view in full screen</li>
                             <li>• Press ESC or click outside to exit full screen</li>
                         </ul>
@@ -278,6 +339,31 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
 
     return (
         <div className={`theme-surface rounded-lg p-2 sm:p-6 ${className}`}>
+            {/* Background Upload Status */}
+            {backgroundUpload.hasActiveUploads && (
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="animate-spin text-blue-500">⏳</div>
+                            <div>
+                                <div className="font-medium text-blue-800 dark:text-blue-200 text-sm">
+                                    {backgroundUpload.activeUploads} file{backgroundUpload.activeUploads > 1 ? 's' : ''} uploading in background
+                                </div>
+                                <div className="text-xs text-blue-600 dark:text-blue-300">
+                                    Progress: {Math.round(backgroundUpload.totalProgress)}% • Uploads continue even if you navigate away
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => backgroundUpload.clearCompleted()}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                            Clear Completed
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className={`flex ${isMobile() ? 'flex-col gap-3' : 'items-center justify-between'} mb-4 sm:mb-6`}>
                 <div className={`flex items-center ${isMobile() ? 'justify-between' : 'gap-4'}`}>
                     <h2 className="text-lg font-semibold theme-text flex items-center gap-2">
@@ -285,7 +371,7 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
                         Mind Maps
                     </h2>
                     
-                    {/* Moved controls to left side */}
+                    {/* View mode controls */}
                     <div className={`flex ${isMobile() ? 'gap-1' : 'gap-2'}`}>
                         <div className={`flex theme-surface2 rounded-lg ${isMobile() ? 'p-0.5' : 'p-1'}`}>
                             <button
@@ -309,241 +395,134 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
                                 📋 {!isMobile() && 'List'}
                             </button>
                         </div>
-                        <button
-                            onClick={() => setMode('add')}
-                            className={`${isMobile() ? 'btn-secondary text-xs px-2 py-1' : 'btn-secondary text-sm'} flex items-center gap-1`}
-                        >
-                            <PlusIcon />
-                            {!isMobile() && 'Add Mind Map'}
-                        </button>
                     </div>
                 </div>
+
+                {/* Add button */}
+                <button
+                    onClick={() => setMode('add')}
+                    className={`btn-primary ${isMobile() ? 'w-full' : ''} flex items-center gap-2 text-sm`}
+                >
+                    <PlusIcon />
+                    Add Mind Map
+                </button>
             </div>
 
-            {/* Mind Maps display */}
+            {/* Mind Maps Display */}
             {mindMaps.length === 0 ? (
                 <div className="text-center py-12">
-                    <ImageIcon className="w-16 h-16 mx-auto mb-4 theme-text-secondary" />
-                    <h3 className="text-xl font-semibold mb-2 theme-text">Create Your Mind Maps</h3>
-                    <p className="theme-text-secondary mb-4">Upload visual concept maps to organize your learning</p>
-                    
-                    {/* Mind Map Structure Example */}
-                    <div className="mb-6 p-4 theme-surface2 rounded-lg max-w-lg mx-auto">
-                        <div className="text-sm theme-text-secondary mb-3 font-medium">Mind Map Structure Guide:</div>
-                        <div className="space-y-3 text-left">
-                            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border-l-4 border-purple-500">
-                                <div className="font-semibold text-purple-800 dark:text-purple-300 mb-1">Central Topic</div>
-                                <div className="text-sm text-purple-700 dark:text-purple-200">
-                                    Main concept in the center (e.g., "Database Systems")
-                                </div>
-                            </div>
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
-                                <div className="font-semibold text-blue-800 dark:text-blue-300 mb-1">Main Branches</div>
-                                <div className="text-sm text-blue-700 dark:text-blue-200">
-                                    Key categories extending outward (Types, Operations, etc.)
-                                </div>
-                            </div>
-                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
-                                <div className="font-semibold text-green-800 dark:text-green-300 mb-1">Sub-branches</div>
-                                <div className="text-sm text-green-700 dark:text-green-200">
-                                    Details and examples connected to main branches
-                                </div>
-                            </div>
-                            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border-l-4 border-orange-500">
-                                <div className="font-semibold text-orange-800 dark:text-orange-300 mb-1">Visual Elements</div>
-                                <div className="text-sm text-orange-700 dark:text-orange-200">
-                                    Colors, icons, images to enhance memory
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
+                    <div className="text-6xl mb-4">🧠</div>
+                    <h3 className="text-lg font-medium theme-text mb-2">No Mind Maps Yet</h3>
+                    <p className="theme-text-secondary mb-4">Upload images or PDF files to create your first mind map</p>
                     <button
                         onClick={() => setMode('add')}
-                        className="px-6 py-3 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition"
+                        className="btn-primary flex items-center gap-2 mx-auto"
                     >
-                        <PlusIcon className="w-5 h-5 inline mr-2" />
-                        Upload Your First Mind Map
+                        <PlusIcon />
+                        Add Your First Mind Map
                     </button>
                 </div>
             ) : (
-                <div>
+                <>
                     {viewMode === 'grid' ? (
-                        // Grid View - Ensure 2 items per row on mobile
-                        <div className={`grid ${isMobile() ? 'grid-cols-2 gap-2' : 'md:grid-cols-2 lg:grid-cols-3 gap-4'}`}>
-                            {mindMaps.map((mindMap) => (
-                                <div key={mindMap.id} className={`border theme-border rounded-lg ${isMobile() ? 'p-2' : 'p-4'} hover:shadow-md transition-shadow`}>
-                                    {/* Preview */}
+                        <div className={`grid ${isMobile() ? 'grid-cols-1 gap-3' : 'grid-cols-2 lg:grid-cols-3 gap-4'}`}>
+                            {mindMaps.map((item) => (
+                                <div key={item.id} className="theme-surface2 rounded-lg border hover:shadow-md transition-shadow">
                                     <div 
-                                        className={`aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg ${isMobile() ? 'mb-2' : 'mb-3'} relative overflow-hidden cursor-pointer group`}
-                                        onClick={() => openFullScreen(mindMap)}
+                                        className="relative cursor-pointer"
+                                        onClick={() => !item.isUploading && openFullScreen(item)}
                                     >
-                                        {mindMap.type === 'image' ? (
-                                            <img 
-                                                src={mindMap.fileUrl} 
-                                                alt={mindMap.label}
-                                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-red-100 dark:bg-red-900/20">
+                                        {item.isUploading ? (
+                                            <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-t-lg flex items-center justify-center">
                                                 <div className="text-center">
-                                                    <FileIcon className={`${isMobile() ? 'w-8 h-8' : 'w-12 h-12'} text-red-500 mx-auto mb-2`} />
-                                                    <span className={`${isMobile() ? 'text-xs' : 'text-xs'} font-medium text-red-700 dark:text-red-300`}>PDF</span>
+                                                    <div className="animate-spin text-2xl mb-2">⏳</div>
+                                                    <div className="text-sm theme-text">Uploading...</div>
                                                 </div>
                                             </div>
-                                        )}
-                                        
-                                        {/* Overlay on hover */}
-                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
-                                            <span className={`text-white opacity-0 group-hover:opacity-100 transition-opacity ${isMobile() ? 'text-xs' : 'text-sm'} font-medium`}>
-                                                {isMobile() ? 'Tap to view' : 'Click to view full screen'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Mind Map info */}
-                                    <div>
-                                        <h3 className={`font-medium theme-text ${isMobile() ? 'text-xs' : 'text-sm'} line-clamp-2 ${isMobile() ? 'mb-1' : 'mb-2'}`}>
-                                            {mindMap.label}
-                                        </h3>
-                                        
-                                        <div className={`${isMobile() ? 'text-xs' : 'text-xs'} theme-text-secondary ${isMobile() ? 'mb-1' : 'mb-2'}`}>
-                                            <div className={`flex ${isMobile() ? 'flex-col gap-0' : 'items-center justify-between'}`}>
-                                                <span className={`${isMobile() ? 'truncate' : ''}`}>{mindMap.fileName}</span>
-                                                {mindMap.fileSize && !isMobile() && <span>{mindMap.fileSize}</span>}
+                                        ) : item.type === 'image' ? (
+                                            <img
+                                                src={item.fileUrl}
+                                                alt={item.label}
+                                                className="w-full aspect-video object-cover rounded-t-lg"
+                                            />
+                                        ) : (
+                                            <div className="aspect-video bg-red-50 dark:bg-red-900/20 rounded-t-lg flex items-center justify-center">
+                                                <FileIcon className="text-red-500 w-12 h-12" />
                                             </div>
-                                            {!isMobile() && <div>Added {mindMap.timestamp.toLocaleDateString()}</div>}
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className={`flex gap-1 ${isMobile() ? 'mt-2' : 'mt-3'}`}>
+                                        )}
+                                    </div>
+                                    <div className="p-3">
+                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                            <h4 className="font-medium theme-text text-sm line-clamp-2">{item.label}</h4>
                                             <button
-                                                onClick={() => openFullScreen(mindMap)}
-                                                className={`flex-1 btn-primary ${isMobile() ? 'text-xs px-2 py-1' : 'text-xs'}`}
-                                            >
-                                                {isMobile() ? 'View' : 'View Full Screen'}
-                                            </button>
-                                            <button
-                                                onClick={() => deleteMindMap(mindMap.id)}
-                                                className={`${isMobile() ? 'px-1.5 py-1' : 'px-2 py-1'} text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-xs`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteMindMap(item.id);
+                                                }}
+                                                className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1 rounded flex-shrink-0"
                                                 title="Delete mind map"
                                             >
-                                                <TrashIcon />
+                                                <TrashIcon className="w-3 h-3" />
                                             </button>
                                         </div>
+                                        <div className="flex items-center gap-2 text-xs theme-text-secondary">
+                                            <span>{item.fileName}</span>
+                                            {item.fileSize && <span>• {item.fileSize}</span>}
+                                        </div>
+                                        {item.isUploading && (
+                                            <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                                                ⏳ Uploading in background...
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        // List View
-                        <div className="space-y-3">
-                            {mindMaps.map((mindMap) => (
-                                <div key={mindMap.id} className="border theme-border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                    <div className="flex items-center gap-4">
-                                        {/* Thumbnail */}
-                                        <div 
-                                            className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg flex-shrink-0 overflow-hidden cursor-pointer group"
-                                            onClick={() => openFullScreen(mindMap)}
-                                        >
-                                            {mindMap.type === 'image' ? (
-                                                <img 
-                                                    src={mindMap.fileUrl} 
-                                                    alt={mindMap.label}
-                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-red-100 dark:bg-red-900/20">
-                                                    <FileIcon className="w-6 h-6 text-red-500" />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-medium theme-text text-sm truncate mb-1">
-                                                {mindMap.label}
-                                            </h3>
-                                            <div className="text-xs theme-text-secondary space-y-1">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="truncate mr-2">{mindMap.fileName}</span>
-                                                    {mindMap.fileSize && <span className="flex-shrink-0">{mindMap.fileSize}</span>}
-                                                </div>
-                                                <div>Added {mindMap.timestamp.toLocaleDateString()}</div>
-                                            </div>
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className="flex gap-2 flex-shrink-0">
-                                            <button
-                                                onClick={() => openFullScreen(mindMap)}
-                                                className="btn-primary text-xs px-3 py-1"
-                                            >
-                                                View
-                                            </button>
-                                            <button
-                                                onClick={() => deleteMindMap(mindMap.id)}
-                                                className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                                                title="Delete mind map"
-                                            >
-                                                <TrashIcon />
-                                            </button>
-                                        </div>
+                        <div className="space-y-2">
+                            {mindMaps.map((item) => (
+                                <div key={item.id} className="theme-surface2 rounded-lg border p-4 flex items-center gap-4 hover:shadow-sm transition-shadow">
+                                    <div 
+                                        className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
+                                            item.isUploading 
+                                                ? 'bg-gray-100 dark:bg-gray-800' 
+                                                : item.type === 'image' 
+                                                    ? 'bg-green-100 dark:bg-green-900/20' 
+                                                    : 'bg-red-100 dark:bg-red-900/20'
+                                        } cursor-pointer`}
+                                        onClick={() => !item.isUploading && openFullScreen(item)}
+                                    >
+                                        {item.isUploading ? (
+                                            <div className="animate-spin">⏳</div>
+                                        ) : item.type === 'image' ? (
+                                            <ImageIcon className="text-green-600 w-6 h-6" />
+                                        ) : (
+                                            <FileIcon className="text-red-600 w-6 h-6" />
+                                        )}
                                     </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-medium theme-text truncate">{item.label}</h4>
+                                        <div className="text-sm theme-text-secondary">
+                                            {item.fileName} {item.fileSize && `• ${item.fileSize}`}
+                                        </div>
+                                        {item.isUploading && (
+                                            <div className="text-xs text-blue-600 dark:text-blue-400">
+                                                ⏳ Uploading in background...
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={() => deleteMindMap(item.id)}
+                                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded flex-shrink-0"
+                                        title="Delete mind map"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     )}
-                </div>
-            )}
-
-            {/* Full Screen Modal */}
-            {fullScreenItem && (
-                <div 
-                    className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50"
-                    onClick={closeFullScreen}
-                >
-                    <div className="relative w-full h-full p-4">
-                        {/* Close button */}
-                        <button
-                            onClick={closeFullScreen}
-                            className="absolute top-4 right-4 z-60 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-2 transition-all"
-                            title="Close (ESC)"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-
-                        {/* Title */}
-                        <div className="absolute top-4 left-4 z-60 bg-white bg-opacity-20 text-white px-4 py-2 rounded-lg">
-                            <h3 className="font-medium">{fullScreenItem.label}</h3>
-                            <p className="text-xs opacity-80">{fullScreenItem.fileName}</p>
-                        </div>
-
-                        {/* Content */}
-                        <div 
-                            className="w-full h-full flex items-center justify-center"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {fullScreenItem.type === 'image' ? (
-                                <img 
-                                    src={fullScreenItem.fileUrl} 
-                                    alt={fullScreenItem.label}
-                                    className="max-w-full max-h-full object-contain cursor-zoom-in"
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            ) : (
-                                <iframe
-                                    src={fullScreenItem.fileUrl}
-                                    className="w-full h-full border-0 rounded-lg"
-                                    title={fullScreenItem.label}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            )}
-                        </div>
-                    </div>
-                </div>
+                </>
             )}
         </div>
     );

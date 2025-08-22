@@ -3,6 +3,7 @@ import { SparklesIcon, PlusIcon, TrashIcon, UploadIcon } from './icons';
 import { processAIImport } from '../utils/aiImportService';
 import { MCQTest } from './TestComponents';
 import AILoadingAnimation from './AILoadingAnimation';
+import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
 
 interface MCQOption {
     id: string;
@@ -51,22 +52,38 @@ const MCQManager: React.FC<MCQManagerProps> = ({
     const [newExplanation, setNewExplanation] = useState('');
     const [newCategory, setNewCategory] = useState('');
 
-    // Create unique storage key that includes tab ID for isolation
-    const baseKey = `mcq_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
-    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
+    // Book tab context for proper data isolation
+    const tabContext: BookTabContext = React.useMemo(() => {
+        return BookTabManager.createTemplateTabContext(
+            currentBook,
+            currentChapter,
+            'mcq'
+        );
+    }, [currentBook, currentChapter]);
 
-    // Load MCQs from localStorage
+    // Load MCQs using book-linked tab system
     React.useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            setMcqQuestions(JSON.parse(saved));
+        try {
+            const data = BookTabManager.loadTabData('mcq', tabContext);
+            if (data && Array.isArray(data)) {
+                setMcqQuestions(data);
+            } else {
+                setMcqQuestions([]);
+            }
+        } catch (error) {
+            console.error('Failed to load MCQ questions:', error);
+            setMcqQuestions([]);
         }
-    }, [storageKey]);
+    }, [tabContext]);
 
-    // Save MCQs to localStorage
+    // Save MCQs using book-linked tab system
     const saveMcqQuestions = (questions: MCQQuestion[]) => {
-        localStorage.setItem(storageKey, JSON.stringify(questions));
-        setMcqQuestions(questions);
+        try {
+            BookTabManager.saveTabData('mcq', tabContext, questions);
+            setMcqQuestions(questions);
+        } catch (error) {
+            console.error('Failed to save MCQ questions:', error);
+        }
     };
 
     // Handle adding/editing MCQ questions

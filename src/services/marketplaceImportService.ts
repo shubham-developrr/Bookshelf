@@ -180,8 +180,16 @@ export class MarketplaceBookImportService {
      * Parse chapters from ZIP
      */
     private static async parseChaptersFromZip(chaptersFolder: JSZip, chapters: any): Promise<void> {
-        for (const [chapterName, chapterEntry] of Object.entries(chaptersFolder.files)) {
-            if (chapterEntry.dir) {
+        for (const [chapterPath, chapterEntry] of Object.entries(chaptersFolder.files)) {
+            if (chapterEntry.dir && chapterPath.endsWith('/')) {
+                // Extract chapter name from path and validate
+                const chapterName = chapterPath.replace(/\/$/, '').split('/').pop();
+                
+                if (!chapterName || chapterName.trim() === '') {
+                    console.warn(`Skipping invalid chapter path: ${chapterPath}`);
+                    continue;
+                }
+                
                 const chapterData: any = {
                     metadata: {},
                     subtopics: [],
@@ -206,11 +214,14 @@ export class MarketplaceBookImportService {
                 // Read tabs
                 const tabsFolder = chaptersFolder.folder(`${chapterName}/tabs`);
                 if (tabsFolder) {
-                    for (const [tabFileName, tabEntry] of Object.entries(tabsFolder.files)) {
-                        if (!tabEntry.dir && tabFileName.endsWith('.json')) {
-                            const tabId = tabFileName.replace('.json', '');
-                            const tabData = JSON.parse(await tabEntry.async('text'));
-                            chapterData.tabs[tabId] = tabData;
+                    for (const [tabPath, tabEntry] of Object.entries(tabsFolder.files)) {
+                        if (!tabEntry.dir && tabPath.endsWith('.json')) {
+                            const tabFileName = tabPath.split('/').pop();
+                            if (tabFileName) {
+                                const tabId = tabFileName.replace('.json', '');
+                                const tabData = JSON.parse(await tabEntry.async('text'));
+                                chapterData.tabs[tabId] = tabData;
+                            }
                         }
                     }
                 }
@@ -495,15 +506,26 @@ export class MarketplaceBookImportService {
      * Import tab data with proper isolation
      */
     private static async importTabData(bookName: string, chapterKey: string, tabId: string, tabData: any): Promise<void> {
+        if (!tabData || !tabData.templateType) {
+            console.warn(`Invalid tab data for ${tabId}, skipping...`);
+            return;
+        }
+        
         const templateType = tabData.templateType;
         const data = tabData.data;
+        
+        // Validate tabId and templateType
+        if (!templateType || typeof templateType !== 'string') {
+            console.warn(`Invalid templateType for tab ${tabId}: ${templateType}`);
+            return;
+        }
         
         // Determine storage key based on template type and tab ID
         let storageKey: string;
         
         if (templateType === 'CUSTOM') {
             // Custom tab
-            const customTabName = tabData.displayName;
+            const customTabName = tabData.displayName || tabId.replace('custom_', '');
             storageKey = `customtab_${bookName}_${chapterKey}_${customTabName}`;
             localStorage.setItem(storageKey, typeof data === 'string' ? data : JSON.stringify(data));
         } else {
@@ -518,16 +540,41 @@ export class MarketplaceBookImportService {
                 storageKey = baseKey;
             }
             
-            localStorage.setItem(storageKey, JSON.stringify(data));
+            // Validate data before storing
+            if (data !== null && data !== undefined) {
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify(data));
+                } catch (err) {
+                    console.warn(`Failed to store tab data for ${tabId}: ${err}`);
+                    // Try storing as string if JSON serialization fails
+                    localStorage.setItem(storageKey, String(data));
+                }
+            }
         }
         
         console.log(`📥 Imported tab: ${tabId} -> ${storageKey}`);
     }
 
     /**
-     * Get storage key pattern by template type
+     * Get storage key pattern by template type - FIXED VERSION
      */
     private static getStorageKeyByTemplate(templateType: string, bookName: string, chapterKey: string): string {
+        // Validate inputs
+        if (!templateType || typeof templateType !== 'string') {
+            console.error(`Invalid templateType: ${templateType}`);
+            return `unknown_${bookName}_${chapterKey}`;
+        }
+        
+        if (!bookName || typeof bookName !== 'string') {
+            console.error(`Invalid bookName: ${bookName}`);
+            return `${templateType.toLowerCase()}_unknown_${chapterKey}`;
+        }
+        
+        if (!chapterKey || typeof chapterKey !== 'string') {
+            console.error(`Invalid chapterKey: ${chapterKey}`);
+            return `${templateType.toLowerCase()}_${bookName}_unknown`;
+        }
+        
         const keyMap: { [key: string]: string } = {
             'FLASHCARD': `flashcards_${bookName}_${chapterKey}`,
             'MCQ': `mcq_${bookName}_${chapterKey}`,
@@ -536,7 +583,12 @@ export class MarketplaceBookImportService {
             'MINDMAP': `mindmaps_${bookName}_${chapterKey}`,
             'VIDEOS': `videos_${bookName}_${chapterKey}`
         };
-        return keyMap[templateType] || `${templateType.toLowerCase()}_${bookName}_${chapterKey}`;
+        
+        const normalizedType = templateType.toUpperCase().trim();
+        const result = keyMap[normalizedType] || `${templateType.toLowerCase()}_${bookName}_${chapterKey}`;
+        
+        console.log(`🔍 Storage key for ${templateType}: ${result}`);
+        return result;
     }
 
     /**

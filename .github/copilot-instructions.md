@@ -1,212 +1,293 @@
-# Interactive Study Bookshelf - AI Agent Instructions
+# Copilot Instructions for Interactive Study Bookshelf
 
-## Architecture Overview
+## 🏗️ Architecture Overview
 
-This is a **React + TypeScript educational platform** with advanced AI tutoring, mobile-optimized text highlighting, theme system, and comprehensive content management. The app transforms static educational content into an interactive learning experience with Kindle-style text selection, AI-powered explanations, and rich multimedia support.
+This is a React 19 + TypeScript educational platform with a sophisticated multi-provider AI integration, advanced text highlighting system, and comprehensive book creation/marketplace features.
 
-### Core Application Structure
-- **Main App Component**: `src/components/App.tsx` (current) vs `AppNew.tsx` (legacy)
-- **Routing**: React Router with nested context providers (`ThemeProvider`, `UserProvider`)
-- **Page Flow**: Bookshelf → Subject → Chapter → Reader (with multi-tab content management)
-- **AI Integration**: Groq SDK with `moonshotai/kimi-k2-instruct` model for educational responses
+### Core Application Flow
+- **Main App**: `src/components/App.tsx` - React Router setup with theme/user context providers
+- **Entry Points**: Users start at `EnhancedBookshelfPage` → navigate to subjects → chapters → reading mode
+- **AI Integration**: Global `EnhancedAIGuruModal` accessible from any page via floating button
+- **State Management**: Context-based (Theme, User) + localStorage for persistence
 
-## Key Architectural Patterns
+## 🤖 AI System Architecture
 
-### 1. Theme System (Critical)
-```tsx
-// All components MUST use CSS variables defined in index.css
-<div className="theme-surface theme-text theme-transition">
-  // 4 themes: light, dark, blue, amoled
-  // Never hardcode colors - always use theme utility classes
-</div>
+### Multi-Provider Fallback Pattern
+```typescript
+// Primary: Gemini API (user's API key) → Fallback: Groq (app API key)
+// Located in: src/services/EnhancedAIService.ts
+const aiService = EnhancedAIService.getInstance();
+await aiService.generateResponse(prompt, fastMode, enableThinking);
 ```
-**CSS Variables**: `:root` defines `--color-bg`, `--color-surface`, etc. in `index.css`
-**Context**: `src/contexts/ThemeContext.tsx` with localStorage persistence
-**Files**: Theme changes update CSS variables dynamically via `ThemeContext`
 
-### 2. Text Highlighting Engine (Complex - 1368 lines)
-```tsx
-// CRITICAL: Use KindleStyleTextViewerFixed.tsx - the WORKING implementation
-import KindleStyleTextViewerFixed from './components/KindleStyleTextViewerFixed';
-// NEVER use KindleStyleTextViewer.tsx - that's the broken legacy version
+**Key Implementation Details:**
+- **Cascading Fallback**: Gemini models (2.5-pro → 2.5-flash → 1.5-pro → 1.5-flash) → Groq llama-3.3-70b
+- **User API Keys**: Users provide their own Gemini API keys via `GeminiAPIService`
+- **Environment Variables**: `VITE_GROQ_API_KEY` (fallback), user-provided Gemini keys stored in localStorage
 
-// Canvas-based text measurement for pixel-perfect mobile accuracy
-// Word-level positioning with coordinate-based selection system
-// Mobile: double-tap (500ms window, 5px threshold) for single words, drag for multi-word
-// Haptic feedback integration for mobile UX
+### AI Integration Points
+- **AI Guru Modal**: `EnhancedAIGuruModal.tsx` - Main conversational interface with chat history persistence
+- **Text Selection**: Right-click → "Explain with AI" sends context-aware prompts with JSON formatting
+- **Content Generation**: SVG icons, educational responses, exam evaluation
+- **Memory System**: Chat history stored in localStorage with automatic summarization for context
+
+## 📝 Text Highlighting System
+
+### Multi-Engine Architecture
+The app uses **3 different highlighting engines** for different contexts:
+
+1. **AdvancedTextSelectionEngine** - Most sophisticated, mobile-optimized
+2. **ProfessionalTextHighlighter** - Clean, modern interface  
+3. **KindleStyleTextViewerFixed** - Mobile-first with haptic feedback and justified text layout
+
+**Key Pattern:**
+```typescript
+// Highlights persist in localStorage with chapter-specific keys
+const highlight: Highlight = {
+  id: string,
+  text: string, 
+  color: 'yellow' | 'green' | 'blue' | 'red',
+  chapterId: string,
+  timestamp: Date
+};
 ```
-**Complex Logic**: Canvas text measurement, touch/mouse event coordination, selection menu positioning
-**Mobile-First**: Separate touch/mouse handlers prevent interference, `touchActive` flag critical
 
-### 3. AI Integration Pattern
-```tsx
-// Enhanced AI with LaTeX math + markdown + code syntax highlighting
-import { ENHANCED_AI_GURU_PROMPT, AI_GURU_SYSTEM_CONTEXT } from '../utils/aiGuruPrompt';
-// Model: 'moonshotai/kimi-k2-instruct' via Groq SDK
-// API Key: process.env.GROQ_API_KEY (loaded via vite.config.ts from .env.local)
+**Critical Implementation Details:**
+- **Mobile Selection**: Double-tap to start selection, drag for multi-word selection (4+ words minimum)
+- **Haptic Feedback**: Uses `src/utils/haptics.ts` for tactile feedback on mobile selections
+- **Touch vs Mouse**: Components handle both with `touchActive` state to prevent double-firing
+- **Context Menu**: Positioned with viewport edge detection and responsive fallback positioning
+
+## 📚 Book Management & Storage
+
+### Data Architecture
+```typescript
+// Books stored as: localStorage['books'] = Book[]
+// Chapters: localStorage[`chapters_${bookId}`] = Chapter[]  
+// Content: localStorage[`${templateType}_${bookName}_${chapterKey}`] = any
 ```
-**Response Rendering**: `EnhancedAIResponse.tsx` with ReactMarkdown + rehype-katex + react-syntax-highlighter
-**Message System**: Conversation history with user/model/error role types
 
-### 4. Content Management System
-```tsx
-// Multi-tab content management for chapters
-// Tabs: Text, MCQ, Q&A, Notes, Mind Maps, Flashcards, Videos
-// Import/Export functionality with JSON + ZIP support
-// Template-based content creation system
+### Template System
+**6 Core Templates** with isolated storage:
+- `FLASHCARD` → `flashcards_${bookName}_${chapterKey}`
+- `MCQ` → `mcq_${bookName}_${chapterKey}` 
+- `QA` → `qa_${bookName}_${chapterKey}`
+- `NOTES` → `notes_${bookName}_${chapterKey}`
+- `MINDMAP` → `mindmaps_${bookName}_${chapterKey}`
+- `VIDEOS` → `videos_${bookName}_${chapterKey}`
+
+**Custom Tabs**: `customtab_${tabId}_${bookName}_${chapterKey}` pattern
+
+## 🎨 Theme System
+
+### Dynamic CSS Variables
+Themes use CSS custom properties managed by `ThemeContext.tsx`:
+```typescript
+// Themes: 'light' | 'dark' | 'blue' | 'amoled' | 'custom'
+// CSS classes: theme-bg, theme-surface, theme-text, theme-accent
 ```
-**Template System**: Pre-defined chapter templates with configurable tab types
-**Data Persistence**: Local storage for content, structured JSON export/import
 
-## Critical Development Workflows
+**Theme Application:**
+- Context sets CSS variables on `:root`
+- Components use `theme-*` utility classes
+- Custom themes generated from user color picker
+
+## 🚀 Development Workflows
+
+### Key Commands
+```bash
+npm run dev              # Start development server (port 5173)
+npm run build           # Production build
+npm run preview         # Preview build locally
+```
 
 ### Environment Setup
-```bash
-# Required environment variable
-GROQ_API_KEY=your_groq_api_key  # in .env.local (NOT .env)
-
-# Development server (runs on port 5174, NOT 5173)
-npm run dev
-
-# Install with legacy peer deps (required for React 19)
-npm install --legacy-peer-deps
-
-# Build with proper env variable loading
-npm run build
+```env
+# Required for full functionality:
+VITE_GROQ_API_KEY=your_groq_key         # AI fallback
+# Optional (user-provided via UI):
+# Gemini API keys stored in localStorage
 ```
 
-### Testing & Debugging
-```bash
-# Playwright tests for UI validation
-npx playwright test
+### Local Storage Key Patterns
+```typescript
+// Core Data:
+'books'                              // All user books
+`chapters_${bookId}`                 // Book chapters
+`highlights_${chapter}`              // Text highlights
 
-# Multiple test files for different features:
-# - comprehensive-final-test.spec.ts (full app flow)
-# - enhanced-reader-test.spec.ts (content management)
-# - flashcard-functionality-complete.spec.ts (flashcard system)
+// Template System (Tab Isolated):
+`flashcards_${book}_${chapter}`      // Base template
+`flashcards_${book}_${chapter}_${tabId}`  // Tab-isolated version
+
+// Template Types:
+'FLASHCARD', 'MCQ', 'QA', 'NOTES', 'MINDMAP', 'VIDEOS'
+
+// Custom Tabs:
+`customtab_${tabName}_${book}_${chapter}`
+
+// Tab Persistence (User-specific):
+`tabs_cache_${userId}_${chapterId}`
+
+// Settings:
+'theme-mode', 'user_gemini_api_key', 'ai_guru_memory_summary'
 ```
 
-### Mobile Text Selection Debugging
-**Most Complex Component**: `KindleStyleTextViewerFixed.tsx` (1368 lines)
-- Canvas measurement for accurate word positioning on mobile devices
-- Touch event coordination with `touchActive` flag prevents mouse interference
-- Double-tap detection: 500ms window, 5px movement threshold
-- Menu positioning: `getExactHighlightMatch()` vs `getHighlightToRemove()` logic
-- Haptic feedback integration for native-like mobile experience
+**Critical Pattern**: All template data can exist in both base and tab-isolated versions. Always check for tab-specific keys first: `${templateType}_${book}_${chapter}_${tabId}` before falling back to base keys.
 
-### Theme Development
-```css
-/* CSS Variable Pattern - ALL colors must use variables */
-.theme-surface { background-color: var(--color-surface); }
-.theme-accent-text { color: var(--color-accent); }
-.theme-transition { transition: all 0.3s ease; }
+## 📁 Critical File Locations
 
-/* Test ALL 4 themes: light, dark, blue, amoled */
-/* Mobile-first responsive: 640px, 768px, 1024px breakpoints */
+### Core Components
+- **App Shell**: `src/components/App.tsx`
+- **Main Pages**: `src/pages/Enhanced*.tsx` (Bookshelf, Reader, etc.)
+- **AI System**: `src/services/EnhancedAIService.ts`, `src/components/EnhancedAIGuruModal.tsx`
+- **Highlighting**: `src/components/AdvancedTextSelectionEngine.tsx`
+
+### Services & Utils
+- **AI Services**: `src/services/EnhancedAIService.ts`, `GeminiAPIService.ts`
+- **Book Management**: `src/utils/BookManager.ts`
+- **Export/Import**: `src/services/marketplaceExportService.ts`
+
+### Data & Types
+- **Type Definitions**: `src/types/types.ts`
+- **Constants**: `src/constants/constants.tsx`
+
+## ⚠️ Common Patterns & Conventions
+
+### Error Handling
+```typescript
+// AI calls always have fallback providers
+try {
+  return await geminiAPI.generate(prompt);
+} catch (error) {
+  return await groqAPI.generate(prompt); // Fallback
+}
 ```
 
-## Project-Specific Conventions
-
-### Component Organization & Naming
-```
-src/
-├── components/           # Reusable UI components
-│   ├── Enhanced*.tsx    # Preferred versions (EnhancedAIGuruModal > AIGuruModal)
-│   ├── *Manager.tsx     # Content management (MCQManager, FlashCardManager, etc.)
-│   └── icons.tsx        # Centralized icon components
-├── pages/              # Route-level components
-│   ├── Enhanced*.tsx   # Current implementations
-│   └── *.tsx          # Legacy versions
-├── contexts/          # React contexts (Theme, User)
-├── utils/            # Utility functions (AI prompts, search algorithms)
-└── types/           # TypeScript definitions
+### Data Persistence
+```typescript
+// Template data pattern:
+const key = `${templateType}_${bookName}_${chapterKey}`;
+localStorage.setItem(key, JSON.stringify(data));
 ```
 
-### State Management Philosophy
-- **No Redux** - Using React Context + local state only
-- **Highlights**: Local state in `App.tsx`, passed down as props to reader components
-- **AI State**: Modal state with `initialPrompt` for context passing between components
-- **Themes**: Context with localStorage persistence and CSS variable updates
-- **Content**: Local state with localStorage backup, JSON export for persistence
+## 🎯 Component Development Patterns
 
-### AI Response Format & Rendering
-```tsx
-// Enhanced AI responses support LaTeX math + code + markdown
-<ReactMarkdown 
-  remarkPlugins={[remarkMath, remarkGfm]} 
-  rehypePlugins={[rehypeKatex]}
-  components={{
-    code: ({ language, children }) => (
-      <SyntaxHighlighter language={language}>{children}</SyntaxHighlighter>
-    )
-  }}
->
-  {content} // Supports: $inline math$, $$display math$$, ```code blocks```
-</ReactMarkdown>
+### Hook Usage Standards
+```typescript
+// Standard component structure with proper hook ordering
+const Component: React.FC<Props> = ({ prop1, prop2 }) => {
+  // 1. State hooks first
+  const [data, setData] = useState<Type[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // 2. Refs
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // 3. Storage key pattern (critical for data persistence)
+  const baseKey = `${templateType}_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
+  const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
+  
+  // 4. Load data from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      setData(JSON.parse(saved));
+    }
+  }, [storageKey]);
+  
+  // 5. Auto-save with debouncing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (data.length > 0) {
+        localStorage.setItem(storageKey, JSON.stringify(data));
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [data, storageKey]);
+  
+  // 6. Event handlers with useCallback for performance
+  const handleSave = useCallback(() => {
+    localStorage.setItem(storageKey, JSON.stringify(data));
+  }, [data, storageKey]);
+};
 ```
 
-### Mobile-First Responsive Design
-```tsx
-// Breakpoint utilities defined in index.css
-// Mobile: ≤640px, Tablet: 641-1024px, Desktop: ≥1025px
-const isMobile = () => window.innerWidth <= 640;
-const isTablet = () => window.innerWidth > 640 && window.innerWidth <= 1024;
-
-// Touch events require passive:false for text selection to work
-// Always separate touch/mouse handlers to prevent conflicts
+### Tab Isolation System
+```typescript
+// Templates support both shared and tab-isolated data
+// Always construct storage keys to check tab-specific data first
+const getTemplateData = (templateType: string, tabId?: string) => {
+  const baseKey = `${templateType}_${book}_${chapter}`;
+  const tabKey = tabId ? `${baseKey}_${tabId}` : null;
+  
+  // Priority: tab-specific → base → default
+  if (tabKey && localStorage.getItem(tabKey)) {
+    return JSON.parse(localStorage.getItem(tabKey)!);
+  }
+  if (localStorage.getItem(baseKey)) {
+    return JSON.parse(localStorage.getItem(baseKey)!);
+  }
+  return [];
+};
 ```
 
-## Common Gotchas & Critical Fixes
+## 📱 Mobile-First Responsive Patterns
 
-### Text Highlighting System
-- **NEVER use `KindleStyleTextViewer.tsx`** - use `KindleStyleTextViewerFixed.tsx`
-- Delete button positioning: only appears for exactly highlighted text (not partial matches)
-- Menu positioning: calculate end of selection coordinates, not center
-- Mobile scrolling: prevent accidental selection during scroll gestures
-- Canvas measurement: required for pixel-perfect word positioning on mobile
+### Component Structure
+```typescript
+// Standard mobile detection pattern used throughout
+const isMobile = () => window.innerWidth <= 768;
+const isSmallMobile = () => window.innerWidth <= 480;
 
-### AI Integration Requirements
-- Check `process.env.GROQ_API_KEY` availability before making requests
-- Use `ENHANCED_AI_GURU_PROMPT` system for consistent educational responses
-- LaTeX rendering requires `katex/dist/katex.min.css` import in main CSS
-- Message history management for conversation context
+// Responsive state management
+const [isMobile, setIsMobile] = useState(false);
+useEffect(() => {
+  const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+  checkMobile();
+  window.addEventListener('resize', checkMobile);
+  return () => window.removeEventListener('resize', checkMobile);
+}, []);
+```
 
-### Theme System Requirements
-- **ALL components must support all 4 themes** (light, dark, blue, amoled)
-- Test theme switching in every new component during development
-- Use `theme-transition` class for smooth color transitions
-- Never hardcode colors - always use CSS variables via theme utility classes
+### Touch Event Patterns
+```typescript
+// Prevent mouse/touch double-firing
+const [touchActive, setTouchActive] = useState(false);
 
-### Content Management
-- Import/Export uses JSZip for packaging content with metadata
-- Template system defines available tab types per chapter
-- Content managers (MCQ, Q&A, etc.) use consistent JSON structure
-- File uploads handled via react-dropzone with validation
+const handleTouchStart = (e: React.TouchEvent) => {
+  setTouchActive(true);
+  // Touch-specific logic
+};
 
-## Files to Reference for Understanding
+const handleMouseEvent = (e: React.MouseEvent) => {
+  if (touchActive && isMobile()) return; // Ignore mouse on mobile
+  // Mouse-specific logic
+};
 
-### Core Architecture
-- `src/components/App.tsx` - Main app routing and state management
-- `src/contexts/ThemeContext.tsx` - Theme system implementation
-- `src/contexts/UserContext.tsx` - User state and content management
+// Reset touch state with delay
+setTimeout(() => setTouchActive(false), 500);
+```
 
-### Complex Systems (Read Before Modifying)
-- `src/components/KindleStyleTextViewerFixed.tsx` - Text highlighting engine (1368 lines)
-- `src/components/EnhancedAIGuruModal.tsx` - AI integration with conversation history
-- `src/utils/aiGuruPrompt.ts` - AI prompt engineering for educational responses
+### Responsive UI Patterns
+- **Tailwind Classes**: `sm:hidden` (hide on desktop), `hidden sm:block` (show on desktop only)
+- **Conditional Rendering**: `{isMobile() ? <MobileComponent /> : <DesktopComponent />}`
+- **Dynamic Classes**: `${isMobile() ? 'text-xs p-1' : 'text-sm p-3'}`
 
-### Content Management
-- `src/pages/EnhancedReaderPage.tsx` - Multi-tab content system
-- `src/components/*Manager.tsx` - Individual content type managers
-- `src/components/BookContentManager.tsx` - Import/export functionality
+## 🔧 Debugging Tips
 
-### Styling & Configuration
-- `index.css` - CSS variables, theme utilities, responsive breakpoints
-- `vite.config.ts` - Environment variable handling, build configuration
-- `package.json` - Dependencies (note: requires --legacy-peer-deps)
+1. **AI Issues**: Check browser console for provider fallback messages
+2. **Storage Issues**: Inspect localStorage keys - they follow strict naming patterns  
+3. **Highlighting**: Look for selection range errors in mobile browsers
+4. **Theme Issues**: Check CSS variable application on document root
+5. **Mobile Touch**: Use touchActive state debugging in KindleStyleTextViewerFixed
+6. **Tab Isolation**: Verify storage keys include tabId suffixes for isolated data
 
-## Legacy/Deprecated Components (Do Not Use)
-- `AppNew.tsx` → Use `App.tsx`
-- `KindleStyleTextViewer.tsx` → Use `KindleStyleTextViewerFixed.tsx`
-- `AdvancedTextSelectionEngine.tsx` → Replaced by Kindle-style system
-- Basic component versions → Use Enhanced* versions when available
+## 🚀 Marketplace & Export System
+
+The platform includes sophisticated export/import functionality:
+- **MarketplaceBookExportService**: Creates complete book modules with all content
+- **Export Format v2.0**: Comprehensive data preservation including templates, highlights, notes
+- **Supabase Integration**: Backend marketplace for book publishing/sharing
+
+When working with export/import features, understand the complete data gathering process captures ALL localStorage content associated with books.

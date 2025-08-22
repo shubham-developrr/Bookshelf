@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
+import SupabaseBookService from '../services/SupabaseBookService';
 
 /**
- * Enhanced Book Management System with UUID and Version Control
+ * Enhanced Book Management System with UUID, Version Control, and Backend Sync
  */
 
 export interface BookMetadata {
@@ -141,7 +142,7 @@ export class BookManager {
   }
 
   /**
-   * Save book to localStorage with quota error handling
+   * Save book to localStorage with quota error handling and backend sync
    */
   static saveBook(book: BookMetadata): void {
     try {
@@ -155,6 +156,10 @@ export class BookManager {
       }
       
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(books));
+      
+      // Queue for backend sync
+      this.queueBackendSync(book);
+      
     } catch (error) {
       if (error instanceof Error && error.name === 'QuotaExceededError') {
         console.error('LocalStorage quota exceeded. Cannot save book:', book.name);
@@ -187,6 +192,10 @@ export class BookManager {
           }
           
           localStorage.setItem(this.STORAGE_KEY, JSON.stringify(books));
+          
+          // Still try to sync to backend even with minimal data
+          this.queueBackendSync(book);
+          
         } catch (retryError) {
           console.error('Failed to save even minimal book data:', retryError);
           alert('Storage quota exceeded. Please clear some data or use a different browser.');
@@ -283,7 +292,7 @@ export class BookManager {
   }
 
   /**
-   * Clean up all data associated with a book
+   * Clean up all data associated with a book including tab isolation data
    */
   static cleanupBookData(bookId: string): void {
     const keysToRemove: string[] = [];
@@ -294,13 +303,130 @@ export class BookManager {
         key.includes(`_${bookId}_`) ||
         key.startsWith(`chapters_${bookId}`) ||
         key.startsWith(`subtopics_${bookId}`) ||
-        key.includes(bookId)
+        key.includes(bookId) ||
+        // Tab isolation patterns: ${templateType}_${book}_${chapter}_${tabId}
+        this.isTabIsolationKey(key, bookId)
       )) {
         keysToRemove.push(key);
       }
     }
     
     keysToRemove.forEach(key => localStorage.removeItem(key));
+  }
+
+  /**
+   * Check if key matches tab isolation pattern for a specific book
+   */
+  private static isTabIsolationKey(storageKey: string, bookId: string): boolean {
+    const templateTypes = ['FLASHCARD', 'MCQ', 'QA', 'NOTES', 'MINDMAP', 'VIDEOS'];
+    const customTabPattern = /^customtab_.*_.*_.*$/;
+    
+    // Check standard template patterns: ${templateType}_${book}_${chapter}_${tabId}
+    const hasTemplatePattern = templateTypes.some(templateType => 
+      storageKey.startsWith(`${templateType}_`) && storageKey.includes(`_${bookId}_`)
+    );
+    
+    // Check custom tab patterns: customtab_${tabName}_${book}_${chapter}
+    const hasCustomTabPattern = customTabPattern.test(storageKey) && storageKey.includes(`_${bookId}_`);
+    
+    return hasTemplatePattern || hasCustomTabPattern;
+  }
+
+  /**
+   * Auto-save book data with debouncing pattern (TestSprite Pattern Detection)
+   */
+  private static autoSaveCallbacks: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  
+  static autoSaveBook(book: BookMetadata, delay: number = 1000): void {
+    const saveKey = `book_${book.id}`;
+    
+    // Cancel existing auto-save callback
+    const existingTimeout = this.autoSaveCallbacks.get(saveKey);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+    
+    // Setup new auto-save with debouncing (1-second delay as per copilot instructions)
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.getAllBooks().map(b => 
+        b.id === book.id ? { ...book, updatedAt: new Date().toISOString() } : b
+      )));
+      console.log(`Auto-saved book: ${book.name}`);
+      this.autoSaveCallbacks.delete(saveKey);
+    }, delay);
+    
+    this.autoSaveCallbacks.set(saveKey, timeoutId);
+  }
+
+  /**
+   * Tab isolation storage key generator (TestSprite Pattern Detection)
+   * Pattern: ${templateType}_${bookName}_${chapterKey}_${tabId}
+   */
+  static generateTabIsolatedStorageKey(
+    templateType: string,
+    bookName: string,
+    chapterKey: string,
+    tabId?: string
+  ): string {
+    const baseKey = `${templateType}_${bookName.replace(/\s+/g, '_')}_${chapterKey.replace(/\s+/g, '_')}`;
+    return tabId ? `${baseKey}_${tabId}` : baseKey;
+  }
+
+  /**
+   * Priority fallback pattern for tab-isolated data (TestSprite Pattern Detection)
+   * Priority: tab-specific → base → default
+   */
+  static getTabIsolatedData<T>(
+    templateType: string,
+    bookName: string,
+    chapterKey: string,
+    tabId?: string,
+    defaultValue: T[] = []
+  ): T[] {
+    const baseKey = this.generateTabIsolatedStorageKey(templateType, bookName, chapterKey);
+    const tabKey = tabId ? `${baseKey}_${tabId}` : null;
+    
+    // Priority: tab-specific → base → default
+    if (tabKey && localStorage.getItem(tabKey)) {
+      try {
+        return JSON.parse(localStorage.getItem(tabKey)!) || defaultValue;
+      } catch {
+        return defaultValue;
+      }
+    }
+    
+    if (localStorage.getItem(baseKey)) {
+      try {
+        return JSON.parse(localStorage.getItem(baseKey)!) || defaultValue;
+      } catch {
+        return defaultValue;
+      }
+    }
+    
+    return defaultValue;
+  }
+
+  /**
+   * Save tab-isolated data with auto-save pattern (TestSprite Pattern Detection)
+   */
+  static saveTabIsolatedData<T>(
+    templateType: string,
+    bookName: string,
+    chapterKey: string,
+    data: T[],
+    tabId?: string
+  ): void {
+    const storageKey = this.generateTabIsolatedStorageKey(templateType, bookName, chapterKey, tabId);
+    
+    // Auto-save with debouncing pattern
+    setTimeout(() => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(data));
+        console.log(`Auto-saved ${templateType} data for ${bookName} - ${chapterKey}${tabId ? ` (Tab: ${tabId})` : ''}`);
+      } catch (error) {
+        console.error(`Failed to save ${templateType} data:`, error);
+      }
+    }, 1000);
   }
 
   /**
@@ -500,6 +626,132 @@ export class BookManager {
       console.log('All book data cleared from localStorage');
     } catch (error) {
       console.error('Failed to clear data:', error);
+    }
+  }
+
+  // ==================== BACKEND SYNC METHODS ====================
+
+  /**
+   * Queue book for backend sync
+   */
+  private static queueBackendSync(book: BookMetadata): void {
+    if (typeof window === 'undefined') return; // Skip during SSR
+    
+    try {
+      SupabaseBookService.queueForSync(book.id);
+      
+      // Debounced sync - only sync if user is online and authenticated
+      setTimeout(() => {
+        if (SupabaseBookService.isOnline()) {
+          SupabaseBookService.saveBook(book).catch(error => {
+            console.warn('Background sync failed:', error);
+            // Keep in queue for retry
+          });
+        }
+      }, 2000);
+    } catch (error) {
+      console.warn('Failed to queue backend sync:', error);
+    }
+  }
+
+  /**
+   * Sync all books to backend
+   */
+  static async syncAllBooksToBackend(): Promise<{ success: boolean; synced: number; errors: string[] }> {
+    try {
+      const result = await SupabaseBookService.syncAllBooks();
+      console.log(`📚 Synced ${result.synced} books to backend`);
+      return result;
+    } catch (error) {
+      console.error('Failed to sync books to backend:', error);
+      return { success: false, synced: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] };
+    }
+  }
+
+  /**
+   * Load books from backend and merge with local
+   */
+  static async loadBooksFromBackend(): Promise<{ success: boolean; loaded: number; errors: string[] }> {
+    try {
+      const result = await SupabaseBookService.getUserBooks();
+      
+      if (!result.success || !result.books) {
+        return { success: false, loaded: 0, errors: [result.error || 'Failed to load books'] };
+      }
+
+      const localBooks = this.getAllBooks();
+      const errors: string[] = [];
+      let loaded = 0;
+
+      // Merge remote books with local books
+      for (const remoteBook of result.books) {
+        const localBook = localBooks.find(b => b.id === remoteBook.id);
+        
+        if (!localBook) {
+          // Book exists only remotely - load it
+          const loadResult = await SupabaseBookService.loadBook(remoteBook.id);
+          if (loadResult.success) {
+            loaded++;
+          } else {
+            errors.push(`${remoteBook.name}: ${loadResult.error}`);
+          }
+        } else {
+          // Book exists locally and remotely - check for conflicts
+          const localTime = new Date(localBook.updatedAt).getTime();
+          const remoteTime = new Date(remoteBook.updatedAt).getTime();
+          
+          if (remoteTime > localTime) {
+            // Remote version is newer - load it
+            const loadResult = await SupabaseBookService.loadBook(remoteBook.id);
+            if (loadResult.success) {
+              loaded++;
+            } else {
+              errors.push(`${remoteBook.name}: ${loadResult.error}`);
+            }
+          }
+        }
+      }
+
+      console.log(`📥 Loaded ${loaded} books from backend`);
+      return { success: errors.length === 0, loaded, errors };
+      
+    } catch (error) {
+      console.error('Failed to load books from backend:', error);
+      return { success: false, loaded: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] };
+    }
+  }
+
+  /**
+   * Enable auto-sync for all books
+   */
+  static enableAutoSync(): void {
+    const books = this.getAllBooks();
+    books.forEach(book => {
+      SupabaseBookService.enableAutoSync(book.id);
+    });
+    console.log(`🔄 Enabled auto-sync for ${books.length} books`);
+  }
+
+  /**
+   * Disable auto-sync for all books
+   */
+  static disableAutoSync(): void {
+    const books = this.getAllBooks();
+    books.forEach(book => {
+      SupabaseBookService.disableAutoSync(book.id);
+    });
+    console.log(`⏸️ Disabled auto-sync for ${books.length} books`);
+  }
+
+  /**
+   * Process sync queue (call when coming online)
+   */
+  static async processSyncQueue(): Promise<void> {
+    try {
+      await SupabaseBookService.processSyncQueue();
+      console.log('📤 Processed sync queue');
+    } catch (error) {
+      console.error('Failed to process sync queue:', error);
     }
   }
 }

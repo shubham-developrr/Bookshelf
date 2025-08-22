@@ -5,6 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { PencilIcon, EyeIcon, BookOpenIcon, PlusIcon, TrashIcon } from './icons';
+import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
 import 'katex/dist/katex.min.css';
 
 interface Note {

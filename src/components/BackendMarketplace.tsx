@@ -80,7 +80,7 @@ const BackendMarketplace: React.FC<BackendMarketplaceProps> = ({ onDownloadBook 
         marketplaceBook.book_id
       );
 
-      if (downloadResult.success && downloadResult.downloadData) {
+      if (downloadResult.success && downloadResult.importResult) {
         // Create book metadata directly from marketplace data
         const bookData = {
           id: marketplaceBook.book_id,

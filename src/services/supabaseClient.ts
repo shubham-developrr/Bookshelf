@@ -164,6 +164,38 @@ export interface Database {
           note?: string | null;
         };
       };
+      user_books: {
+        Row: {
+          id: string;
+          user_id: string;
+          book_data: any;
+          chapters_data: any[];
+          content_data: Record<string, any>;
+          created_at: string;
+          updated_at: string;
+          last_synced: string;
+        };
+        Insert: {
+          id: string;
+          user_id: string;
+          book_data: any;
+          chapters_data?: any[];
+          content_data?: Record<string, any>;
+          created_at?: string;
+          updated_at?: string;
+          last_synced?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          book_data?: any;
+          chapters_data?: any[];
+          content_data?: Record<string, any>;
+          created_at?: string;
+          updated_at?: string;
+          last_synced?: string;
+        };
+      };
     };
   };
 }

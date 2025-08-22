@@ -42,3 +42,11 @@ docs/
 test-book-export/
 
 test-zip-correctness/
+
+mcp-servers.json
+
+.github/
+.github\copilot-instructions.md
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md

@@ -1,8 +1,0 @@
-{
-  "bookName": "Test Import Book",
-  "bookId": "test_book_001",
-  "exportDate": "2025-08-19T10:30:00.000Z",
-  "version": "1.0.0",
-  "chapters": ["Introduction to Test", "Advanced Test Topics"],
-  "description": "Test book for import functionality"
-}

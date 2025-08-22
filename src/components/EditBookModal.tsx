@@ -36,15 +36,35 @@ const EditBookModal: React.FC<EditBookModalProps> = ({ isOpen, onClose, onSave, 
         }
     }, [initialData]);
 
-    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
             setImageFile(file);
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                setFormData(prev => ({ ...prev, image: e.target?.result as string }));
-            };
-            reader.readAsDataURL(file);
+            
+            try {
+                // Import the asset manager service
+                const { SupabaseAssetService } = await import('../services/SupabaseAssetService');
+                
+                // Upload cover image to cloud storage
+                const uploadResult = await SupabaseAssetService.uploadAsset(file, {
+                    assetType: 'image'
+                });
+
+                if (uploadResult.success && uploadResult.url) {
+                    setFormData(prev => ({ ...prev, image: uploadResult.url! }));
+                    console.log(`✅ Cover image uploaded to cloud: ${file.name}`);
+                } else {
+                    throw new Error(uploadResult.error || 'Upload failed');
+                }
+            } catch (error) {
+                console.error('Cover image cloud upload failed, falling back to base64:', error);
+                // Fallback to base64 storage
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setFormData(prev => ({ ...prev, image: e.target?.result as string }));
+                };
+                reader.readAsDataURL(file);
+            }
         }
     };
 

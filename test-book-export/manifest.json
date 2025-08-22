@@ -1,8 +1,0 @@
-{
-  "bookName": "Test Imported Book",
-  "bookId": "test-book-import",
-  "exportDate": "2024-01-15T10:00:00.000Z",
-  "version": "1.0",
-  "chapters": ["Introduction to Testing"],
-  "description": "This is a test book to verify import functionality and localStorage persistence."
-}

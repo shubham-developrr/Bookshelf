@@ -173,13 +173,15 @@ interface EnhancedReaderPageProps {
     highlights: Highlight[];
     addHighlight: (highlight: Omit<Highlight, 'id' | 'timestamp'>) => void;
     removeHighlight: (id: string) => void;
+    section?: string; // 'shelf' or 'creator' for isolated storage
 }
 
 const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({ 
     openAIGuru, 
     highlights, 
     addHighlight, 
-    removeHighlight 
+    removeHighlight,
+    section = 'creator' // Default to creator for backwards compatibility 
 }) => {
     const { subjectName, chapterName } = useParams<{ subjectName: string; chapterName: string }>();
     const navigate = useNavigate();
@@ -2415,6 +2417,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
                     <MindMapManager
                         currentBook={currentBook}
                         currentChapter={currentChapter}
+                        tabId={activeTab} // Consistently pass tabId
                     />
                 );
         }
@@ -2425,6 +2428,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
                 <MindMapManager
                     currentBook={currentBook}
                     currentChapter={currentChapter}
+                    tabId={activeTab} // Consistently pass tabId
                 />
             );
         }
@@ -2475,7 +2479,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3 sm:gap-4">
                         <button 
-                            onClick={() => navigate(`/subject/${encodeURIComponent(currentBook)}`)}
+                            onClick={() => navigate(`/shelf/subject/${encodeURIComponent(currentBook)}`)}
                             className="p-2 rounded-lg hover:theme-surface2 theme-transition touch-manipulation"
                             style={{ minWidth: '44px', minHeight: '44px' }}
                         >
@@ -2488,7 +2492,7 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
                     
                     {/* Exam Mode Button - Theme Adaptive */}
                     <button
-                        onClick={() => navigate(`/exam/${encodeURIComponent(currentBook)}/${encodeURIComponent(currentChapter)}`)}
+                        onClick={() => navigate(`/shelf/exam/${encodeURIComponent(currentBook)}/${encodeURIComponent(currentChapter)}`)}
                         className="flex items-center gap-2 px-3 py-2 theme-accent text-white rounded-lg hover:opacity-90 theme-transition touch-manipulation font-medium text-sm"
                         style={{ minHeight: '44px' }}
                     >

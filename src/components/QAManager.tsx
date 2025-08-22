@@ -4,6 +4,7 @@ import { processAIImport } from '../utils/aiImportService';
 import { OCRService } from '../utils/ocrService';
 import AILoadingAnimation from './AILoadingAnimation';
 import { QATest } from './TestComponents';
+import { BookTabManager, BookTabContext } from '../utils/BookTabManager';
 
 interface QAQuestion {
     id: string;
@@ -51,9 +52,14 @@ const QAManager: React.FC<QAManagerProps> = ({
     // Edit state
     const [editingQuestion, setEditingQuestion] = useState<QAQuestion | null>(null);
 
-    // Create unique storage key that includes tab ID for isolation
-    const baseKey = `qa_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
-    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
+    // Book tab context for proper data isolation
+    const tabContext: BookTabContext = React.useMemo(() => {
+        return BookTabManager.createTemplateTabContext(
+            currentBook,
+            currentChapter,
+            'qa'
+        );
+    }, [currentBook, currentChapter]);
 
     // Base marks options
     const baseMarksOptions = [1, 2, 5, 7, 10];
@@ -75,20 +81,28 @@ const QAManager: React.FC<QAManagerProps> = ({
 
     // Load Q&As from localStorage
     React.useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            const questions = JSON.parse(saved).map((q: any) => ({
-                ...q,
-                timestamp: new Date(q.timestamp)
-            }));
-            setQaQuestions(questions);
+        try {
+            const data = BookTabManager.loadTabData('qa', tabContext);
+            if (data && Array.isArray(data)) {
+                const questions = data.map((q: any) => ({
+                    ...q,
+                    timestamp: new Date(q.timestamp)
+                }));
+                setQaQuestions(questions);
+            }
+        } catch (error) {
+            console.error('Failed to load QA questions:', error);
         }
-    }, [storageKey]);
+    }, [tabContext]);
 
     // Save Q&As to localStorage
     const saveQaQuestions = (questions: QAQuestion[]) => {
-        localStorage.setItem(storageKey, JSON.stringify(questions));
-        setQaQuestions(questions);
+        try {
+            BookTabManager.saveTabData('qa', tabContext, questions);
+            setQaQuestions(questions);
+        } catch (error) {
+            console.error('Failed to save QA questions:', error);
+        }
     };
 
     // Create new Q&A

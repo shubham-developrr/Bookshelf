@@ -36,8 +36,9 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
     const [isAIProcessing, setIsAIProcessing] = useState(false);
 
     // Create unique storage key that includes tab ID for isolation
+    // IMPORTANT: Use base key only to ensure data consistency across tabs
     const baseKey = `flashcards_${currentBook}_${currentChapter.replace(/\s+/g, '_')}`;
-    const storageKey = tabId ? `${baseKey}_${tabId}` : baseKey;
+    const storageKey = baseKey; // Temporarily disable tab isolation to fix sync issues
 
     // Load flashcards from localStorage
     useEffect(() => {

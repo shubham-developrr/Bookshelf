@@ -22,6 +22,7 @@ import PublishModal from '../components/PublishModal';
 import EnhancedAIGuruModal from '../components/EnhancedAIGuruModal';
 import MarketplaceBookManager from '../components/MarketplaceBookManager';
 import UpdateChecker from '../components/UpdateChecker';
+import SyncStatusUI from '../components/SyncStatusUI';
 
 // Gear icon component
 const GearIcon: React.FC = () => (
@@ -119,16 +120,17 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
 
     const handleBookDownload = async (marketplaceBook: any) => {
         try {
-            // For marketplace books, we need to download from the backend
+            console.log('🚀 Starting book download:', marketplaceBook.title);
+
+            // For marketplace books, use the enhanced download system
             if (marketplaceBook.id) {
                 const result = await EnhancedMarketplaceService.downloadBook(marketplaceBook.id);
                 
-                if (result.success && result.downloadData) {
-                    // For now, we'll use a simplified approach since the actual book file 
-                    // download and import is complex. Let's just add it to the imported books.
+                if (result.success && result.importResult) {
+                    // Create proper imported book entry with complete data
                     const newImportedBook = {
-                        id: marketplaceBook.book_id || marketplaceBook.id,
-                        name: marketplaceBook.title,
+                        id: result.importResult.bookId,
+                        name: result.importResult.bookName,
                         description: marketplaceBook.description,
                         creatorName: marketplaceBook.author_name,
                         university: marketplaceBook.university || '',
@@ -136,15 +138,26 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                         subjectCode: marketplaceBook.subject_code || '',
                         marketplaceId: marketplaceBook.id,
                         downloadDate: new Date().toISOString(),
-                        version: marketplaceBook.version
+                        version: marketplaceBook.version,
+                        // Include import statistics for verification
+                        importStats: result.importResult.imported,
+                        hasCompleteContent: true
                     };
                     
                     const updatedImportedBooks = [...importedBooks, newImportedBook];
                     setImportedBooks(updatedImportedBooks);
                     localStorage.setItem('importedBooks', JSON.stringify(updatedImportedBooks));
                     
-                    console.log('Book downloaded successfully:', marketplaceBook.title);
-                    alert('Book downloaded successfully! Check "Your Shelf" section.');
+                    console.log('✅ Book downloaded and imported successfully:', result.importResult);
+                    
+                    alert(
+                        `Book downloaded successfully!\n\n` +
+                        `📖 "${result.importResult.bookName}"\n` +
+                        `📚 ${result.importResult.imported.chapters} chapters imported\n` +
+                        `📝 ${result.importResult.imported.subtopics} subtopics\n` +
+                        `📋 ${result.importResult.imported.tabs} template tabs\n` +
+                        `\nCheck "Your Shelf" section to access the content.`
+                    );
                 } else {
                     throw new Error(result.error || 'Download failed');
                 }
@@ -153,6 +166,7 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                 const bookModule = await bookLoader.loadBookModule(marketplaceBook);
                 setLoadedBooks([...bookLoader.getLoadedBooks()]);
                 console.log('Book downloaded successfully:', bookModule.title);
+                alert('Book downloaded successfully! Check "Your Shelf" section.');
             }
         } catch (error) {
             console.error('Error downloading book:', error);
@@ -432,7 +446,7 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
     const renderBookCard = (book: BookModule) => (
         <button
             key={book.id}
-            onClick={() => navigate(`/book/${book.id}`)}
+            onClick={() => navigate(`/shelf/subject/${encodeURIComponent(book.id)}`)}
             className="card theme-transition group text-left p-3 sm:p-4 lg:p-6 flex flex-col h-full relative"
         >
             <div className="absolute top-2 right-2 z-10">
@@ -547,7 +561,7 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
     const renderLegacySubjectCard = (subject: string) => (
         <button
             key={subject}
-            onClick={() => navigate(`/subject/${encodeURIComponent(subject)}`)}
+            onClick={() => navigate(`/shelf/subject/${encodeURIComponent(subject)}`)}
             className="card theme-transition group text-left p-3 sm:p-4 lg:p-6 flex flex-col h-full"
         >
             <div className="aspect-[3/4] mb-3 sm:mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 flex-shrink-0">
@@ -585,7 +599,7 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
             </div>
             
             <button
-                onClick={() => navigate(`/subject/${encodeURIComponent(book.name)}`)}
+                onClick={() => navigate(`/shelf/subject/${encodeURIComponent(book.name)}`)}
                 className="flex-1 w-full"
             >
                 <div className="aspect-[3/4] mb-3 sm:mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-purple-100 to-purple-200 flex-shrink-0 flex items-center justify-center">
@@ -628,7 +642,12 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                     </div>
                     
                     {/* Action Buttons - Profile moved to the right */}
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-3">
+                        {/* Sync Status */}
+                        {state.isAuthenticated && (
+                            <SyncStatusUI className="hidden sm:flex" />
+                        )}
+                        
                         {/* Authentication Area */}
                         {state.isAuthenticated ? (
                             <UserProfileDropdown />
