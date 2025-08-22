@@ -4,7 +4,7 @@ import UnifiedBookAdapter from '../services/UnifiedBookAdapter';
 interface CreateBookModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (bookData: BookData) => void;
+    onSave: (bookData: BookData) => Promise<void>;
 }
 
 export interface BookData {
@@ -27,12 +27,15 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
     });
 
     const [imageFile, setImageFile] = useState<File | null>(null);
+    const [isImageUploading, setIsImageUploading] = useState(false);
+    const [isCreatingBook, setIsCreatingBook] = useState(false);
     const fileInputRef = React.createRef<HTMLInputElement>();
 
     const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
             setImageFile(file);
+            setIsImageUploading(true);
             
             try {
                 // Import the asset manager service
@@ -57,6 +60,8 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
                     setFormData(prev => ({ ...prev, image: e.target?.result as string }));
                 };
                 reader.readAsDataURL(file);
+            } finally {
+                setIsImageUploading(false);
             }
         }
     };
@@ -65,26 +70,47 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
         fileInputRef.current?.click();
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name.trim() || !formData.creatorName.trim() || !formData.university.trim()) {
             alert('Please fill in all required fields');
             return;
         }
         
-        onSave(formData);
+        // Check if image is still uploading
+        if (isImageUploading) {
+            alert('Please wait for the image upload to complete before creating the book.');
+            return;
+        }
         
-        // Reset form
-        setFormData({
-            name: '',
-            image: '',
-            creatorName: '',
-            university: '',
-            semester: '',
-            subjectCode: ''
-        });
-        setImageFile(null);
-        onClose();
+        setIsCreatingBook(true);
+        
+        try {
+            // Wait a brief moment to ensure any async image processing is complete
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            await onSave(formData);
+            
+            // Show success message
+            alert('📚 Book created successfully!');
+            
+            // Reset form
+            setFormData({
+                name: '',
+                image: '',
+                creatorName: '',
+                university: '',
+                semester: '',
+                subjectCode: ''
+            });
+            setImageFile(null);
+            onClose();
+        } catch (error) {
+            console.error('Error creating book:', error);
+            alert('Failed to create book. Please try again.');
+        } finally {
+            setIsCreatingBook(false);
+        }
     };
 
     const handleInputChange = (field: keyof BookData, value: string) => {
@@ -95,7 +121,19 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
 
     return (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="theme-surface rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="theme-surface rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col relative">
+                
+                {/* Loading Overlay */}
+                {isCreatingBook && (
+                    <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-60 rounded-lg">
+                        <div className="text-white text-center">
+                            <div className="animate-spin text-4xl mb-4">📚</div>
+                            <div className="text-lg font-semibold mb-2">Creating your book...</div>
+                            <div className="text-sm opacity-75">Please wait while we set up everything</div>
+                        </div>
+                    </div>
+                )}
+                
                 <div className="flex justify-between items-center p-6 border-b theme-border flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div>
@@ -135,14 +173,20 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
                             </label>
                             <div className="flex items-center gap-4">
                                 <div className="w-16 h-20 theme-surface2 rounded-lg flex items-center justify-center border theme-border overflow-hidden">
-                                    {formData.image ? (
+                                    {isImageUploading ? (
+                                        <div className="animate-spin text-blue-500">
+                                            📤
+                                        </div>
+                                    ) : formData.image ? (
                                         <img 
                                             src={formData.image} 
                                             alt="Book cover" 
                                             className="w-full h-full object-cover"
                                         />
                                     ) : (
-                                        null
+                                        <div className="text-gray-400 text-xs text-center">
+                                            No Image
+                                        </div>
                                     )}
                                 </div>
                                 <input
@@ -151,16 +195,20 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
                                     accept="image/*"
                                     onChange={handleImageUpload}
                                     className="hidden"
+                                    disabled={isImageUploading}
                                 />
                                 <button
                                     type="button"
                                     onClick={triggerFileUpload}
-                                    className="btn-secondary cursor-pointer"
+                                    disabled={isImageUploading}
+                                    className={`btn-secondary cursor-pointer ${isImageUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    Choose Image
+                                    {isImageUploading ? 'Uploading...' : 'Choose Image'}
                                 </button>
                             </div>
-                            <p className="text-xs theme-text-secondary mt-1">You can add or change the cover image later</p>
+                            <p className="text-xs theme-text-secondary mt-1">
+                                {isImageUploading ? 'Uploading image to cloud...' : 'You can add or change the cover image later'}
+                            </p>
                         </div>
                         {/* Creator Name */}
                     <div>
@@ -234,15 +282,29 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="flex-1 px-4 py-2 theme-surface2 theme-text rounded-lg border theme-border hover:theme-surface3 theme-transition"
+                                disabled={isCreatingBook || isImageUploading}
+                                className={`flex-1 px-4 py-2 theme-surface2 theme-text rounded-lg border theme-border hover:theme-surface3 theme-transition ${(isCreatingBook || isImageUploading) ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 theme-transition font-medium"
+                                disabled={isCreatingBook || isImageUploading}
+                                className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 theme-transition font-medium flex items-center justify-center gap-2 ${(isCreatingBook || isImageUploading) ? 'opacity-75 cursor-not-allowed' : ''}`}
                             >
-                                Create Book
+                                {isCreatingBook ? (
+                                    <>
+                                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                        Creating...
+                                    </>
+                                ) : isImageUploading ? (
+                                    <>
+                                        <div className="animate-spin">📤</div>
+                                        Wait for Upload
+                                    </>
+                                ) : (
+                                    'Create Book'
+                                )}
                             </button>
                         </div>
                     </form>

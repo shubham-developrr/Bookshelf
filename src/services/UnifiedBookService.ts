@@ -11,6 +11,9 @@
 import { supabase } from './supabaseClient';
 import { v4 as uuidv4 } from 'uuid';
 
+// Lazy import to avoid circular dependency
+let EnhancedSyncService: any;
+
 export interface Book {
   id: string;
   name: string;
@@ -41,8 +44,22 @@ export interface ContentData {
 
 export class UnifiedBookService {
   private static instance: UnifiedBookService;
+  private enhancedSync: any = null;
 
-  private constructor() {}
+  private constructor() {
+    // Don't initialize EnhancedSyncService in constructor to avoid circular dependency
+  }
+
+  private async getEnhancedSync(): Promise<any> {
+    if (!this.enhancedSync) {
+      if (!EnhancedSyncService) {
+        const module = await import('./EnhancedSyncService');
+        EnhancedSyncService = module.default;
+      }
+      this.enhancedSync = EnhancedSyncService.getInstance();
+    }
+    return this.enhancedSync;
+  }
 
   static getInstance(): UnifiedBookService {
     if (!UnifiedBookService.instance) {
@@ -169,7 +186,7 @@ export class UnifiedBookService {
       // 2. Update book timestamp
       await this.updateBookTimestamp(bookId);
 
-      // 3. Sync to cloud immediately
+      // 3. Sync to cloud immediately (including highlights, custom tabs, exam mode)
       const book = await this.getBookFromLocalStorage(bookId);
       if (book) {
         const chapters = await this.getChaptersFromLocalStorage(bookId);
@@ -178,6 +195,15 @@ export class UnifiedBookService {
         
         if (!syncResult.success) {
           console.error('Failed to sync content to cloud:', syncResult.error);
+        } else {
+          // Also trigger enhanced sync for comprehensive data sync
+          this.getEnhancedSync().then(enhancedSync => {
+            enhancedSync.syncAllUserDataToCloud().then((result: any) => {
+              if (!result.success) {
+                console.warn('Enhanced sync encountered issues:', result.errors);
+              }
+            });
+          });
         }
       }
 
@@ -399,8 +425,23 @@ export class UnifiedBookService {
       key.startsWith(`notes_${normalizedBookName}`) ||
       key.startsWith(`mindmaps_${normalizedBookName}`) ||
       key.startsWith(`videos_${normalizedBookName}`) ||
-      key.startsWith(`highlights_`) ||
-      (key.includes('customtab_') && key.includes(`_${normalizedBookName}_`))
+      key.startsWith(`questionPapers_${normalizedBookName}`) ||   // EXAM MODE: Question papers
+      key.startsWith(`evaluationReports_${normalizedBookName}`) || // EXAM MODE: Evaluation reports
+      key.startsWith(`subtopics_${bookId}_`) ||  // READ TAB: Subtopics content
+      key.startsWith(`html_editors_${normalizedBookName}_`) ||  // CUSTOM TABS: HTML editors content
+      key.startsWith(`rich_text_editors_${normalizedBookName}_`) ||  // CUSTOM TABS: Rich text editors content
+      // FIXED: Better highlights matching - highlights_BookName_ChapterName pattern
+      (key.startsWith('highlights_') && key.includes(`_${normalizedBookName}_`)) ||
+      // FIXED: Better custom tab matching - customtab_TabName_BookName_ChapterName pattern
+      (key.includes('customtab_') && key.includes(`_${normalizedBookName}_`)) ||
+      // ADDITIONAL: Tab-isolated template data (with tabId suffix)
+      key.includes(`_${normalizedBookName}_`) && key.includes('_tab_') ||
+      // ADDITIONAL: Exam mode with different patterns
+      (key.includes('exam_') && key.includes(`_${normalizedBookName}_`)) ||
+      (key.includes('evaluation_') && key.includes(`_${normalizedBookName}_`)) ||
+      // ADDITIONAL: User progress and settings
+      (key.includes('progress_') && key.includes(`_${normalizedBookName}_`)) ||
+      (key.includes('settings_') && key.includes(`_${normalizedBookName}_`))
     );
   }
 
@@ -518,12 +559,66 @@ export class UnifiedBookService {
         }
       }
 
-      console.log(`✅ Force sync completed: ${synced}/${books.length} books synced`);
+      // ENHANCED: Also sync highlights, custom tabs, and exam mode data
+      console.log('🔄 Running enhanced sync for comprehensive data...');
+      const enhancedSync = await this.getEnhancedSync();
+      const enhancedResult = await enhancedSync.syncAllUserDataToCloud();
+      if (!enhancedResult.success) {
+        errors.push(...enhancedResult.errors.map(err => `Enhanced sync: ${err}`));
+      }
+
+      console.log(`✅ Force sync completed: ${synced}/${books.length} books synced, ${enhancedResult.highlights} highlights, ${enhancedResult.customTabs} custom tabs, ${enhancedResult.examMode} exam mode entries`);
       return { success: errors.length === 0, synced, errors };
 
     } catch (error) {
       console.error('Force sync failed:', error);
       return { success: false, synced: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] };
+    }
+  }
+
+  /**
+   * Complete bidirectional sync - sync to cloud and from cloud
+   */
+  async completeBidirectionalSync(): Promise<{ success: boolean; details: any; errors: string[] }> {
+    console.log('🔄 Running complete bidirectional sync...');
+
+    try {
+      // 1. Sync all local data to cloud
+      const toCloudResult = await this.forceSyncAllToCloud();
+
+      // 2. Sync all cloud data to local
+      const enhancedSync = await this.getEnhancedSync();
+      const fromCloudResult = await enhancedSync.syncFromCloudToLocal();
+
+      // 3. Reload books to get latest data
+      const booksResult = await this.getAllBooks();
+
+      const allErrors = [
+        ...toCloudResult.errors,
+        ...(fromCloudResult.error ? [fromCloudResult.error] : [])
+      ];
+
+      const success = toCloudResult.success && fromCloudResult.success && booksResult.success;
+
+      console.log(`✅ Complete bidirectional sync ${success ? 'completed' : 'completed with errors'}`);
+
+      return {
+        success,
+        details: {
+          toCloud: toCloudResult,
+          fromCloud: fromCloudResult,
+          books: booksResult.books.length
+        },
+        errors: allErrors
+      };
+
+    } catch (error) {
+      console.error('💥 Complete bidirectional sync failed:', error);
+      return {
+        success: false,
+        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+        errors: [error instanceof Error ? error.message : 'Unknown error']
+      };
     }
   }
 }

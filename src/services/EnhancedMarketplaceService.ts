@@ -121,7 +121,7 @@ export class EnhancedMarketplaceService {
       console.log(`🚀 Starting complete book publication for: ${options.title}`);
 
       // Get book metadata
-      const bookMetadata = BookManager.getBookById(options.book_id);
+      const bookMetadata = await BookManager.getBookById(options.book_id);
       if (!bookMetadata) {
         return { success: false, error: 'Book not found' };
       }

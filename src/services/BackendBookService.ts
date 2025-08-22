@@ -15,7 +15,8 @@ import { BookTabManager } from '../utils/BookTabManager';
 export interface BookMetadata {
   id: string;
   name: string;
-  coverImage?: string;
+  image?: string; // Changed from coverImage to match BookManager interface
+  coverImage?: string; // Keep both for backward compatibility
   authorName: string;
   creatorName?: string;
   university?: string;

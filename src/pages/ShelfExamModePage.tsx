@@ -5,6 +5,8 @@ import { PlusIcon } from '../components/icons';
 import QuestionEditor from '../components/QuestionEditorNew';
 import DetailedEvaluationModal from '../components/DetailedEvaluationModal';
 import EvaluationReportsModal, { EvaluationReport } from '../components/EvaluationReportsModal';
+import ExamModeLoadingScreen from '../components/ExamModeLoadingScreen';
+import { ChapterDataLoader } from '../services/ChapterDataLoader';
 // import { generateAIGuruResponse } from '../services/githubModelsService';
 import Groq from 'groq-sdk';
 
@@ -108,6 +110,11 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
     const [customCategory, setCustomCategory] = useState('');
     const [paperDuration, setPaperDuration] = useState(30);
 
+    // Cloud-First Loading States
+    const [showExamLoadingScreen, setShowExamLoadingScreen] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [examDataLoaded, setExamDataLoaded] = useState(false);
+
     const currentBook = subjectName ? decodeURIComponent(subjectName) : '';
     const currentChapter = chapterName ? decodeURIComponent(chapterName) : '';
 
@@ -197,8 +204,62 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         return () => clearInterval(interval);
     }, [examStarted, timeRemaining]);
 
-    // Load evaluation reports from localStorage on mount
+    // NEW CLOUD-FIRST EXAM DATA LOADING
+    const loadExamDataFromCloud = async () => {
+        if (!currentBook || !currentChapter) return;
+
+        try {
+            console.log('🚀 Starting cloud-first exam data loading...');
+            
+            // Show loading screen for initial exam mode entry
+            setShowExamLoadingScreen(true);
+            
+            const loader = ChapterDataLoader.getInstance();
+            const result = await loader.loadChapterData(currentBook, currentChapter);
+            
+            console.log('📊 Exam data loading result:', result);
+            
+            // Loading screen will hide automatically when data is loaded
+            
+        } catch (error) {
+            console.error('❌ Cloud-first exam data loading failed:', error);
+            setShowExamLoadingScreen(false);
+            setExamDataLoaded(true); // Allow entry even if loading fails
+        }
+    };
+
+    // Handle exam loading screen completion
+    const handleExamLoadingComplete = () => {
+        setShowExamLoadingScreen(false);
+        setExamDataLoaded(true);
+        setIsInitialLoad(false);
+        console.log('✅ Exam mode data loading complete');
+    };
+
+    const handleExamLoadingStart = () => {
+        setIsInitialLoad(false); // Mark that we've started loading
+    };
+
+    // MAIN EXAM DATA INITIALIZATION - Cloud-first approach
     useEffect(() => {
+        const initializeExamData = async () => {
+            if (!currentBook || !currentChapter) return;
+            
+            console.log(`🚀 Initializing exam mode: ${currentBook} → ${currentChapter}`);
+            
+            // Start cloud-first data loading
+            await loadExamDataFromCloud();
+        };
+        
+        if (isInitialLoad) {
+            initializeExamData();
+        }
+    }, [currentBook, currentChapter, isInitialLoad]);
+
+    // Load evaluation reports from localStorage AFTER cloud sync
+    useEffect(() => {
+        if (!examDataLoaded) return; // Wait for cloud data to be synced first
+        
         const savedReports = localStorage.getItem(`evaluationReports_${currentBook}_${currentChapter}`);
         if (savedReports) {
             try {
@@ -207,11 +268,12 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
                     ...report,
                     submittedAt: new Date(report.submittedAt)
                 })));
+                console.log(`📊 Loaded ${reports.length} evaluation reports from localStorage`);
             } catch (error) {
                 console.error('Error loading evaluation reports:', error);
             }
         }
-    }, [currentBook, currentChapter]);
+    }, [currentBook, currentChapter, examDataLoaded]);
 
     // Save evaluation reports to localStorage whenever they change
     useEffect(() => {
@@ -223,8 +285,10 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         }
     }, [evaluationReports, currentBook, currentChapter]);
 
-    // Load question papers from localStorage on mount
+    // Load question papers from localStorage AFTER cloud sync
     useEffect(() => {
+        if (!examDataLoaded) return; // Wait for cloud data to be synced first
+        
         const savedPapers = localStorage.getItem(`questionPapers_${currentBook}_${currentChapter}`);
         if (savedPapers) {
             try {
@@ -235,11 +299,12 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
                     createdAt: new Date(paper.createdAt)
                 }));
                 setQuestionPapers(papersWithDates);
+                console.log(`📝 Loaded ${papersWithDates.length} question papers from localStorage`);
             } catch (error) {
                 console.error('Error loading question papers:', error);
             }
         }
-    }, [currentBook, currentChapter]);
+    }, [currentBook, currentChapter, examDataLoaded]);
 
     // Save question papers to localStorage whenever they change
     useEffect(() => {
@@ -784,6 +849,18 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                 return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
         }
     };
+
+    // Show loading screen if exam data hasn't been loaded yet
+    if (showExamLoadingScreen) {
+        return (
+            <ExamModeLoadingScreen
+                bookName={currentBook}
+                chapterName={currentChapter}
+                onLoadingComplete={handleExamLoadingComplete}
+                onLoadingStart={handleExamLoadingStart}
+            />
+        );
+    }
 
     return (
         <div className="theme-bg min-h-screen theme-text theme-transition">

@@ -68,6 +68,12 @@ const GeminiIcon = () => (
   </svg>
 );
 
+const SyncIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
 interface UserProfileDropdownProps {
   className?: string;
 }
@@ -81,6 +87,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className = '
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showLibraryModal, setShowLibraryModal] = useState(false);
   const [geminiStatus, setGeminiStatus] = useState<'checking' | 'available' | 'unavailable'>('checking');
+  const [isSyncing, setIsSyncing] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const user = state.user;
@@ -131,6 +138,32 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className = '
   const handlePremiumAI = () => {
     setIsOpen(false);
     setShowPremiumModal(true);
+  };
+
+  const handleResyncData = async () => {
+    if (isSyncing) return;
+    
+    setIsSyncing(true);
+    setIsOpen(false);
+    
+    try {
+      // Import the sync service dynamically to avoid circular dependencies
+      const { EnhancedSyncService } = await import('../services/EnhancedSyncService');
+      const syncService = EnhancedSyncService.getInstance();
+      
+      const result = await syncService.syncAllUserDataToCloud();
+      
+      if (result.success) {
+        alert(`✅ Sync completed successfully!\n\n📄 Highlights synced: ${result.highlights}\n📝 Custom tabs synced: ${result.customTabs}\n📊 Exam data synced: ${result.examMode}`);
+      } else {
+        alert(`⚠️ Sync completed with warnings:\n\n${result.errors.join('\n')}`);
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+      alert('❌ Sync failed. Please check your internet connection and try again.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const getThemeIcon = (themeName: string) => {
@@ -310,6 +343,25 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className = '
                   </div>
                 )}
               </div>
+            </button>
+
+            {/* Resync Data */}
+            <button
+              onClick={handleResyncData}
+              disabled={isSyncing}
+              className="flex items-center justify-between w-full px-4 py-2 text-left 
+                         hover:theme-surface-hover theme-text transition-colors duration-150
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="flex items-center space-x-3">
+                <div className={isSyncing ? 'animate-spin' : ''}>
+                  <SyncIcon />
+                </div>
+                <span>Resync</span>
+              </div>
+              {isSyncing && (
+                <span className="text-xs theme-text-secondary">Syncing...</span>
+              )}
             </button>
 
             {/* Theme Selector */}

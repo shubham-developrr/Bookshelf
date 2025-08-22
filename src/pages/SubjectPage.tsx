@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BackIcon, BookOpenIcon, PlusIcon, TrashIcon } from '../components/icons';
+import { BackIcon, BookOpenIcon, PlusIcon, TrashIcon, ExamIcon } from '../components/icons';
 import { getBookImage } from '../assets/images/index';
 import { syllabus, chapterSubtopics } from '../constants/constants';
 import { useTheme } from '../contexts/ThemeContext';
-import { MarketplaceBookExportService } from '../services/marketplaceExportService';
 import UnifiedBookAdapter from '../services/UnifiedBookAdapter';
 
 interface Chapter {
@@ -30,10 +29,6 @@ const SubjectPage: React.FC = () => {
     const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
     const [newChapterNumber, setNewChapterNumber] = useState(1);
     const [newChapterName, setNewChapterName] = useState('');
-    
-    // Export functionality state
-    const [isExporting, setIsExporting] = useState(false);
-    const [exportMessage, setExportMessage] = useState('');
 
     // Function to get the correct book image
     const getCorrectBookImage = (): string => {
@@ -286,59 +281,6 @@ const SubjectPage: React.FC = () => {
         }
     };
 
-    const handleExportBook = async () => {
-        setIsExporting(true);
-        setExportMessage('');
-        
-        try {
-            let bookData;
-            
-            if (isCustomBook) {
-                // Export custom book
-                const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
-                const customBook = savedBooks.find((savedBook: any) => savedBook.name === book);
-                if (!customBook) {
-                    throw new Error('Custom book not found');
-                }
-                
-                bookData = {
-                    bookId: customBook.id,
-                    bookName: book,
-                    chapters: customChapters.map(chapter => ({
-                        id: chapter.id,
-                        name: chapter.name,
-                        number: chapter.number
-                    }))
-                };
-            } else {
-                // Export built-in book
-                const chapters = syllabus[book];
-                if (!chapters) {
-                    throw new Error('Book not found');
-                }
-                
-                bookData = {
-                    bookId: book.toLowerCase().replace(/\s+/g, '_'),
-                    bookName: book,
-                    chapters: chapters.map((chapterName, index) => ({
-                        id: `chapter_${index + 1}`,
-                        name: chapterName,
-                        number: index + 1
-                    }))
-                };
-            }
-            
-            await MarketplaceBookExportService.exportBookModule(bookData.bookName, bookData.bookId);
-            setExportMessage(`Successfully exported "${book}"!`);
-            
-        } catch (error) {
-            console.error('Export failed:', error);
-            setExportMessage(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        } finally {
-            setIsExporting(false);
-        }
-    };
-
     if (!book || (!isCustomBook && !isImportedBook && !syllabus[book])) {
         return (
             <div className="theme-bg min-h-screen theme-transition">
@@ -369,21 +311,6 @@ const SubjectPage: React.FC = () => {
                         <h1 className="text-lg sm:text-xl font-bold theme-text">Chapters</h1>
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* Export button */}
-                        <button
-                            onClick={handleExportBook}
-                            disabled={isExporting}
-                            className="flex items-center gap-2 px-3 py-2 theme-accent text-white rounded-lg hover:bg-opacity-90 theme-transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                            title="Export this book"
-                        >
-                            {isExporting ? (
-                                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                            ) : (
-                                '📤'
-                            )}
-                            <span className="hidden sm:inline">Export</span>
-                        </button>
-                        
                         {/* Add Chapter button for custom books */}
                         {isCustomBook && (
                             <button
@@ -392,6 +319,29 @@ const SubjectPage: React.FC = () => {
                             >
                                 <PlusIcon />
                                 <span className="hidden sm:inline">Add Chapter</span>
+                            </button>
+                        )}
+                        
+                        {/* Exam Mode button - Available for all books with chapters */}
+                        {((customChapters.length > 0) || (!isCustomBook && syllabus[book] && syllabus[book].length > 0)) && (
+                            <button
+                                onClick={() => {
+                                    // Navigate to exam mode for the first chapter
+                                    let firstChapter;
+                                    if (isCustomBook && customChapters.length > 0) {
+                                        firstChapter = customChapters[0].name;
+                                    } else if (!isCustomBook && syllabus[book] && syllabus[book].length > 0) {
+                                        firstChapter = syllabus[book][0];
+                                    } else {
+                                        firstChapter = 'Chapter 1';
+                                    }
+                                    navigate(`/exam/${encodeURIComponent(book)}/${encodeURIComponent(firstChapter)}`);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 theme-transition"
+                                title="Open Exam Mode"
+                            >
+                                <ExamIcon />
+                                <span className="hidden sm:inline">Exam Mode</span>
                             </button>
                         )}
                     </div>
@@ -489,17 +439,6 @@ const SubjectPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
-
-                {/* Export Message */}
-                {exportMessage && (
-                    <div className={`mb-6 p-4 rounded-lg ${
-                        exportMessage.includes('Successfully') 
-                            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' 
-                            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
-                    }`}>
-                        {exportMessage}
-                    </div>
-                )}
 
                 {/* Add Chapter Form */}
                 {isCustomBook && showAddChapter && (

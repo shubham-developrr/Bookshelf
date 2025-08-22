@@ -20,6 +20,8 @@ import HTMLCodeEditor from '../components/HTMLCodeEditor';
 import { ResponsiveTabBar } from '../components/ResponsiveTabBar';
 import { generateAIGuruResponse } from '../services/githubModelsService';
 import { tabPersistenceManager } from '../services/TabPersistenceManager';
+import ChapterLoadingScreen from '../components/ChapterLoadingScreen';
+import { ChapterDataLoader } from '../services/ChapterDataLoader';
 import Groq from 'groq-sdk';
 
 // Template ID Constants - Built-in IDs that cannot be changed
@@ -545,6 +547,10 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
     const [loadingMessage, setLoadingMessage] = useState('Initializing chapter...');
     const [smallFilesLoaded, setSmallFilesLoaded] = useState(false);
     
+    // New Cloud-First Loading States
+    const [showChapterLoadingScreen, setShowChapterLoadingScreen] = useState(false);
+    const [isInitialChapterLoad, setIsInitialChapterLoad] = useState(true);
+    
     const [editingSubtopic, setEditingSubtopic] = useState<string | null>(null);
     const [showAddSubtopic, setShowAddSubtopic] = useState(false);
     const [newSubtopicTitle, setNewSubtopicTitle] = useState('');
@@ -600,6 +606,44 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
     const currentSubtopics = currentChapter && chapterSubtopics[currentBook] 
         ? chapterSubtopics[currentBook][currentChapter] || []
         : [];
+
+    // NEW CLOUD-FIRST CHAPTER LOADING FUNCTIONS
+    const loadChapterDataFromCloud = async () => {
+        try {
+            console.log('🚀 Starting cloud-first chapter loading...');
+            
+            // Show loading screen for initial chapter entry
+            setShowChapterLoadingScreen(true);
+            setIsLoadingChapterData(true);
+            
+            const loader = ChapterDataLoader.getInstance();
+            const result = await loader.loadChapterData(currentBook, currentChapter);
+            
+            console.log('📊 Chapter loading result:', result);
+            
+            // Loading screen will hide automatically when small files are loaded
+            // via the ChapterLoadingScreen component subscription
+            
+        } catch (error) {
+            console.error('❌ Cloud-first chapter loading failed:', error);
+            setShowChapterLoadingScreen(false);
+            setIsLoadingChapterData(false);
+            setSmallFilesLoaded(true); // Allow entry even if loading fails
+        }
+    };
+
+    // Handle loading screen completion
+    const handleLoadingComplete = () => {
+        setShowChapterLoadingScreen(false);
+        setIsLoadingChapterData(false);
+        setSmallFilesLoaded(true);
+        setIsInitialChapterLoad(false);
+        console.log('✅ Chapter loading UI complete');
+    };
+
+    const handleLoadingStart = () => {
+        setIsInitialChapterLoad(false); // Mark that we've started loading
+    };
 
     // PROGRESSIVE CHAPTER DATA LOADING
     const loadChapterDataProgressively = async () => {
@@ -698,8 +742,8 @@ const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({
             
             console.log(`🚀 Initializing chapter: ${currentBook} → ${currentChapter}`);
             
-            // Start progressive data loading
-            await loadChapterDataProgressively();
+            // Start cloud-first data loading
+            await loadChapterDataFromCloud();
             
             // Check if custom chapter
             const savedBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
@@ -2576,6 +2620,18 @@ Remember: Output ONLY the SVG code, nothing else. Make it clean, minimal, and pr
     const allSubtopics = isCustomChapter 
         ? customSubtopics.map(sub => sub.title)
         : currentSubtopics;
+
+    // NEW CLOUD-FIRST LOADING SCREEN
+    if (showChapterLoadingScreen) {
+        return (
+            <ChapterLoadingScreen
+                bookName={currentBook}
+                chapterName={currentChapter}
+                onLoadingComplete={handleLoadingComplete}
+                onLoadingStart={handleLoadingStart}
+            />
+        );
+    }
 
     // PROGRESSIVE LOADING SCREEN - Show until small files are loaded
     if (isLoadingChapterData && !smallFilesLoaded) {
