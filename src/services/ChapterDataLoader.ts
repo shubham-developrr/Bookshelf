@@ -484,23 +484,8 @@ export class ChapterDataLoader {
           // Extract tab name from existing tab data
           const normalizedBook = bookName.replace(/\s+/g, '_');
           const normalizedChapter = chapterName.replace(/\s+/g, '_');
-          
-          // Try to find the actual tab name from the tabs cache
-          const tabsCacheKey = `tabs_cache_a1c35782-6147-452f-9f00-512b3611131b_${chapterName.replace(/\s+/g, '_')}`;
-          const tabsCache = localStorage.getItem(tabsCacheKey);
-          let tabName = 'hhhhhhhhhhhhh'; // fallback
-          
-          if (tabsCache) {
-            try {
-              const tabsData = JSON.parse(tabsCache);
-              const matchingTab = tabsData.tabs?.find((tab: any) => tab.id.includes('CustomTab'));
-              if (matchingTab) {
-                tabName = matchingTab.title;
-              }
-            } catch (e) {
-              console.warn('Error parsing tabs cache:', e);
-            }
-          }
+          const keyPrefix = `html_editors_${normalizedBook}_${normalizedChapter}_`;
+          const tabName = key.substring(keyPrefix.length);
           
           // Create the expected content key that HTMLCodeEditor looks for
           const expectedContentKey = `html_editor_content_${normalizedBook}_${normalizedChapter}_${tabName}_1`;
@@ -535,36 +520,12 @@ export class ChapterDataLoader {
       
       // Handle Rich Text editor content keys
       if (key.startsWith('rich_text_editors_') && (key.includes('_CustomTab') || key.includes('_Notes'))) {
-        let editorId = '';
-        let tabName = 'hhhhhhhhhhhhh'; // default fallback
-        
         const normalizedBook = bookName.replace(/\s+/g, '_');
         const normalizedChapter = chapterName.replace(/\s+/g, '_');
-        
-        if (key.includes('_CustomTab')) {
-          const tabMatch = key.match(/CustomTab(\d+|[a-zA-Z]+)/);
-          editorId = tabMatch ? `CustomTab${tabMatch[1]}` : '';
-          
-          // Try to find the actual tab name from the tabs cache
-          const tabsCacheKey = `tabs_cache_a1c35782-6147-452f-9f00-512b3611131b_${chapterName.replace(/\s+/g, '_')}`;
-          const tabsCache = localStorage.getItem(tabsCacheKey);
-          
-          if (tabsCache) {
-            try {
-              const tabsData = JSON.parse(tabsCache);
-              const matchingTab = tabsData.tabs?.find((tab: any) => tab.id.includes('CustomTab'));
-              if (matchingTab) {
-                tabName = matchingTab.title;
-              }
-            } catch (e) {
-              console.warn('Error parsing tabs cache:', e);
-            }
-          }
-        } else if (key.includes('_Notes')) {
-          editorId = 'Notes';
-          tabName = 'Notes';
-        }
-        
+        const keyPrefix = `rich_text_editors_${normalizedBook}_${normalizedChapter}_`;
+        const tabName = key.substring(keyPrefix.length);
+        const editorId = tabName;
+
         if (editorId) {
           // Create the expected content key for rich text editors
           const expectedContentKey = `rich_text_editor_content_${normalizedBook}_${normalizedChapter}_${tabName}_1`;

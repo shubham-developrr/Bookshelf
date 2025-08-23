@@ -1849,13 +1849,40 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                 <QuestionEditor
                     paper={editingPaper}
                     onClose={() => setEditingPaper(null)}
-                    onSave={(updatedPaper) => {
+                    onSave={async (updatedPaper) => {
+                        // Update local state first for immediate UI response
                         setQuestionPapers(prev => 
                             prev.map(paper => 
                                 paper.id === updatedPaper.id ? updatedPaper : paper
                             )
                         );
                         setEditingPaper(null);
+
+                        // Then, save the updated paper to the cloud
+                        try {
+                            if (updatedPaper.cloudId) {
+                                console.log(`🔄 CREATOR: Syncing updated question paper "${updatedPaper.title}" to cloud...`);
+                                const result = await QuestionPaperService.updateQuestionPaper(updatedPaper.cloudId, updatedPaper);
+
+                                if (result.success) {
+                                    console.log(`✅ CREATOR: Successfully synced updated paper.`);
+
+                                    // Also sync with UnifiedBookAdapter for comprehensive data consistency
+                                    const adapter = UnifiedBookAdapter.getInstance();
+                                    await adapter.saveTemplateData(currentBook, currentChapter, 'questionPapers',
+                                        questionPapers.map(p => p.id === updatedPaper.id ? updatedPaper : p)
+                                    );
+                                    console.log('✅ CREATOR: Updated paper also synced via UnifiedBookAdapter');
+                                } else {
+                                    console.warn(`⚠️ CREATOR: Failed to sync updated paper:`, result.error);
+                                    // Optional: Add user feedback about sync failure
+                                }
+                            } else {
+                                console.warn(`⚠️ CREATOR: Cannot sync updated paper without a cloudId.`);
+                            }
+                        } catch (error) {
+                            console.error('❌ CREATOR: Exception while syncing updated paper:', error);
+                        }
                     }}
                 />
             )}

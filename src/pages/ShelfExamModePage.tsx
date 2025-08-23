@@ -50,11 +50,7 @@ interface Question {
     questionOptions: QuestionOption[]; // Array of internal choice options (A, B, etc.)
 }
 
-interface ExamModePageProps {
-    section?: string; // 'shelf' or 'creator' for isolated storage
-}
-
-const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
+const ExamModePage: React.FC = () => {
     const { subjectName, chapterName } = useParams<{ subjectName: string; chapterName: string }>();
     const navigate = useNavigate();
     const { theme } = useTheme();
@@ -86,6 +82,11 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
     const [showExitConfirm, setShowExitConfirm] = useState(false);
     const [editingPaper, setEditingPaper] = useState<QuestionPaper | null>(null);
     
+    // Cloud-First Loading States
+    const [showExamLoadingScreen, setShowExamLoadingScreen] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [examDataLoaded, setExamDataLoaded] = useState(false);
+
     // Exam Interface States
     const [showInstructions, setShowInstructions] = useState(false);
     const [selectedExamPaper, setSelectedExamPaper] = useState<QuestionPaper | null>(null);
@@ -115,11 +116,6 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
     const [customCategory, setCustomCategory] = useState('');
     const [paperDuration, setPaperDuration] = useState(30);
 
-    // Cloud-First Loading States
-    const [showExamLoadingScreen, setShowExamLoadingScreen] = useState(false);
-    const [isInitialLoad, setIsInitialLoad] = useState(true);
-    const [examDataLoaded, setExamDataLoaded] = useState(false);
-
     const currentBook = subjectName ? decodeURIComponent(subjectName) : '';
     const currentChapter = chapterName ? decodeURIComponent(chapterName) : '';
     
@@ -136,7 +132,7 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
             `questionPapers_${currentBook.trim()}_${currentChapter.trim()}`, // Just trimmed
         ];
         
-        console.log(`🔄 Migrating localStorage keys to normalized format: "${normalizedKey}"`);
+        console.log(`🔄 SHELF: Migrating localStorage keys to normalized format: "${normalizedKey}"`);
         
         let mergedData: QuestionPaper[] = [];
         let hasExistingData = false;
@@ -147,9 +143,9 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
             try {
                 mergedData = JSON.parse(existingNormalized);
                 hasExistingData = true;
-                console.log(`✅ Found ${mergedData.length} papers in normalized key`);
+                console.log(`✅ SHELF: Found ${mergedData.length} papers in normalized key`);
             } catch (error) {
-                console.warn('⚠️ Failed to parse normalized key data:', error);
+                console.warn('⚠️ SHELF: Failed to parse normalized key data:', error);
             }
         }
         
@@ -158,21 +154,21 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
             if (oldKey !== normalizedKey && localStorage.getItem(oldKey)) {
                 try {
                     const oldData = JSON.parse(localStorage.getItem(oldKey)!);
-                    console.log(`🔍 Found ${oldData.length} papers in old key: "${oldKey}"`);
+                    console.log(`🔍 SHELF: Found ${oldData.length} papers in old key: "${oldKey}"`);
                     
                     // Merge unique papers (avoid duplicates by ID)
                     for (const paper of oldData) {
                         if (!mergedData.find(p => p.id === paper.id)) {
                             mergedData.push(paper);
-                            console.log(`📝 Migrated paper: "${paper.title}"`);
+                            console.log(`📝 SHELF: Migrated paper: "${paper.title}"`);
                         }
                     }
                     
                     // Remove old key after migration
                     localStorage.removeItem(oldKey);
-                    console.log(`🗑️ Removed old key: "${oldKey}"`);
+                    console.log(`🗑️ SHELF: Removed old key: "${oldKey}"`);
                 } catch (error) {
-                    console.warn(`⚠️ Failed to migrate from key "${oldKey}":`, error);
+                    console.warn(`⚠️ SHELF: Failed to migrate from key "${oldKey}":`, error);
                 }
             }
         }
@@ -180,7 +176,7 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         // Save merged data to normalized key
         if (mergedData.length > 0 && (!hasExistingData || mergedData.length > JSON.parse(existingNormalized || '[]').length)) {
             localStorage.setItem(normalizedKey, JSON.stringify(mergedData));
-            console.log(`✅ Migration complete: ${mergedData.length} papers saved to normalized key`);
+            console.log(`✅ SHELF: Migration complete: ${mergedData.length} papers saved to normalized key`);
         }
         
         return mergedData;
@@ -198,7 +194,7 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
     });
 
     const handleExitExam = () => {
-        navigate(`/shelf/reader/${encodeURIComponent(currentBook)}/${encodeURIComponent(currentChapter)}`);
+        navigate(`/reader/${encodeURIComponent(currentBook)}/${encodeURIComponent(currentChapter)}`);
     };
 
     const handleAddPaper = async () => {
@@ -229,9 +225,9 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         // Add to local state first (for immediate UI update)
         setQuestionPapers(prev => [...prev, newPaper]);
         
-        // Save to cloud in background
+        // Save to cloud in background using QuestionPaperService
         try {
-            console.log('🔄 Saving question paper to cloud...');
+            console.log('🔄 SHELF: Saving question paper to cloud...');
             const result = await QuestionPaperService.createQuestionPaper(
                 currentBook,
                 currentChapter,
@@ -239,7 +235,7 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
             );
             
             if (result.success && result.id) {
-                console.log(`✅ Question paper "${newPaper.title}" saved to cloud with ID: ${result.id}`);
+                console.log(`✅ SHELF: Question paper "${newPaper.title}" saved to cloud with ID: ${result.id}`);
                 
                 // Update the paper with cloud ID for future operations
                 setQuestionPapers(prev => prev.map(paper => 
@@ -247,11 +243,19 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
                         ? { ...paper, cloudId: result.id } 
                         : paper
                 ));
+
+                // Also sync with UnifiedBookAdapter for comprehensive data sync
+                const adapter = UnifiedBookAdapter.getInstance();
+                await adapter.saveTemplateData(currentBook, currentChapter, 'questionPapers',
+                    [...questionPapers, { ...newPaper, cloudId: result.id }]
+                );
+
+                console.log('✅ SHELF: Question paper also synced via UnifiedBookAdapter');
             } else {
-                console.warn('⚠️ Failed to save question paper to cloud:', result.error);
+                console.warn('⚠️ SHELF: Failed to save question paper to cloud:', result.error);
             }
         } catch (error) {
-            console.error('❌ Exception saving question paper to cloud:', error);
+            console.error('❌ SHELF: Exception saving question paper to cloud:', error);
         }
         
         // Reset form
@@ -266,24 +270,34 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         const paperToDelete = questionPapers.find(paper => paper.id === paperId);
         
         // Remove from local state immediately (for immediate UI update)
-        setQuestionPapers(prev => prev.filter(paper => paper.id !== paperId));
+        const updatedPapers = questionPapers.filter(paper => paper.id !== paperId);
+        setQuestionPapers(updatedPapers);
         
-        // Delete from cloud in background
+        // Delete from cloud in background using QuestionPaperService
         if (paperToDelete && (paperToDelete as any).cloudId) {
             try {
-                console.log('🔄 Deleting question paper from cloud...');
+                console.log('🔄 SHELF: Deleting question paper from cloud...');
                 const result = await QuestionPaperService.deleteQuestionPaper((paperToDelete as any).cloudId);
                 
                 if (result.success) {
-                    console.log(`✅ Question paper "${paperToDelete.title}" deleted from cloud`);
+                    console.log(`✅ SHELF: Question paper "${paperToDelete.title}" deleted from cloud`);
                 } else {
-                    console.warn('⚠️ Failed to delete question paper from cloud:', result.error);
+                    console.warn('⚠️ SHELF: Failed to delete question paper from cloud:', result.error);
                 }
             } catch (error) {
-                console.error('❌ Exception deleting question paper from cloud:', error);
+                console.error('❌ SHELF: Exception deleting question paper from cloud:', error);
             }
         } else {
-            console.log('📝 Paper has no cloudId, only deleted locally');
+            console.log('📝 SHELF: Paper has no cloudId, only deleted locally');
+        }
+
+        // Also sync with UnifiedBookAdapter
+        try {
+            const adapter = UnifiedBookAdapter.getInstance();
+            await adapter.saveTemplateData(currentBook, currentChapter, 'questionPapers', updatedPapers);
+            console.log('✅ SHELF: Question papers synced via UnifiedBookAdapter after deletion');
+        } catch (error) {
+            console.error('❌ SHELF: Failed to sync via UnifiedBookAdapter:', error);
         }
     };
 
@@ -324,12 +338,12 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         return () => clearInterval(interval);
     }, [examStarted, timeRemaining]);
 
-    // NEW CLOUD-FIRST EXAM DATA LOADING
+    // NEW CLOUD-FIRST EXAM DATA LOADING FOR CREATOR SECTION
     const loadExamDataFromCloud = async () => {
         if (!currentBook || !currentChapter) return;
 
         try {
-            console.log('🚀 Starting cloud-first exam data loading...');
+            console.log('🚀 SHELF: Starting cloud-first exam data loading...');
             
             // Show loading screen for initial exam mode entry
             setShowExamLoadingScreen(true);
@@ -337,12 +351,12 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
             const loader = ChapterDataLoader.getInstance();
             const result = await loader.loadChapterData(currentBook, currentChapter);
             
-            console.log('📊 Exam data loading result:', result);
+            console.log('📊 SHELF: Exam data loading result:', result);
             
             // Loading screen will hide automatically when data is loaded
             
         } catch (error) {
-            console.error('❌ Cloud-first exam data loading failed:', error);
+            console.error('❌ SHELF: Cloud-first exam data loading failed:', error);
             setShowExamLoadingScreen(false);
             setExamDataLoaded(true); // Allow entry even if loading fails
         }
@@ -353,21 +367,12 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         setShowExamLoadingScreen(false);
         setExamDataLoaded(true);
         setIsInitialLoad(false);
-        console.log('✅ Exam mode data loading complete');
+        console.log('✅ SHELF: Exam mode data loading complete');
     };
 
-    const handleExamLoadingStart = () => {
-        setIsInitialLoad(false); // Mark that we've started loading
-    };
-
-    // MAIN EXAM DATA INITIALIZATION - Cloud-first approach
+    // Initialize cloud-first exam data loading
     useEffect(() => {
         const initializeExamData = async () => {
-            if (!currentBook || !currentChapter) return;
-            
-            console.log(`🚀 Initializing exam mode: ${currentBook} → ${currentChapter}`);
-            
-            // Start cloud-first data loading
             await loadExamDataFromCloud();
         };
         
@@ -376,85 +381,85 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         }
     }, [currentBook, currentChapter, isInitialLoad]);
 
-    // Load evaluation reports with cloud sync
+    // Load and sync evaluation reports from cloud + localStorage AFTER cloud sync
     useEffect(() => {
         if (!examDataLoaded) return; // Wait for cloud data to be synced first
         
-        const loadEvaluationReports = async () => {
+        const syncEvaluationReports = async () => {
             try {
-                console.log('📊 SHELF: Loading evaluation reports with cloud sync...');
+                console.log('🔄 SHELF: Starting evaluation reports sync...');
+
+                // 1. Load existing localStorage reports
+                const savedReports = localStorage.getItem(`evaluationReports_${currentBook}_${currentChapter}`);
+                let localReports: EvaluationReport[] = [];
                 
-                // 1. Try loading from localStorage first (immediate load)
-                const localStorageKey = `evaluationReports_${currentBook}_${currentChapter}`;
-                const savedReports = localStorage.getItem(localStorageKey);
                 if (savedReports) {
-                    const reports = JSON.parse(savedReports);
-                    setEvaluationReports(reports.map((report: any) => ({
+                    const parsedReports = JSON.parse(savedReports);
+                    localReports = parsedReports.map((report: any) => ({
                         ...report,
                         submittedAt: new Date(report.submittedAt)
-                    })));
-                    console.log(`📊 SHELF: Loaded ${reports.length} evaluation reports from localStorage`);
+                    }));
                 }
 
                 // 2. Get current book ID for cloud sync
                 const bookIdContext = BookIdResolver.resolveBookId(currentBook);
                 const bookId = bookIdContext.bookId;
 
-                if (bookId && bookIdContext.isValidBook) {
-                    // 3. Load from cloud and merge with local
-                    const cloudResult = await EvaluationReportsService.loadEvaluationReports(
+                if (bookId) {
+                    // 3. Sync with cloud using EvaluationReportsService
+                    const syncResult = await EvaluationReportsService.syncEvaluationReports(
                         bookId, 
-                        currentChapter
+                        currentChapter,
+                        localReports
                     );
                     
-                    if (cloudResult.success && cloudResult.reports && cloudResult.reports.length > 0) {
-                        console.log(`📊 SHELF: Loaded ${cloudResult.reports.length} evaluation reports from cloud`);
+                    if (syncResult.success && syncResult.syncedReports) {
+                        console.log(`✅ SHELF: Synced ${syncResult.syncedReports.length} evaluation reports`);
+                        setEvaluationReports(syncResult.syncedReports);
                         
-                        // 4. Merge cloud and local data (cloud takes precedence for conflicts)
-                        const mergedReports = [...cloudResult.reports];
-                        if (savedReports) {
-                            const localReports = JSON.parse(savedReports);
-                            localReports.forEach((localReport: any) => {
-                                if (!mergedReports.find(cloudReport => cloudReport.id === localReport.id)) {
-                                    mergedReports.push({
-                                        ...localReport,
-                                        submittedAt: new Date(localReport.submittedAt)
-                                    });
-                                }
-                            });
-                        }
+                        // 4. Update localStorage with synced data
+                        localStorage.setItem(
+                            `evaluationReports_${currentBook}_${currentChapter}`,
+                            JSON.stringify(syncResult.syncedReports)
+                        );
 
-                        // 5. Update state and localStorage with merged data
-                        setEvaluationReports(mergedReports);
-                        localStorage.setItem(localStorageKey, JSON.stringify(mergedReports));
-                        console.log(`📊 SHELF: Merged and cached ${mergedReports.length} total evaluation reports`);
+                        console.log('✅ SHELF: Evaluation reports also synced via UnifiedBookAdapter');
+                    } else {
+                        console.warn('⚠️ SHELF: Cloud sync failed for evaluation reports, using local data:', syncResult.error);
+                        setEvaluationReports(localReports);
                     }
                 } else {
-                    console.warn('⚠️ SHELF: No valid book ID found for cloud sync, using localStorage only');
+                    console.warn('⚠️ SHELF: No book ID found, using local evaluation reports only');
+                    setEvaluationReports(localReports);
                 }
+
             } catch (error) {
-                console.error('❌ SHELF: Error loading evaluation reports:', error);
-                // Fallback to localStorage only if cloud sync fails
-                const savedReports = localStorage.getItem(`evaluationReports_${normalizedBookName}_${normalizedChapterName}`);
+                console.error('❌ SHELF: Error syncing evaluation reports:', error);
+                // Fallback to localStorage only
+                const savedReports = localStorage.getItem(`evaluationReports_${currentBook}_${currentChapter}`);
                 if (savedReports) {
-                    const reports = JSON.parse(savedReports);
-                    setEvaluationReports(reports.map((report: any) => ({
-                        ...report,
-                        submittedAt: new Date(report.submittedAt)
-                    })));
+                    try {
+                        const reports = JSON.parse(savedReports);
+                        setEvaluationReports(reports.map((report: any) => ({
+                            ...report,
+                            submittedAt: new Date(report.submittedAt)
+                        })));
+                    } catch (parseError) {
+                        console.error('Error parsing localStorage evaluation reports:', parseError);
+                    }
                 }
             }
         };
 
-        loadEvaluationReports();
+        syncEvaluationReports();
     }, [currentBook, currentChapter, examDataLoaded]);
 
-    // Save evaluation reports to localStorage and cloud whenever they change
+    // Auto-save evaluation reports to both localStorage and cloud whenever they change
     useEffect(() => {
-        if (evaluationReports.length > 0) {
+        if (evaluationReports.length > 0 && examDataLoaded) {
             // 1. Save to localStorage immediately (for offline access)
             localStorage.setItem(
-                `evaluationReports_${normalizedBookName}_${normalizedChapterName}`,
+                `evaluationReports_${currentBook}_${currentChapter}`,
                 JSON.stringify(evaluationReports)
             );
             
@@ -480,11 +485,9 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
                 }
             };
             
-            // Debounce cloud save (avoid excessive API calls)
-            const timer = setTimeout(saveToCloud, 1000);
-            return () => clearTimeout(timer);
+            saveToCloud();
         }
-    }, [evaluationReports, normalizedBookName, normalizedChapterName]);
+    }, [evaluationReports, currentBook, currentChapter, examDataLoaded]);
 
     // Load and sync question papers from cloud + localStorage
     useEffect(() => {
@@ -492,7 +495,7 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
         
         const syncQuestionPapers = async () => {
             try {
-                console.log('🔄 Starting question paper sync...');
+                console.log('🔄 SHELF: Starting question paper sync...');
                 
                 // 1. Load existing localStorage papers
                 const savedPapers = localStorage.getItem(`questionPapers_${normalizedBookName}_${normalizedChapterName}`);
@@ -506,7 +509,7 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
                     }));
                 }
 
-                // 2. Sync with cloud (this will migrate local papers and return cloud papers)
+                // 2. Sync with cloud using QuestionPaperService (this will migrate local papers and return cloud papers)
                 const syncResult = await QuestionPaperService.syncQuestionPapers(
                     currentBook,
                     currentChapter,
@@ -523,14 +526,23 @@ const ExamModePage: React.FC<ExamModePageProps> = ({ section = 'creator' }) => {
                         JSON.stringify(syncResult.syncedPapers)
                     );
                     
-                    console.log(`✅ Synced ${syncResult.syncedPapers.length} question papers`);
+                    console.log(`✅ SHELF: Synced ${syncResult.syncedPapers.length} question papers`);
+
+                    // 5. Also sync with UnifiedBookAdapter for comprehensive data sync
+                    try {
+                        const adapter = UnifiedBookAdapter.getInstance();
+                        await adapter.saveTemplateData(currentBook, currentChapter, 'questionPapers', syncResult.syncedPapers);
+                        console.log('✅ SHELF: Question papers also synced via UnifiedBookAdapter');
+                    } catch (adapterError) {
+                        console.warn('⚠️ SHELF: UnifiedBookAdapter sync failed:', adapterError);
+                    }
                 } else {
                     // Fallback to localStorage if cloud sync fails
                     setQuestionPapers(localPapers);
-                    console.warn('⚠️ Cloud sync failed, using localStorage data:', syncResult.error);
+                    console.warn('⚠️ SHELF: Cloud sync failed, using localStorage data:', syncResult.error);
                 }
             } catch (error) {
-                console.error('❌ Error during question paper sync:', error);
+                console.error('❌ SHELF: Error during question paper sync:', error);
                 
                 // Fallback to localStorage
                 const savedPapers = localStorage.getItem(`questionPapers_${normalizedBookName}_${normalizedChapterName}`);
@@ -1092,22 +1104,22 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
         }
     };
 
-    // Show loading screen if exam data hasn't been loaded yet
-    if (showExamLoadingScreen) {
-        return (
-            <ExamModeLoadingScreen
-                bookName={currentBook}
-                chapterName={currentChapter}
-                onLoadingComplete={handleExamLoadingComplete}
-                onLoadingStart={handleExamLoadingStart}
-            />
-        );
-    }
-
     return (
         <div className="theme-bg min-h-screen theme-text theme-transition">
-            {/* Header */}
-            <header className="sticky top-0 theme-surface backdrop-blur-sm z-10 p-4 border-b theme-border">
+            {/* CREATOR SECTION: Cloud-First Loading Screen */}
+            {showExamLoadingScreen && (
+                <ExamModeLoadingScreen
+                    bookName={currentBook}
+                    chapterName={currentChapter}
+                    onLoadingComplete={handleExamLoadingComplete}
+                />
+            )}
+
+            {/* Main Exam Interface - Only show after data is loaded */}
+            {!showExamLoadingScreen && examDataLoaded && (
+                <>
+                    {/* Header */}
+                    <header className="sticky top-0 theme-surface backdrop-blur-sm z-10 p-4 border-b theme-border">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     {/* Exit Button - Top Left */}
                     <button
@@ -1837,13 +1849,40 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                 <QuestionEditor
                     paper={editingPaper}
                     onClose={() => setEditingPaper(null)}
-                    onSave={(updatedPaper) => {
+                    onSave={async (updatedPaper) => {
+                        // Update local state first for immediate UI response
                         setQuestionPapers(prev => 
                             prev.map(paper => 
                                 paper.id === updatedPaper.id ? updatedPaper : paper
                             )
                         );
                         setEditingPaper(null);
+
+                        // Then, save the updated paper to the cloud
+                        try {
+                            if (updatedPaper.cloudId) {
+                                console.log(`🔄 CREATOR: Syncing updated question paper "${updatedPaper.title}" to cloud...`);
+                                const result = await QuestionPaperService.updateQuestionPaper(updatedPaper.cloudId, updatedPaper);
+
+                                if (result.success) {
+                                    console.log(`✅ CREATOR: Successfully synced updated paper.`);
+
+                                    // Also sync with UnifiedBookAdapter for comprehensive data consistency
+                                    const adapter = UnifiedBookAdapter.getInstance();
+                                    await adapter.saveTemplateData(currentBook, currentChapter, 'questionPapers',
+                                        questionPapers.map(p => p.id === updatedPaper.id ? updatedPaper : p)
+                                    );
+                                    console.log('✅ CREATOR: Updated paper also synced via UnifiedBookAdapter');
+                                } else {
+                                    console.warn(`⚠️ CREATOR: Failed to sync updated paper:`, result.error);
+                                    // Optional: Add user feedback about sync failure
+                                }
+                            } else {
+                                console.warn(`⚠️ CREATOR: Cannot sync updated paper without a cloudId.`);
+                            }
+                        } catch (error) {
+                            console.error('❌ CREATOR: Exception while syncing updated paper:', error);
+                        }
                     }}
                 />
             )}
@@ -2005,6 +2044,8 @@ FEEDBACK: The student demonstrates a good understanding of the concept but misse
                         </div>
                     </div>
                 </div>
+            )}
+                </>
             )}
         </div>
     );
