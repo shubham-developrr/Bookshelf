@@ -17,7 +17,7 @@ import supabaseStorage from './services/SupabaseStorageService.js';
 dotenv.config();
 
 // Connect to database
-connectDB();
+// connectDB(); // Temporarily disabled - MongoDB connection not configured
 
 const app = express();
 

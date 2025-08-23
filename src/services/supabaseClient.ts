@@ -4,29 +4,44 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.local file.'
-  );
+// For development, we can work without Supabase initially
+let supabase: any = null;
+
+if (supabaseUrl && supabaseAnonKey && 
+    !supabaseUrl.includes('placeholder') && 
+    !supabaseAnonKey.includes('placeholder')) {
+  
+  // Create Supabase client with optimized configuration
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce'
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
+    },
+    db: {
+      schema: 'public'
+    }
+  });
+} else {
+  console.warn('Supabase not configured. Using backend API only mode.');
+  
+  // Create a mock supabase object to prevent errors
+  supabase = {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      signOut: () => Promise.resolve({ error: null })
+    }
+  };
 }
 
-// Create Supabase client with optimized configuration
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce'
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
-    }
-  },
-  db: {
-    schema: 'public'
-  }
-});
+export { supabase };
 
 // Database type definitions for TypeScript
 export interface Database {
