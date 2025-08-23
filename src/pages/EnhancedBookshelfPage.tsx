@@ -22,6 +22,7 @@ import PublishModal from '../components/PublishModal';
 import EnhancedAIGuruModal from '../components/EnhancedAIGuruModal';
 import MarketplaceBookManager from '../components/MarketplaceBookManager';
 import UpdateChecker from '../components/UpdateChecker';
+import BackendStatus from '../components/BackendStatus';
 
 // Gear icon component
 const GearIcon: React.FC = () => (
@@ -625,6 +626,7 @@ const EnhancedBookshelfPage: React.FC<EnhancedBookshelfPageProps> = ({
                             <BookOpenIcon className="w-5 h-5 text-white" />
                         </div>
                         <h1 className="text-xl sm:text-2xl font-bold theme-text flex items-center">Bookshelf</h1>
+                        <BackendStatus className="ml-4" />
                     </div>
                     
                     {/* Action Buttons - Profile moved to the right */}

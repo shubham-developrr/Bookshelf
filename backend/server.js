@@ -10,6 +10,8 @@ import tabRoutes from './routes/tabs.js';
 import examRoutes from './routes/exams.js';
 import highlightRoutes from './routes/highlights.js';
 import userRoutes from './routes/users.js';
+import uploadRoutes from './routes/uploads.js';
+import supabaseStorage from './services/SupabaseStorageService.js';
 
 // Load environment variables
 dotenv.config();
@@ -37,6 +39,10 @@ app.use('/api/tabs', tabRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/highlights', highlightRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/uploads', uploadRoutes);
+
+// Initialize Supabase storage buckets
+supabaseStorage.initializeBuckets().catch(console.error);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
