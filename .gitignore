@@ -37,3 +37,8 @@ mcp.config.json
 
 #Screenshots (optional - uncomment if you don't want to track)
 screenshots/
+docs/
+
+test-book-export/
+
+test-zip-correctness/

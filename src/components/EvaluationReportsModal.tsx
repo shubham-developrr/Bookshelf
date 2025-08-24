@@ -1,0 +1,283 @@
+import React, { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
+import { CloseIcon, FileTextIcon, ClockIcon, CheckCircleIcon, AlertCircleIcon, TrashIcon } from './icons';
+
+export interface EvaluationReport {
+    id: string;
+    paperTitle: string;
+    subjectName: string;
+    chapterName: string;
+    submittedAt: Date;
+    status: 'processing' | 'completed' | 'failed';
+    totalMarks: number;
+    obtainedMarks: number;
+    percentage: number;
+    questionResults: Array<{
+        questionId: string;
+        questionNumber: number;
+        questionType: string;
+        questionText: string;
+        userAnswer: string;
+        correctAnswer: string;
+        score: number;
+        maxScore: number;
+        feedback: string;
+        isCorrect: boolean;
+        sectionName: string;
+    }>;
+    processingProgress?: number;
+    error?: string;
+}
+
+interface EvaluationReportsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    reports: EvaluationReport[];
+    onDeleteReport: (reportId: string) => void;
+    onViewReport: (report: EvaluationReport) => void;
+}
+
+const EvaluationReportsModal: React.FC<EvaluationReportsModalProps> = ({
+    isOpen,
+    onClose,
+    reports,
+    onDeleteReport,
+    onViewReport
+}) => {
+    const { theme } = useTheme();
+    const [sortBy, setSortBy] = useState<'date' | 'score' | 'title'>('date');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'processing' | 'failed'>('all');
+
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'completed':
+                return <CheckCircleIcon className="w-4 h-4 text-green-500" />;
+            case 'processing':
+                return <ClockIcon className="w-4 h-4 text-yellow-500 animate-spin" />;
+            case 'failed':
+                return <AlertCircleIcon className="w-4 h-4 text-red-500" />;
+            default:
+                return <FileTextIcon className="w-4 h-4 theme-text-secondary" />;
+        }
+    };
+
+    const getStatusText = (status: string) => {
+        switch (status) {
+            case 'completed':
+                return 'Completed';
+            case 'processing':
+                return 'Processing...';
+            case 'failed':
+                return 'Failed';
+            default:
+                return 'Unknown';
+        }
+    };
+
+    const filteredAndSortedReports = reports
+        .filter(report => filterStatus === 'all' || report.status === filterStatus)
+        .sort((a, b) => {
+            switch (sortBy) {
+                case 'date':
+                    return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+                case 'score':
+                    return b.percentage - a.percentage;
+                case 'title':
+                    return a.paperTitle.localeCompare(b.paperTitle);
+                default:
+                    return 0;
+            }
+        });
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="theme-surface w-full max-w-6xl h-[90vh] md:max-h-[90vh] rounded-xl flex flex-col shadow-2xl overflow-hidden">
+                {/* Header - Mobile Optimized */}
+                <div className="flex justify-between items-center p-3 md:p-4 border-b theme-border flex-shrink-0">
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                        <FileTextIcon className="w-5 h-5 md:w-6 md:h-6 theme-accent-text flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                            <h2 className="text-base md:text-xl font-bold theme-text truncate">Previous Evaluation Reports</h2>
+                            <p className="text-xs md:text-sm theme-text-secondary">
+                                {reports.length} report{reports.length !== 1 ? 's' : ''} • 
+                                {reports.filter(r => r.status === 'processing').length} processing
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={onClose}
+                        className="p-1.5 md:p-2 rounded-lg hover:theme-surface2 theme-transition flex-shrink-0"
+                    >
+                        <CloseIcon />
+                    </button>
+                </div>
+
+                {/* Filters and Sort - Mobile Optimized */}
+                <div className="p-3 md:p-4 border-b theme-border flex flex-col sm:flex-row gap-2 sm:gap-4 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs md:text-sm theme-text-secondary whitespace-nowrap">Sort by:</label>
+                        <select 
+                            value={sortBy} 
+                            onChange={(e) => setSortBy(e.target.value as any)}
+                            className="px-2 md:px-3 py-1.5 md:py-1 rounded-lg theme-surface2 theme-text text-xs md:text-sm border theme-border flex-1"
+                        >
+                            <option value="date">Date</option>
+                            <option value="score">Score</option>
+                            <option value="title">Title</option>
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs md:text-sm theme-text-secondary whitespace-nowrap">Filter:</label>
+                        <select 
+                            value={filterStatus} 
+                            onChange={(e) => setFilterStatus(e.target.value as any)}
+                            className="px-2 md:px-3 py-1.5 md:py-1 rounded-lg theme-surface2 theme-text text-xs md:text-sm border theme-border flex-1"
+                        >
+                            <option value="all">All</option>
+                            <option value="completed">Completed</option>
+                            <option value="processing">Processing</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Reports List - Mobile Optimized with No Scroll */}
+                <div className="flex-1 p-3 md:p-4 overflow-hidden">
+                    {filteredAndSortedReports.length === 0 ? (
+                        <div className="text-center py-8 md:py-12 h-full flex flex-col justify-center">
+                            <FileTextIcon className="w-8 h-8 md:w-12 md:h-12 mx-auto theme-text-secondary mb-3 md:mb-4" />
+                            <p className="theme-text-secondary text-sm md:text-base">No evaluation reports found</p>
+                            <p className="text-xs md:text-sm theme-text-secondary mt-1">
+                                {filterStatus !== 'all' ? 'Try changing the filter' : 'Take an exam to see reports here'}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="h-full overflow-y-auto">
+                            <div className="grid gap-2 md:gap-4">
+                                {filteredAndSortedReports.map((report) => (
+                                    <div 
+                                        key={report.id}
+                                        className="theme-surface2 rounded-lg p-3 md:p-4 border theme-border hover:theme-surface3 theme-transition"
+                                    >
+                                        {/* Mobile-First Compact Layout */}
+                                        <div className="space-y-2 md:space-y-3">
+                                            {/* Header Row - Always Visible */}
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    {getStatusIcon(report.status)}
+                                                    <div className="min-w-0 flex-1">
+                                                        <h3 className="font-medium md:font-semibold theme-text text-sm md:text-base leading-tight truncate">
+                                                            {report.paperTitle}
+                                                        </h3>
+                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                            <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                                                report.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                                report.status === 'processing' ? 'bg-yellow-100 text-yellow-700' :
+                                                                'bg-red-100 text-red-700'
+                                                            }`}>
+                                                                {getStatusText(report.status)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-1 md:gap-2 flex-shrink-0">
+                                                    {report.status === 'completed' && (
+                                                        <button
+                                                            onClick={() => onViewReport(report)}
+                                                            className="px-2 md:px-3 py-1 md:py-2 bg-blue-600 text-white rounded text-xs md:text-sm hover:bg-blue-700 theme-transition"
+                                                        >
+                                                            View Details
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => onDeleteReport(report.id)}
+                                                        className="p-1 md:p-2 text-red-600 hover:bg-red-50 rounded theme-transition"
+                                                        title="Delete Report"
+                                                    >
+                                                        <TrashIcon className="w-3 h-3 md:w-4 md:h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Content Row - Compact Mobile Layout */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 text-xs md:text-sm">
+                                                <div className="min-w-0">
+                                                    <p className="theme-text-secondary text-xs">Subject</p>
+                                                    <p className="theme-text truncate">{report.subjectName}</p>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="theme-text-secondary text-xs">Chapter</p>
+                                                    <p className="theme-text truncate">{report.chapterName}</p>
+                                                </div>
+                                                {report.status === 'completed' && (
+                                                    <>
+                                                        <div className="min-w-0">
+                                                            <p className="theme-text-secondary text-xs">Score</p>
+                                                            <p className="theme-text font-medium">
+                                                                {report.obtainedMarks}/{report.totalMarks}
+                                                            </p>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="theme-text-secondary text-xs">Percentage</p>
+                                                            <p className={`font-medium ${
+                                                                report.percentage >= 75 ? 'text-green-600' :
+                                                                report.percentage >= 50 ? 'text-yellow-600' :
+                                                                'text-red-600'
+                                                            }`}>
+                                                                {report.percentage}%
+                                                            </p>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Bottom Row - Questions and Date */}
+                                            <div className="flex justify-between items-center text-xs theme-text-secondary pt-1 border-t theme-border">
+                                                <span>
+                                                    {report.status === 'completed' ? 
+                                                        `${report.questionResults.filter(q => q.isCorrect).length}/${report.questionResults.length} correct` :
+                                                        'In progress'
+                                                    }
+                                                </span>
+                                                <span>
+                                                    {new Date(report.submittedAt).toLocaleDateString()}
+                                                </span>
+                                            </div>
+
+                                            {/* Processing Progress - Only on Mobile when Processing */}
+                                            {report.status === 'processing' && report.processingProgress !== undefined && (
+                                                <div className="mt-2">
+                                                    <div className="flex justify-between text-xs theme-text-secondary mb-1">
+                                                        <span>Processing...</span>
+                                                        <span>{report.processingProgress}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
+                                                        <div 
+                                                            className="bg-blue-600 h-1.5 md:h-2 rounded-full transition-all duration-300"
+                                                            style={{ width: `${report.processingProgress}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Error Display - Compact */}
+                                            {report.status === 'failed' && report.error && (
+                                                <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                                                    {report.error}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default EvaluationReportsModal;
