@@ -14,6 +14,8 @@ import HighlightsPage from '../pages/HighlightsPage';
 import BookContentPage from '../pages/BookContentPage';
 import ExamModePage from '../pages/ExamModePage';
 import AuthCallback from '../pages/AuthCallback';
+import CloudSyncDemo from './CloudSyncDemo';
+import AuthWrapper from './AuthWrapper';
 import { tabPersistenceManager } from '../services/TabPersistenceManager';
 
 function AppContent() {
@@ -92,6 +94,16 @@ function AppContent() {
                                 openAIGuru={openAIGuru}
                                 removeHighlight={removeHighlight}
                             />
+                        } 
+                    />
+
+                    {/* Cloud Sync Demo */}
+                    <Route 
+                        path="/cloud-sync-demo" 
+                        element={
+                            <AuthWrapper>
+                                <CloudSyncDemo />
+                            </AuthWrapper>
                         } 
                     />
                 </Routes>
