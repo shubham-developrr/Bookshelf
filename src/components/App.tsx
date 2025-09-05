@@ -80,6 +80,7 @@ function AppContent() {
                                 highlights={highlights}
                                 addHighlight={addHighlight}
                                 removeHighlight={removeHighlight}
+                                setHighlights={setHighlights}
                             />
                         } 
                     />
