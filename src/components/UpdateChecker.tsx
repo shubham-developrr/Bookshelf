@@ -1,20 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { EnhancedMarketplaceService } from '../services/EnhancedMarketplaceService';
 
+/**
+ * @interface UpdateInfo
+ * @description Defines the structure of an update information object.
+ * @property {boolean} hasUpdate - Whether an update is available.
+ * @property {string} currentVersion - The current version of the application.
+ * @property {string} latestVersion - The latest version of the application.
+ * @property {string} [releaseNotes] - The release notes for the latest version.
+ */
 interface UpdateInfo {
   hasUpdate: boolean;
   currentVersion: string;
-  latestVersion: string;
+  latestVersion:string;
   releaseNotes?: string;
 }
 
+/**
+ * @interface UpdateCheckerProps
+ * @description Defines the props for the UpdateChecker component.
+ * @property {string} userId - The ID of the current user.
+ * @property {function} [onUpdateAvailable] - Callback function to be called when an update is available.
+ */
 interface UpdateCheckerProps {
   userId: string;
   onUpdateAvailable?: (updates: UpdateInfo[]) => void;
 }
 
 /**
- * Simplified Update Checker Component
+ * @description A component that checks for application updates and displays information about them.
+ * @param {UpdateCheckerProps} props - The props for the component.
+ * @returns {React.FC} The update checker component.
  */
 const UpdateChecker: React.FC<UpdateCheckerProps> = ({ userId, onUpdateAvailable }) => {
   const [updates, setUpdates] = useState<UpdateInfo[]>([]);

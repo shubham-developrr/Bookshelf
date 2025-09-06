@@ -16,6 +16,11 @@ import ExamModePage from '../pages/ExamModePage';
 import AuthCallback from '../pages/AuthCallback';
 import { tabPersistenceManager } from '../services/TabPersistenceManager';
 
+/**
+ * @description The main component that renders the application's UI, including the router,
+ * routes, and global modals. It also manages global state like highlights and the AI Guru modal.
+ * @returns {JSX.Element} The AppContent component.
+ */
 function AppContent() {
     const { state } = useUser();
     const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -23,7 +28,9 @@ function AppContent() {
     const [aiInitialPrompt, setAiInitialPrompt] = useState('');
     const [showAuthModal, setShowAuthModal] = useState(false);
 
-    // Initialize tab persistence when user logs in
+    /**
+     * @description Initializes the tabPersistenceManager when a user logs in.
+     */
     useEffect(() => {
         if (state.isAuthenticated && state.user) {
             tabPersistenceManager.initialize(state.user.id);
@@ -32,6 +39,10 @@ function AppContent() {
         }
     }, [state.isAuthenticated, state.user]);
 
+    /**
+     * @description Adds a new highlight to the global highlights state.
+     * @param {Highlight} highlight - The highlight object to add.
+     */
     const addHighlight = (highlight: Highlight) => {
         setHighlights(prev => {
             const newHighlight: Highlight = {
@@ -44,10 +55,18 @@ function AppContent() {
         });
     };
 
+    /**
+     * @description Removes a highlight from the global highlights state.
+     * @param {string} id - The ID of the highlight to remove.
+     */
     const removeHighlight = (id: string) => {
         setHighlights(prev => prev.filter(h => h.id !== id));
     };
 
+    /**
+     * @description Opens the AI Guru modal with an optional initial prompt.
+     * @param {string} [prompt] - The initial prompt for the AI Guru.
+     */
     const openAIGuru = (prompt?: string) => {
         setAiInitialPrompt(prompt || '');
         setAIGuruModalOpen(true);
@@ -112,6 +131,11 @@ function AppContent() {
     );
 }
 
+/**
+ * @description The root component of the application. Its primary role is to wrap the
+ * AppContent with the necessary context providers (ThemeProvider, UserProvider).
+ * @returns {JSX.Element} The App component.
+ */
 function App() {
     return (
         <ThemeProvider>

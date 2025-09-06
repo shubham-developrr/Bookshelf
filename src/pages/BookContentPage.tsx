@@ -5,6 +5,10 @@ import BookContentManager from '../components/BookContentManager';
 // Mock data store - in a real app this would be from a database or state management
 const mockBookStore: { [key: string]: { name: string; chapters: any[] } } = {};
 
+/**
+ * @description A page that displays the content of a book, including its chapters and subtopics.
+ * @returns {React.FC} The book content page.
+ */
 const BookContentPage: React.FC = () => {
     const { bookId } = useParams<{ bookId: string }>();
     const navigate = useNavigate();

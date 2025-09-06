@@ -2,11 +2,22 @@ import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { supabaseUserService } from '../services/SupabaseUserService';
 
+/**
+ * @interface EnhancedAuthModalProps
+ * @description Defines the props for the EnhancedAuthModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ */
 interface EnhancedAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+/**
+ * @description A modal component for handling user authentication (login and registration).
+ * @param {EnhancedAuthModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The enhanced authentication modal component.
+ */
 const EnhancedAuthModal: React.FC<EnhancedAuthModalProps> = ({ isOpen, onClose }) => {
   const { state, actions } = useUser();
   const [isLogin, setIsLogin] = useState(true);
@@ -21,6 +32,10 @@ const EnhancedAuthModal: React.FC<EnhancedAuthModalProps> = ({ isOpen, onClose }
 
   if (!isOpen) return null;
 
+  /**
+   * @description Handles the form submission for both login and registration.
+   * @param {React.FormEvent} e - The form event.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -45,6 +60,9 @@ const EnhancedAuthModal: React.FC<EnhancedAuthModalProps> = ({ isOpen, onClose }
     }
   };
 
+  /**
+   * @description Handles the Google login process.
+   */
   const handleGoogleLogin = async () => {
     setError(null);
     setIsLoading(true);
@@ -59,6 +77,10 @@ const EnhancedAuthModal: React.FC<EnhancedAuthModalProps> = ({ isOpen, onClose }
     }
   };
 
+  /**
+   * @description A simple Google icon component.
+   * @returns {React.ReactElement} The rendered Google icon.
+   */
   const GoogleIcon = () => (
     <svg className="w-5 h-5" viewBox="0 0 24 24">
       <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

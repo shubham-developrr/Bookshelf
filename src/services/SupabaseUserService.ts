@@ -2,12 +2,19 @@ import { supabase } from './supabaseClient';
 import type { User, UserProgress, UserHighlight, UserPreferences } from '../contexts/UserContext';
 
 /**
- * SupabaseUserService - Complete backend implementation for user management
- * Replaces the mock UserService with real Supabase integration
+ * @class SupabaseUserService
+ * @description Provides a complete backend implementation for user management, including authentication,
+ * profile, progress, and highlights, using Supabase.
  */
 export class SupabaseUserService {
   // ==================== AUTHENTICATION METHODS ====================
   
+  /**
+   * @description Logs a user in with their email and password.
+   * @param {string} email - The user's email.
+   * @param {string} password - The user's password.
+   * @returns {Promise<User>} A promise that resolves with the full user object.
+   */
   async login(email: string, password: string): Promise<User> {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -26,7 +33,10 @@ export class SupabaseUserService {
     return this.getCurrentUser() as Promise<User>;
   }
 
-  // Handle OAuth callback and session management
+  /**
+   * @description Handles the OAuth callback to finalize the session and retrieve user data.
+   * @returns {Promise<User | null>} The user object if successful, otherwise null.
+   */
   async handleOAuthCallback(): Promise<User | null> {
     try {
       const { data, error } = await supabase.auth.getSession();
@@ -49,7 +59,12 @@ export class SupabaseUserService {
     }
   }
 
-  // Ensure user profile exists (for both email and OAuth users)
+  /**
+   * @description Ensures a user profile exists in the database, creating one if it doesn't.
+   * This is crucial for new users signing up via OAuth.
+   * @private
+   * @param {any} user - The user object from Supabase auth.
+   */
   private async ensureUserProfile(user: any): Promise<void> {
     try {
       const { data: existingProfile } = await supabase
@@ -86,6 +101,10 @@ export class SupabaseUserService {
     }
   }
 
+  /**
+   * @description Initiates the Google OAuth login flow.
+   * @returns {Promise<User>} A promise that resolves with the user object after successful login and redirection.
+   */
   async loginWithGoogle(): Promise<User> {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -119,6 +138,11 @@ export class SupabaseUserService {
     });
   }
 
+  /**
+   * @description Registers a new user with email, password, and profile data.
+   * @param {object} userData - The user's registration data.
+   * @returns {Promise<User>} A promise that resolves with the new user's data.
+   */
   async register(userData: {
     email: string;
     password: string;
@@ -143,11 +167,18 @@ export class SupabaseUserService {
     return this.getCurrentUser() as Promise<User>;
   }
 
+  /**
+   * @description Logs the current user out.
+   */
   async logout(): Promise<void> {
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
   }
 
+  /**
+   * @description Retrieves the current authenticated user's session and profile data.
+   * @returns {Promise<User | null>} The full user object, or null if not authenticated.
+   */
   async getCurrentUser(): Promise<User | null> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
@@ -181,6 +212,11 @@ export class SupabaseUserService {
 
   // ==================== PROFILE MANAGEMENT ====================
 
+  /**
+   * @description Updates the current user's profile data.
+   * @param {Partial<User>} updates - An object with the user properties to update.
+   * @returns {Promise<User>} The updated user object.
+   */
   async updateProfile(updates: Partial<User>): Promise<User> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -214,6 +250,10 @@ export class SupabaseUserService {
 
   // ==================== PROGRESS MANAGEMENT ====================
 
+  /**
+   * @description Fetches all progress records for the current user.
+   * @returns {Promise<UserProgress[]>} An array of user progress objects.
+   */
   async getProgress(): Promise<UserProgress[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -237,6 +277,11 @@ export class SupabaseUserService {
     }));
   }
 
+  /**
+   * @description Creates or updates a progress record for a specific chapter.
+   * @param {Omit<UserProgress, 'lastAccessed'>} progress - The progress data to save.
+   * @returns {Promise<UserProgress>} The updated progress object.
+   */
   async updateProgress(progress: Omit<UserProgress, 'lastAccessed'>): Promise<UserProgress> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -273,6 +318,10 @@ export class SupabaseUserService {
 
   // ==================== HIGHLIGHTS MANAGEMENT ====================
 
+  /**
+   * @description Fetches all highlights for the current user.
+   * @returns {Promise<UserHighlight[]>} An array of user highlight objects.
+   */
   async getHighlights(): Promise<UserHighlight[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -298,6 +347,11 @@ export class SupabaseUserService {
     }));
   }
 
+  /**
+   * @description Adds a new highlight for the current user.
+   * @param {Omit<UserHighlight, 'id' | 'createdAt' | 'updatedAt'>} highlight - The highlight data to add.
+   * @returns {Promise<UserHighlight>} The newly created highlight object.
+   */
   async addHighlight(highlight: Omit<UserHighlight, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserHighlight> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -331,6 +385,12 @@ export class SupabaseUserService {
     };
   }
 
+  /**
+   * @description Updates an existing highlight for the current user.
+   * @param {string} id - The ID of the highlight to update.
+   * @param {Partial<UserHighlight>} updates - The fields to update.
+   * @returns {Promise<UserHighlight>} The updated highlight object.
+   */
   async updateHighlight(id: string, updates: Partial<UserHighlight>): Promise<UserHighlight> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -363,6 +423,10 @@ export class SupabaseUserService {
     };
   }
 
+  /**
+   * @description Removes a highlight for the current user.
+   * @param {string} id - The ID of the highlight to remove.
+   */
   async removeHighlight(id: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -379,7 +443,9 @@ export class SupabaseUserService {
   // ==================== REAL-TIME SUBSCRIPTIONS ====================
 
   /**
-   * Subscribe to real-time updates for user progress
+   * @description Subscribes to real-time updates for user progress.
+   * @param {(progress: UserProgress) => void} callback - The function to call on update.
+   * @returns {any} The Supabase subscription object.
    */
   subscribeToProgressUpdates(callback: (progress: UserProgress) => void) {
     return supabase
@@ -411,7 +477,9 @@ export class SupabaseUserService {
   }
 
   /**
-   * Subscribe to real-time updates for user highlights
+   * @description Subscribes to real-time updates for user highlights.
+   * @param {(highlight: UserHighlight, event: 'INSERT' | 'UPDATE' | 'DELETE') => void} callback - The function to call on update.
+   * @returns {any} The Supabase subscription object.
    */
   subscribeToHighlightUpdates(callback: (highlight: UserHighlight, event: 'INSERT' | 'UPDATE' | 'DELETE') => void) {
     return supabase
@@ -445,12 +513,15 @@ export class SupabaseUserService {
   }
 
   /**
-   * Unsubscribe from all real-time channels
+   * @description Unsubscribes from all real-time channels.
    */
   unsubscribeAll() {
     supabase.removeAllChannels();
   }
 }
 
-// Create and export singleton instance
+/**
+ * @const supabaseUserService
+ * @description The exported singleton instance of the SupabaseUserService class.
+ */
 export const supabaseUserService = new SupabaseUserService();

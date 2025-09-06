@@ -4,6 +4,13 @@ import { extractTextFromFile, extractTextFromMultipleFiles, OCRProgress } from '
 import { processAIImport } from '../utils/aiImportService';
 import AILoadingAnimation from './AILoadingAnimation';
 
+/**
+ * @interface QuestionEditorProps
+ * @description Defines the props for the QuestionEditor component.
+ * @property {object} paper - The exam paper object.
+ * @property {function} onClose - Callback function to close the editor.
+ * @property {function} onSave - Callback function to save the updated paper.
+ */
 interface QuestionEditorProps {
     paper: {
         id: string;
@@ -19,6 +26,15 @@ interface QuestionEditorProps {
     onSave: (updatedPaper: any) => void;
 }
 
+/**
+ * @interface Section
+ * @description Defines the structure of a section in an exam paper.
+ * @property {string} id - The unique identifier for the section.
+ * @property {string} name - The name of the section.
+ * @property {number} totalQuestions - The total number of questions in the section.
+ * @property {number} requiredAnswers - The number of questions required to be answered in the section.
+ * @property {Question[]} questions - An array of questions in the section.
+ */
 interface Section {
     id: string;
     name: string;
@@ -27,6 +43,15 @@ interface Section {
     questions: Question[];
 }
 
+/**
+ * @interface QuestionOption
+ * @description Defines the structure of a question option, for questions with internal choice.
+ * @property {string} id - The unique identifier for the option.
+ * @property {string} text - The text of the question option.
+ * @property {string[]} [options] - An array of possible answers for MCQ questions.
+ * @property {number} [correctAnswer] - The index of the correct answer for MCQ questions.
+ * @property {string} [explanation] - An optional explanation for the correct answer.
+ */
 interface QuestionOption {
     id: string;
     text: string;
@@ -35,6 +60,15 @@ interface QuestionOption {
     explanation?: string;
 }
 
+/**
+ * @interface Question
+ * @description Defines the structure of a question.
+ * @property {string} id - The unique identifier for the question.
+ * @property {number} questionNumber - The number of the question.
+ * @property {'mcq' | 'long-answer'} questionType - The type of the question.
+ * @property {number} marks - The number of marks the question is worth.
+ * @property {QuestionOption[]} questionOptions - An array of question options for internal choice.
+ */
 interface Question {
     id: string;
     questionNumber: number;
@@ -43,6 +77,11 @@ interface Question {
     questionOptions: QuestionOption[]; // Array of internal choice options (A, B, etc.)
 }
 
+/**
+ * @description A component for editing the questions and sections of an exam paper.
+ * @param {QuestionEditorProps} props - The props for the component.
+ * @returns {JSX.Element} The question editor component.
+ */
 const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave }) => {
     const { theme } = useTheme();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +143,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
     const getCurrentSection = () => sections.find(s => s.id === activeSection);
     const getCurrentQuestions = () => getCurrentSection()?.questions || [];
 
+    /**
+     * @description Handles the addition of a new section.
+     */
     const handleAddSection = () => {
         if (!newSectionName.trim()) return;
         
@@ -121,6 +163,10 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         setShowAddSection(false);
     };
 
+    /**
+     * @description Handles the deletion of a section.
+     * @param {string} sectionId - The ID of the section to delete.
+     */
     const handleDeleteSection = (sectionId: string) => {
         if (sections.length <= 1) return; // Keep at least one section
         
@@ -130,6 +176,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         }
     };
 
+    /**
+     * @description Opens the section settings modal.
+     */
     const handleSectionSettings = () => {
         const section = getCurrentSection();
         if (section) {
@@ -140,6 +189,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         }
     };
 
+    /**
+     * @description Opens the rename section modal.
+     */
     const handleRenameSection = () => {
         const section = getCurrentSection();
         if (section) {
@@ -148,6 +200,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         }
     };
 
+    /**
+     * @description Saves the new name for a section.
+     */
     const saveRenameSection = () => {
         if (!renameSectionName.trim()) return;
         
@@ -160,6 +215,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         setRenameSectionName('');
     };
 
+    /**
+     * @description Saves the settings for a section.
+     */
     const saveSectionSettings = () => {
         // Get the actual number of questions in the current section
         const currentSection = sections.find(section => section.id === activeSection);
@@ -191,11 +249,17 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         setShowSectionSettings(false);
     };
 
+    /**
+     * @description Opens the question form to add a new question.
+     */
     const handleAddQuestion = () => {
         resetQuestionForm();
         setShowQuestionForm(true);
     };
 
+    /**
+     * @description Resets the state of the question form.
+     */
     const resetQuestionForm = () => {
         setEditingQuestion(null);
         setQuestionType('long-answer');
@@ -206,6 +270,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         setExplanation('');
     };
 
+    /**
+     * @description Saves a new or edited question.
+     */
     const saveQuestion = () => {
         const currentSection = getCurrentSection();
         if (!currentSection || !questionText.trim()) return;
@@ -269,6 +336,11 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         resetQuestionForm();
     };
 
+    /**
+     * @description Opens the question form to edit an existing question.
+     * @param {Question} question - The question to edit.
+     * @param {number} [optionIndex=0] - The index of the question option to edit.
+     */
     const handleEditQuestion = (question: Question, optionIndex: number = 0) => {
         setEditingQuestion(question);
         setCurrentOptionIndex(optionIndex);
@@ -292,6 +364,10 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         setShowQuestionForm(true);
     };
 
+    /**
+     * @description Deletes a question.
+     * @param {string} questionId - The ID of the question to delete.
+     */
     const handleDeleteQuestion = (questionId: string) => {
         setSections(prev => prev.map(section => ({
             ...section,
@@ -299,6 +375,11 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         })));
     };
 
+    /**
+     * @description Deletes a question option from a question with internal choice.
+     * @param {string} questionId - The ID of the question.
+     * @param {number} optionIndex - The index of the option to delete.
+     */
     const handleDeleteQuestionOption = (questionId: string, optionIndex: number) => {
         setSections(prev => prev.map(section => {
             if (section.id === activeSection) {
@@ -330,6 +411,10 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         }
     };
 
+    /**
+     * @description Adds an "OR" option to a question, allowing for internal choice.
+     * @param {string} questionId - The ID of the question to add an option to.
+     */
     const handleAddOrOption = (questionId: string) => {
         const question = getCurrentQuestions().find(q => q.id === questionId);
         if (!question) return;
@@ -370,6 +455,10 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         }, 100);
     };
 
+    /**
+     * @description Navigates between questions in the current section.
+     * @param {'prev' | 'next'} direction - The direction to navigate.
+     */
     const navigateQuestion = (direction: 'prev' | 'next') => {
         const questions = getCurrentQuestions();
         if (direction === 'prev' && currentQuestionIndex > 0) {
@@ -379,6 +468,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         }
     };
 
+    /**
+     * @description Saves the updated paper and closes the editor.
+     */
     const handleSave = () => {
         const updatedPaper = {
             ...paper,
@@ -388,11 +480,18 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({ paper, onClose, onSave 
         onClose();
     };
 
+    /**
+     * @description Handles the selection of files for OCR processing.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(event.target.files || []);
         setUploadedFiles(files);
     };
 
+    /**
+     * @description Processes the uploaded files with OCR to extract text.
+     */
     const processWithOCR = async () => {
         if (!uploadedFiles || uploadedFiles.length === 0) {
             alert('Please upload files first.');
@@ -464,6 +563,11 @@ Recursion is a programming technique where a function calls itself to solve smal
         }
     };
 
+    /**
+     * @description Parses a string of text to extract questions.
+     * @param {string} text - The text to parse.
+     * @returns {any[]} An array of parsed questions.
+     */
     const parseQuestionsFromText = (text: string) => {
         const questions: any[] = [];
         const lines = text.split('\n').filter(line => line.trim());
@@ -539,6 +643,9 @@ Recursion is a programming technique where a function calls itself to solve smal
         return questions;
     };
 
+    /**
+     * @description Handles the automatic generation of questions from the extracted OCR text.
+     */
     const handleAutoGenerateQuestions = async () => {
         if (!ocrText.trim()) {
             alert('Please extract text first or enter text manually.');

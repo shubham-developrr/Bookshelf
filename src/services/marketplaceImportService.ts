@@ -1,19 +1,15 @@
 import JSZip from 'jszip';
 
 /**
- * MARKETPLACE BOOK IMPORT SERVICE
- * Imports marketplace-ready book modules with complete data restoration
- * Features:
- * - Full data integrity restoration
- * - Version compatibility checking
- * - Asset restoration
- * - Tab isolation preservation
- * - Conflict resolution
- * - Progressive loading
- * - Error recovery
+ * @file A service for importing book modules from ZIP files, handling both legacy (v1.0)
+ * and enhanced (v2.0) formats, and restoring all data to localStorage.
  */
 
-// Import Interfaces
+// #region Import Interfaces
+/**
+ * @interface ImportResult
+ * @description Defines the structure of the result after an import operation.
+ */
 interface ImportResult {
     success: boolean;
     bookId: string;
@@ -30,29 +26,41 @@ interface ImportResult {
     };
 }
 
+/**
+ * @interface ImportConflict
+ * @description Defines the structure for a detected conflict during the import process.
+ */
 interface ImportConflict {
     type: 'book-exists' | 'chapter-exists' | 'data-mismatch';
     description: string;
     resolution: 'skip' | 'overwrite' | 'merge' | 'rename' | 'ask';
 }
 
+/**
+ * @interface ImportOptions
+ * @description Defines the options to control the import process.
+ */
 interface ImportOptions {
     conflictResolution: 'ask' | 'overwrite' | 'merge' | 'skip';
     preserveExisting: boolean;
     generateNewIds: boolean;
     validateIntegrity: boolean;
 }
+// #endregion
 
 /**
- * MARKETPLACE BOOK IMPORT SERVICE
- * Handles importing marketplace book modules with full data restoration
+ * @class MarketplaceBookImportService
+ * @description Handles importing marketplace book modules with full data restoration.
  */
 export class MarketplaceBookImportService {
     private static readonly SUPPORTED_VERSIONS = ['1.0.0', '2.0.0'];
     private static readonly CURRENT_VERSION = '2.0.0';
 
     /**
-     * Import a marketplace book module
+     * @description Imports a marketplace book module from a ZIP file.
+     * @param {File} zipFile - The ZIP file to import.
+     * @param {Partial<ImportOptions>} [options={}] - Options to customize the import process.
+     * @returns {Promise<ImportResult>} A promise that resolves with the result of the import.
      */
     static async importBookModule(
         zipFile: File, 
@@ -101,7 +109,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Extract and validate ZIP file structure
+     * @description Extracts data from a ZIP file and validates its basic structure.
+     * @private
      */
     private static async extractAndValidateZip(zipFile: File): Promise<JSZip> {
         console.log('📦 Extracting ZIP file...');
@@ -127,7 +136,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Parse marketplace module from ZIP
+     * @description Parses the contents of a marketplace module ZIP into a structured object.
+     * @private
      */
     private static async parseMarketplaceModule(zip: JSZip): Promise<any> {
         console.log('📖 Parsing marketplace module...');
@@ -177,7 +187,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Parse chapters from ZIP
+     * @description A helper to parse the contents of each chapter folder within the ZIP.
+     * @private
      */
     private static async parseChaptersFromZip(chaptersFolder: JSZip, chapters: any): Promise<void> {
         for (const [chapterName, chapterEntry] of Object.entries(chaptersFolder.files)) {
@@ -245,7 +256,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Parse assets from ZIP
+     * @description A helper to parse the contents of the 'assets' folder in the ZIP.
+     * @private
      */
     private static async parseAssetsFromZip(zip: JSZip): Promise<any> {
         const assets = {
@@ -282,7 +294,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Validate version compatibility
+     * @description Validates the compatibility of the imported book module.
+     * @private
      */
     private static async validateCompatibility(bookModule: any): Promise<void> {
         console.log('🔍 Validating compatibility...');
@@ -311,7 +324,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Detect import conflicts
+     * @description Detects conflicts between the imported book and existing data in localStorage.
+     * @private
      */
     private static async detectConflicts(bookModule: any, options: ImportOptions): Promise<ImportConflict[]> {
         console.log('⚠️ Detecting conflicts...');
@@ -353,7 +367,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Resolve import conflicts
+     * @description Resolves detected conflicts based on the chosen import options.
+     * @private
      */
     private static async resolveConflicts(conflicts: ImportConflict[], options: ImportOptions): Promise<void> {
         console.log('🔧 Resolving conflicts...');
@@ -370,7 +385,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Import book data into localStorage
+     * @description The core method that writes the parsed book data into localStorage.
+     * @private
      */
     private static async importBookData(bookModule: any, options: ImportOptions): Promise<ImportResult> {
         console.log('💾 Importing book data...');
@@ -492,7 +508,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Import tab data with proper isolation
+     * @description Restores individual tab data to localStorage with proper isolation.
+     * @private
      */
     private static async importTabData(bookName: string, chapterKey: string, tabId: string, tabData: any): Promise<void> {
         const templateType = tabData.templateType;
@@ -525,7 +542,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Get storage key pattern by template type
+     * @description Helper to generate localStorage keys for different template types.
+     * @private
      */
     private static getStorageKeyByTemplate(templateType: string, bookName: string, chapterKey: string): string {
         const keyMap: { [key: string]: string } = {
@@ -540,7 +558,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Restore assets
+     * @description Restores asset data from the imported module.
+     * @private
      */
     private static async restoreAssets(bookModule: any): Promise<void> {
         console.log('🖼️ Restoring assets...');
@@ -564,7 +583,9 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Validate imported book integrity
+     * @description Performs a post-import validation check on the stored data.
+     * @param {string} bookId - The ID of the book to validate.
+     * @returns {Promise<object>} A promise resolving with the validation results.
      */
     static async validateImportedBook(bookId: string): Promise<{
         isValid: boolean;
@@ -607,7 +628,9 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Get import preview without actually importing
+     * @description Provides a summary of a ZIP file's contents without performing the import.
+     * @param {File} zipFile - The ZIP file to preview.
+     * @returns {Promise<object>} A promise resolving with the preview data.
      */
     static async getImportPreview(zipFile: File): Promise<{
         bookName: string;
@@ -653,7 +676,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * Format file size
+     * @description Formats a number of bytes into a human-readable string.
+     * @private
      */
     private static formatFileSize(bytes: number): string {
         if (bytes === 0) return '0 Bytes';
@@ -664,7 +688,8 @@ export class MarketplaceBookImportService {
     }
 
     /**
-     * List all imported books
+     * @description A utility method to get a list of all imported books.
+     * @returns {Array<object>} An array of imported book objects with summary data.
      */
     static getImportedBooks(): Array<{
         id: string;

@@ -1,15 +1,24 @@
 import { BookModule } from '../types/bookModule';
 
+/**
+ * @class BookModuleLoader
+ * @description A singleton class to load, cache, and manage BookModule objects from various sources,
+ * with persistence to localStorage.
+ */
 export class BookModuleLoader {
   private loadedBooks: Map<string, BookModule> = new Map();
   private storageKey = 'importedBookModules';
 
+  /**
+   * @description Initializes the loader by loading any persisted books from localStorage.
+   */
   constructor() {
     this.loadFromLocalStorage();
   }
 
   /**
-   * Load books from localStorage on initialization
+   * @description Loads and parses book modules from localStorage on initialization.
+   * @private
    */
   private loadFromLocalStorage(): void {
     try {
@@ -27,7 +36,8 @@ export class BookModuleLoader {
   }
 
   /**
-   * Save current books to localStorage
+   * @description Saves the current state of loaded books to localStorage.
+   * @private
    */
   private saveToLocalStorage(): void {
     try {
@@ -40,7 +50,9 @@ export class BookModuleLoader {
   }
 
   /**
-   * Load a book module from various sources
+   * @description The main public method to load a book module from a BookModule object, a File, or a URL.
+   * @param {string | File | BookModule} source - The source of the book module.
+   * @returns {Promise<BookModule>} A promise that resolves with the loaded book module.
    */
   async loadBookModule(source: string | File | BookModule): Promise<BookModule> {
     if (typeof source === 'object' && 'id' in source) {
@@ -56,7 +68,10 @@ export class BookModuleLoader {
   }
 
   /**
-   * Load book module from URL or local JSON file
+   * @description Fetches and parses a book module from a URL.
+   * @private
+   * @param {string} url - The URL of the book module JSON file.
+   * @returns {Promise<BookModule>} A promise that resolves with the loaded book module.
    */
   private async loadFromUrl(url: string): Promise<BookModule> {
     try {
@@ -73,7 +88,10 @@ export class BookModuleLoader {
   }
 
   /**
-   * Load book module from uploaded file
+   * @description Reads and parses a book module from a user-uploaded file.
+   * @private
+   * @param {File} file - The file object to load.
+   * @returns {Promise<BookModule>} A promise that resolves with the loaded book module.
    */
   private async loadFromFile(file: File): Promise<BookModule> {
     return new Promise((resolve, reject) => {
@@ -92,7 +110,11 @@ export class BookModuleLoader {
   }
 
   /**
-   * Validate book module structure and cache it
+   * @description Validates the structure of a book module object, and if valid,
+   * caches it and saves it to localStorage.
+   * @private
+   * @param {any} bookData - The book data object to validate.
+   * @returns {BookModule} The validated book module.
    */
   private validateAndCache(bookData: any): BookModule {
     if (!this.isValidBookModule(bookData)) {
@@ -105,7 +127,10 @@ export class BookModuleLoader {
   }
 
   /**
-   * Validate book module structure
+   * @description A type guard to check if a given object conforms to the BookModule interface.
+   * @private
+   * @param {any} data - The object to validate.
+   * @returns {data is BookModule} True if the object is a valid BookModule.
    */
   private isValidBookModule(data: any): data is BookModule {
     return (
@@ -122,21 +147,26 @@ export class BookModuleLoader {
   }
 
   /**
-   * Get all loaded book modules
+   * @description Returns an array of all currently loaded book modules.
+   * @returns {BookModule[]} An array of book modules.
    */
   getLoadedBooks(): BookModule[] {
     return Array.from(this.loadedBooks.values());
   }
 
   /**
-   * Get a specific book module by ID
+   * @description Retrieves a specific loaded book module by its ID.
+   * @param {string} id - The ID of the book to retrieve.
+   * @returns {BookModule | undefined} The book module if found, otherwise undefined.
    */
   getBook(id: string): BookModule | undefined {
     return this.loadedBooks.get(id);
   }
 
   /**
-   * Unload a book module
+   * @description Removes a book module from the loader and localStorage.
+   * @param {string} id - The ID of the book to unload.
+   * @returns {boolean} True if the book was successfully unloaded, false otherwise.
    */
   unloadBook(id: string): boolean {
     const result = this.loadedBooks.delete(id);
@@ -147,7 +177,9 @@ export class BookModuleLoader {
   }
 
   /**
-   * Convert existing hardcoded book data to new format
+   * @description A utility method to convert a legacy book object to the new BookModule format.
+   * @param {any} legacyData - The legacy book object.
+   * @returns {BookModule} The converted book module.
    */
   convertLegacyBook(legacyData: any): BookModule {
     // Migration logic for existing books
@@ -171,5 +203,8 @@ export class BookModuleLoader {
   }
 }
 
-// Singleton instance
+/**
+ * @const bookLoader
+ * @description The exported singleton instance of the BookModuleLoader class.
+ */
 export const bookLoader = new BookModuleLoader();

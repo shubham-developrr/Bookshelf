@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
+/**
+ * @interface VideoData
+ * @description Defines the structure of a video data object.
+ * @property {string} id - The unique ID of the video.
+ * @property {string} title - The title of the video.
+ * @property {string} youtubeUrl - The URL of the YouTube video.
+ * @property {number} [startTime] - The start time of the video in seconds.
+ * @property {number} [endTime] - The end time of the video in seconds.
+ */
 interface VideoData {
     id: string;
     title: string;
@@ -9,6 +18,16 @@ interface VideoData {
     endTime?: number; // in seconds
 }
 
+/**
+ * @interface YouTubePlayerModalProps
+ * @description Defines the props for the YouTubePlayerModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ * @property {VideoData | null} videoData - The data for the video to be played or edited.
+ * @property {function} [onSave] - Callback function to save the video data.
+ * @property {string} subtopicTitle - The title of the subtopic the video is associated with.
+ * @property {'play' | 'edit'} [mode] - The mode of the modal, either 'play' or 'edit'.
+ */
 interface YouTubePlayerModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -18,6 +37,11 @@ interface YouTubePlayerModalProps {
     mode?: 'play' | 'edit'; // New prop to control modal behavior
 }
 
+/**
+ * @description A modal component for playing and editing YouTube videos.
+ * @param {YouTubePlayerModalProps} props - The props for the component.
+ * @returns {React.FC} The YouTube player modal component.
+ */
 const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
     isOpen,
     onClose,

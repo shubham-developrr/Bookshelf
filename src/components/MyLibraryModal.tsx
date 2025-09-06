@@ -2,37 +2,81 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { EnhancedMarketplaceService } from '../services/EnhancedMarketplaceService';
 
-// Icons
+/**
+ * @description A simple Globe icon component.
+ * @param {object} props - The component props.
+ * @param {string} [props.className="w-4 h-4"] - The CSS class name for the icon.
+ * @returns {React.ReactElement} The rendered Globe icon.
+ */
 const GlobeIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9" />
   </svg>
 );
 
+/**
+ * @description A simple EyeOff icon component.
+ * @param {object} props - The component props.
+ * @param {string} [props.className="w-4 h-4"] - The CSS class name for the icon.
+ * @returns {React.ReactElement} The rendered EyeOff icon.
+ */
 const EyeOffIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.05 6.05M9.878 9.878a3 3 0 105.304-.36m4.242 4.242L21.95 21.95m-4.242-4.242a10.15 10.15 0 003.088-5.715A10.05 10.05 0 0012 5c-1.846 0-3.605.494-5.133 1.357" />
   </svg>
 );
 
+/**
+ * @description A simple Upload icon component.
+ * @param {object} props - The component props.
+ * @param {string} [props.className="w-4 h-4"] - The CSS class name for the icon.
+ * @returns {React.ReactElement} The rendered Upload icon.
+ */
 const UploadIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
   </svg>
 );
 
+/**
+ * @description A simple Trash icon component.
+ * @param {object} props - The component props.
+ * @param {string} [props.className="w-4 h-4"] - The CSS class name for the icon.
+ * @returns {React.ReactElement} The rendered Trash icon.
+ */
 const TrashIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
   </svg>
 );
 
+/**
+ * @description A simple BookOpen icon component.
+ * @param {object} props - The component props.
+ * @param {string} [props.className="w-5 h-5"] - The CSS class name for the icon.
+ * @returns {React.ReactElement} The rendered BookOpen icon.
+ */
 const BookOpenIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
   </svg>
 );
 
+/**
+ * @interface PublishedBook
+ * @description Defines the structure of a published book object.
+ * @property {string} id - The unique identifier for the book.
+ * @property {string} title - The title of the book.
+ * @property {string} description - The description of the book.
+ * @property {string} author_name - The name of the book's author.
+ * @property {string} university - The university associated with the book.
+ * @property {boolean} is_published - Whether the book is currently published.
+ * @property {string} version - The version of the book.
+ * @property {number} download_count - The number of times the book has been downloaded.
+ * @property {number} rating - The average rating of the book.
+ * @property {number} rating_count - The number of ratings the book has received.
+ * @property {string} created_at - The date the book was created.
+ */
 interface PublishedBook {
   id: string;
   title: string;
@@ -47,11 +91,22 @@ interface PublishedBook {
   created_at: string;
 }
 
+/**
+ * @interface MyLibraryModalProps
+ * @description Defines the props for the MyLibraryModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ */
 interface MyLibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+/**
+ * @description A modal component that displays the user's published books and allows them to manage them.
+ * @param {MyLibraryModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The "My Library" modal component.
+ */
 const MyLibraryModal: React.FC<MyLibraryModalProps> = ({ isOpen, onClose }) => {
   const { state } = useUser();
   const [publishedBooks, setPublishedBooks] = useState<PublishedBook[]>([]);
@@ -65,6 +120,9 @@ const MyLibraryModal: React.FC<MyLibraryModalProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen, state.isAuthenticated]);
 
+  /**
+   * @description Loads the user's published books from the marketplace.
+   */
   const loadPublishedBooks = async () => {
     try {
       setLoading(true);
@@ -85,6 +143,11 @@ const MyLibraryModal: React.FC<MyLibraryModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  /**
+   * @description Toggles the visibility of a book in the marketplace.
+   * @param {string} bookId - The ID of the book to update.
+   * @param {boolean} currentIsPublished - The current visibility status of the book.
+   */
   const handleVisibilityToggle = async (bookId: string, currentIsPublished: boolean) => {
     try {
       setUpdating(bookId);
@@ -110,6 +173,11 @@ const MyLibraryModal: React.FC<MyLibraryModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  /**
+   * @description Deletes a book from the marketplace.
+   * @param {string} bookId - The ID of the book to delete.
+   * @param {string} bookTitle - The title of the book to delete.
+   */
   const handleDeleteFromMarketplace = async (bookId: string, bookTitle: string) => {
     if (!confirm(`Are you sure you want to remove "${bookTitle}" from the marketplace? This action cannot be undone.`)) {
       return;
@@ -132,6 +200,10 @@ const MyLibraryModal: React.FC<MyLibraryModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  /**
+   * @description Pushes an update for a book to the marketplace.
+   * @param {string} bookId - The ID of the book to update.
+   */
   const handlePushUpdate = async (bookId: string) => {
     try {
       setUpdating(bookId);

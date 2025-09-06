@@ -22,7 +22,9 @@ import { generateAIGuruResponse } from '../services/githubModelsService';
 import { tabPersistenceManager } from '../services/TabPersistenceManager';
 import Groq from 'groq-sdk';
 
-// Template ID Constants - Built-in IDs that cannot be changed
+/**
+ * @description Constants for template IDs.
+ */
 const TEMPLATE_IDS = {
     'Notes': 'NOTES',
     'Flash card': 'FLASHCARD', 
@@ -32,7 +34,11 @@ const TEMPLATE_IDS = {
     'Mind Map': 'MINDMAP'
 } as const;
 
-// Desktop Tab Icon Mapping Function
+/**
+ * @description Gets the appropriate icon for a given tab name.
+ * @param {string} tabName - The name of the tab.
+ * @returns {JSX.Element} The icon component.
+ */
 const getDesktopTabIcon = (tabName: string) => {
   const iconMap: { [key: string]: JSX.Element } = {
     notes: (
@@ -151,6 +157,16 @@ const getDesktopTabIcon = (tabName: string) => {
   );
 };
 
+/**
+ * @interface SubtopicData
+ * @description Defines the structure of a subtopic data object.
+ * @property {string} id - The unique ID of the subtopic.
+ * @property {string} title - The title of the subtopic.
+ * @property {string} content - The content of the subtopic.
+ * @property {string[]} images - An array of image URLs for the subtopic.
+ * @property {string[]} [imageCaptions] - An array of captions for the images.
+ * @property {VideoData[]} [videoLinks] - An array of video data objects.
+ */
 interface SubtopicData {
     id: string;
     title: string;
@@ -160,6 +176,15 @@ interface SubtopicData {
     videoLinks?: VideoData[];
 }
 
+/**
+ * @interface VideoData
+ * @description Defines the structure of a video data object.
+ * @property {string} id - The unique ID of the video.
+ * @property {string} title - The title of the video.
+ * @property {string} youtubeUrl - The URL of the YouTube video.
+ * @property {number} [startTime] - The start time of the video in seconds.
+ * @property {number} [endTime] - The end time of the video in seconds.
+ */
 interface VideoData {
     id: string;
     title: string;
@@ -168,6 +193,14 @@ interface VideoData {
     endTime?: number;
 }
 
+/**
+ * @interface EnhancedReaderPageProps
+ * @description Defines the props for the EnhancedReaderPage component.
+ * @property {function} openAIGuru - Callback function to open the AI Guru modal.
+ * @property {Highlight[]} highlights - An array of highlight objects.
+ * @property {function} addHighlight - Callback function to add a new highlight.
+ * @property {function} removeHighlight - Callback function to remove a highlight.
+ */
 interface EnhancedReaderPageProps {
     openAIGuru: (prompt?: string) => void;
     highlights: Highlight[];
@@ -175,6 +208,11 @@ interface EnhancedReaderPageProps {
     removeHighlight: (id: string) => void;
 }
 
+/**
+ * @description A page that provides an enhanced reading experience with features like highlighting, notes, flashcards, and more.
+ * @param {EnhancedReaderPageProps} props - The props for the component.
+ * @returns {React.FC} The enhanced reader page.
+ */
 const EnhancedReaderPage: React.FC<EnhancedReaderPageProps> = ({ 
     openAIGuru, 
     highlights, 

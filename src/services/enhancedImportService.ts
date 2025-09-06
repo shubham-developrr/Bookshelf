@@ -1,6 +1,10 @@
 import JSZip from 'jszip';
 
-interface EnhancedImportManifest {
+/**
+ * @interface EnhancedImportManifest
+ * @description Defines the structure of the manifest file within an imported book ZIP.
+ */
+export interface EnhancedImportManifest {
     bookName: string;
     bookId: string;
     exportDate: string;
@@ -13,7 +17,11 @@ interface EnhancedImportManifest {
     deviceInfo?: any;
 }
 
-interface EnhancedImportChapterData {
+/**
+ * @interface EnhancedImportChapterData
+ * @description Defines the comprehensive data structure for a single chapter being imported.
+ */
+export interface EnhancedImportChapterData {
     subtopics?: any[];
     templates: {
         flashcards?: any[];
@@ -56,12 +64,15 @@ interface EnhancedImportChapterData {
 }
 
 /**
- * Enhanced Import Service v2.0 - Complete Data Restoration
- * Handles both v1.0 (legacy) and v2.0 (enhanced) export formats
+ * @class EnhancedBookImportService
+ * @description A service to read and process exported book ZIP files, detect the format version,
+ * and restore all associated data into the application's localStorage.
  */
 export class EnhancedBookImportService {
     /**
-     * Import a book from ZIP file with version detection
+     * @description The main public method to start the import process from a ZIP file.
+     * It detects the version and calls the appropriate import handler.
+     * @param {File} zipFile - The ZIP file to import.
      */
     static async importBook(zipFile: File): Promise<void> {
         try {
@@ -87,7 +98,10 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Detect export version from manifest
+     * @description Reads the manifest.json from the ZIP to determine the export format version.
+     * @private
+     * @param {JSZip} zip - The JSZip object representing the archive.
+     * @returns {Promise<string>} A promise that resolves with the version string ('1.0' or '2.0').
      */
     private static async detectExportVersion(zip: JSZip): Promise<string> {
         const manifestFile = zip.file('manifest.json');
@@ -101,7 +115,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Import enhanced v2.0 format with complete data restoration
+     * @description Handles the import logic for the enhanced v2.0 format.
+     * @private
+     * @param {JSZip} zip - The JSZip object.
      */
     private static async importEnhancedBook(zip: JSZip): Promise<void> {
         console.log('📦 Importing enhanced v2.0 format...');
@@ -113,7 +129,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Import legacy v1.0 format (backwards compatibility)
+     * @description Handles the import logic for the legacy v1.0 format.
+     * @private
+     * @param {JSZip} zip - The JSZip object.
      */
     private static async importLegacyBook(zip: JSZip): Promise<void> {
         console.log('📦 Importing legacy v1.0 format...');
@@ -125,7 +143,10 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Read ZIP file and extract data
+     * @description Reads a ZIP file into a JSZip object.
+     * @private
+     * @param {File} zipFile - The file to read.
+     * @returns {Promise<JSZip>} A promise that resolves with the JSZip object.
      */
     private static async readZipFile(zipFile: File): Promise<JSZip> {
         const zip = new JSZip();
@@ -133,7 +154,10 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Parse enhanced v2.0 ZIP data into structured format
+     * @description Parses the contents of an enhanced v2.0 ZIP file into a structured object.
+     * @private
+     * @param {JSZip} zip - The JSZip object.
+     * @returns {Promise<object>} A promise that resolves with the parsed data.
      */
     private static async parseEnhancedZipData(zip: JSZip): Promise<{
         manifest: EnhancedImportManifest;
@@ -194,7 +218,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Read template data from templates folder
+     * @description Helper to read template data from a chapter's 'templates' subfolder in the ZIP.
+     * @private
      */
     private static async readTemplateData(zip: JSZip, chapterName: string, chapterData: EnhancedImportChapterData): Promise<void> {
         const templateFiles = [
@@ -213,7 +238,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Read exam mode data from examMode folder
+     * @description Helper to read exam mode data from a chapter's 'examMode' subfolder in the ZIP.
+     * @private
      */
     private static async readExamModeData(zip: JSZip, chapterName: string, chapterData: EnhancedImportChapterData): Promise<void> {
         const examModeFiles = [
@@ -237,7 +263,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Read highlights data from highlights folder
+     * @description Helper to read highlights data from a chapter's 'highlights' subfolder in the ZIP.
+     * @private
      */
     private static async readHighlightsData(zip: JSZip, chapterName: string, chapterData: EnhancedImportChapterData): Promise<void> {
         const highlightFiles = [
@@ -261,7 +288,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Read user progress data from userProgress folder
+     * @description Helper to read user progress data from a chapter's 'userProgress' subfolder in the ZIP.
+     * @private
      */
     private static async readUserProgressData(zip: JSZip, chapterName: string, chapterData: EnhancedImportChapterData): Promise<void> {
         const progressFiles = [
@@ -285,7 +313,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Read UI state data from uiState folder
+     * @description Helper to read UI state data from a chapter's 'uiState' subfolder in the ZIP.
+     * @private
      */
     private static async readUIStateData(zip: JSZip, chapterName: string, chapterData: EnhancedImportChapterData): Promise<void> {
         const uiFiles = [
@@ -309,7 +338,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Read global data from metadata folder
+     * @description Helper to read global data from the 'metadata' folder in the ZIP.
+     * @private
      */
     private static async readGlobalData(zip: JSZip): Promise<any> {
         const globalFiles = [
@@ -331,7 +361,10 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Parse legacy v1.0 ZIP data (backwards compatibility)
+     * @description Parses the contents of a legacy v1.0 ZIP file.
+     * @private
+     * @param {JSZip} zip - The JSZip object.
+     * @returns {Promise<object>} A promise that resolves with the parsed data.
      */
     private static async parseLegacyZipData(zip: JSZip): Promise<{
         manifest: EnhancedImportManifest;
@@ -381,7 +414,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Integrate book into legacy books system (same as before)
+     * @description Integrates the imported book's manifest data into the application's list of imported books.
+     * @private
+     * @param {object} importData - The parsed import data.
      */
     private static async integrateIntoLegacyBooks(importData: {
         manifest: EnhancedImportManifest;
@@ -426,7 +461,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Restore complete content data to localStorage (v2.0 format)
+     * @description Restores all content data from a v2.0 import into localStorage.
+     * @private
+     * @param {object} importData - The parsed import data.
      */
     private static async restoreCompleteContentData(importData: {
         manifest: EnhancedImportManifest;
@@ -474,7 +511,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Restore template data (existing system)
+     * @description Restores template data for a chapter to localStorage.
+     * @private
      */
     private static async restoreTemplateData(bookName: string, chapterKey: string, templates: any): Promise<void> {
         const templateMappings = [
@@ -504,7 +542,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Restore exam mode data
+     * @description Restores exam mode data for a chapter to localStorage.
+     * @private
      */
     private static async restoreExamModeData(bookName: string, chapterName: string, examMode: any): Promise<void> {
         if (examMode.questionPapers) {
@@ -531,7 +570,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Restore highlights data
+     * @description Restores highlights data for a chapter to localStorage.
+     * @private
      */
     private static async restoreHighlightsData(bookName: string, chapterName: string, highlights: any): Promise<void> {
         if (highlights.textHighlights) {
@@ -551,7 +591,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Restore user progress data
+     * @description Restores user progress data for a chapter to localStorage.
+     * @private
      */
     private static async restoreUserProgressData(bookName: string, chapterName: string, userProgress: any): Promise<void> {
         if (userProgress.readingProgress) {
@@ -576,7 +617,8 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Restore UI state data
+     * @description Restores UI state data for a chapter to localStorage.
+     * @private
      */
     private static async restoreUIStateData(bookName: string, chapterName: string, uiState: any): Promise<void> {
         if (uiState.activeTab) {
@@ -596,7 +638,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Restore global data
+     * @description Restores global, non-chapter-specific data to localStorage.
+     * @private
+     * @param {object} importData - The parsed import data.
      */
     private static async restoreGlobalData(importData: {
         manifest: EnhancedImportManifest;
@@ -650,7 +694,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Restore legacy content data (v1.0 format)
+     * @description Restores content data for a legacy v1.0 import.
+     * @private
+     * @param {object} importData - The parsed legacy import data.
      */
     private static async restoreLegacyContentData(importData: {
         manifest: EnhancedImportManifest;
@@ -674,7 +720,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Validate ZIP file before import
+     * @description Validates an import ZIP file by checking for the manifest and parsing it.
+     * @param {File} zipFile - The ZIP file to validate.
+     * @returns {Promise<object>} A promise that resolves with validation results.
      */
     static async validateImportFile(zipFile: File): Promise<{
         isValid: boolean;
@@ -711,14 +759,17 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Get list of imported books
+     * @description A utility method to get the list of all imported books.
+     * @returns {any[]} An array of imported book objects.
      */
     static getImportedBooks(): any[] {
         return JSON.parse(localStorage.getItem('importedBooks') || '[]');
     }
 
     /**
-     * Get chapter subtopics for imported book
+     * @description A utility method to get the subtopics for a specific imported book.
+     * @param {string} bookName - The name of the book.
+     * @returns {object} A map of chapter names to their subtopics.
      */
     static getImportedChapterSubtopics(bookName: string): { [chapterName: string]: string[] } {
         const allSubtopics = JSON.parse(localStorage.getItem('importedChapterSubtopics') || '{}');
@@ -726,7 +777,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Delete imported book and all its data
+     * @description Deletes an imported book and all of its associated data from localStorage.
+     * @param {string} bookName - The name of the book to delete.
+     * @param {string} bookId - The ID of the book to delete.
      */
     static async deleteImportedBook(bookName: string, bookId: string): Promise<void> {
         try {
@@ -765,7 +818,9 @@ export class EnhancedBookImportService {
     }
 
     /**
-     * Get import statistics
+     * @description Analyzes an import file and returns statistics about its contents.
+     * @param {File} zipFile - The ZIP file to analyze.
+     * @returns {Promise<any>} A promise that resolves with the import statistics.
      */
     static async getImportStats(zipFile: File): Promise<any> {
         try {

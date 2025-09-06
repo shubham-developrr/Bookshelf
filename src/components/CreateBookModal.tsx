@@ -1,11 +1,28 @@
 import React, { useState } from 'react';
 
+/**
+ * @interface CreateBookModalProps
+ * @description Defines the props for the CreateBookModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ * @property {function} onSave - Callback function to save the book data.
+ */
 interface CreateBookModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (bookData: BookData) => void;
 }
 
+/**
+ * @interface BookData
+ * @description Defines the structure of the book data.
+ * @property {string} name - The name of the book.
+ * @property {string} [image] - The URL of the book's cover image.
+ * @property {string} creatorName - The name of the book's creator.
+ * @property {string} university - The university associated with the book.
+ * @property {string} semester - The semester associated with the book.
+ * @property {string} subjectCode - The subject code of the book.
+ */
 export interface BookData {
     name: string;
     image?: string;
@@ -15,6 +32,11 @@ export interface BookData {
     subjectCode: string;
 }
 
+/**
+ * @description A modal component for creating a new book.
+ * @param {CreateBookModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The create book modal component.
+ */
 const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSave }) => {
     const [formData, setFormData] = useState<BookData>({
         name: '',
@@ -28,6 +50,10 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
     const [imageFile, setImageFile] = useState<File | null>(null);
     const fileInputRef = React.createRef<HTMLInputElement>();
 
+    /**
+     * @description Handles the upload of a book cover image.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -40,10 +66,17 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
         }
     };
 
+    /**
+     * @description Triggers the file input to open the file selection dialog.
+     */
     const triggerFileUpload = () => {
         fileInputRef.current?.click();
     };
 
+    /**
+     * @description Handles the submission of the create book form.
+     * @param {React.FormEvent} e - The form event.
+     */
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name.trim() || !formData.creatorName.trim() || !formData.university.trim()) {
@@ -66,6 +99,11 @@ const CreateBookModal: React.FC<CreateBookModalProps> = ({ isOpen, onClose, onSa
         onClose();
     };
 
+    /**
+     * @description Handles changes to the form's input fields.
+     * @param {keyof BookData} field - The field to update.
+     * @param {string} value - The new value for the field.
+     */
     const handleInputChange = (field: keyof BookData, value: string) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };

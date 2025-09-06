@@ -1,6 +1,27 @@
 import JSZip from 'jszip';
 
-interface EnhancedBookExportData {
+/**
+ * @interface EnhancedBookExportData
+ * @description Defines the complete data structure for a version 2.0 book export,
+ * including a manifest, chapter-specific content, and global data.
+ * @param {object} manifest - The manifest for the export.
+ * @param {string} manifest.bookName - The name of the book.
+ * @param {string} manifest.bookId - The ID of the book.
+ * @param {string} manifest.exportDate - The date of the export.
+ * @param {string} manifest.version - The version of the export format.
+ * @param {string} manifest.appVersion - The version of the application.
+ * @param {'complete' | 'templates-only'} manifest.exportType - The type of the export.
+ * @param {string[]} manifest.chapters - An array of chapter names.
+ * @param {string} [manifest.description] - An optional description of the book.
+ * @param {string[]} manifest.dataTypes - An array of data types included in the export.
+ * @param {object} [manifest.deviceInfo] - Optional information about the device used for the export.
+ * @param {string} manifest.deviceInfo.platform - The platform of the device.
+ * @param {string} manifest.deviceInfo.userAgent - The user agent of the device.
+ * @param {string} manifest.deviceInfo.exportTime - The time of the export.
+ * @param {object} content - The content of the book, organized by chapter.
+ * @param {object} [globalData] - Optional global data for the book.
+ */
+export interface EnhancedBookExportData {
     manifest: {
         bookName: string;
         bookId: string;
@@ -82,12 +103,15 @@ interface EnhancedBookExportData {
 }
 
 /**
- * Enhanced Export Service v2.0 - Complete Data Capture
- * Captures ALL user data including exam mode, highlights, progress, and preferences
+ * @class EnhancedBookExportService
+ * @description A service to capture a complete snapshot of a user's data for a specific book,
+ * including content, templates, progress, and settings, and package it into a structured ZIP file.
  */
 export class EnhancedBookExportService {
     /**
-     * Export a book to ZIP file with complete data capture
+     * @description The main public method to trigger the full export process for a book.
+     * @param {string} bookName - The name of the book to export.
+     * @param {string} bookId - The ID of the book to export.
      */
     static async exportBook(bookName: string, bookId: string): Promise<void> {
         try {
@@ -103,7 +127,12 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * NEW: Comprehensive data gathering - scans ALL localStorage for book data
+     * @description Scans all of localStorage for keys related to the specified book and aggregates
+     * the data into the EnhancedBookExportData structure.
+     * @private
+     * @param {string} bookName - The name of the book.
+     * @param {string} bookId - The ID of the book.
+     * @returns {Promise<EnhancedBookExportData>} A promise that resolves with the complete book data.
      */
     private static async gatherCompleteBookData(bookName: string, bookId: string): Promise<EnhancedBookExportData> {
         console.log('📊 Gathering complete book data...');
@@ -190,7 +219,8 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * Get subtopics data for a chapter
+     * @description Gathers subtopic data for a chapter from localStorage.
+     * @private
      */
     private static getChapterSubtopics(bookId: string, chapterName: string): any[] {
         const chapterKey = chapterName.replace(/\s+/g, '_');
@@ -200,7 +230,8 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * NEW: Get comprehensive exam mode data
+     * @description Gathers all exam mode related data for a chapter from localStorage.
+     * @private
      */
     private static getExamModeData(bookName: string, chapterName: string): any {
         const examData: any = {};
@@ -256,7 +287,8 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * NEW: Get highlights and annotations data
+     * @description Gathers all highlight and annotation data for a chapter from localStorage.
+     * @private
      */
     private static getHighlightsData(bookName: string, chapterName: string): any {
         const highlightsData: any = {};
@@ -282,7 +314,8 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * NEW: Get user progress and performance data
+     * @description Gathers all user progress and performance data for a chapter from localStorage.
+     * @private
      */
     private static getUserProgressData(bookName: string, chapterName: string): any {
         const progressData: any = {};
@@ -319,7 +352,8 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * NEW: Get UI state and preferences
+     * @description Gathers all UI state and preference data for a chapter from localStorage.
+     * @private
      */
     private static getUIStateData(bookName: string, chapterName: string): any {
         const uiData: any = {};
@@ -349,7 +383,8 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * Get all template data for a chapter (existing system)
+     * @description Gathers all template data (flashcards, MCQs, etc.) for a chapter from localStorage.
+     * @private
      */
     private static getTemplateData(bookName: string, chapterKey: string): any {
         const templates: any = {};
@@ -392,7 +427,8 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * NEW: Get global data (book-wide settings and metadata)
+     * @description Gathers global data not specific to a single chapter, such as book-wide settings.
+     * @private
      */
     private static getGlobalData(bookName: string, bookId: string): any {
         const globalData: any = {};
@@ -425,7 +461,10 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * NEW: Create enhanced ZIP file with organized structure
+     * @description Takes the aggregated export data and creates a structured ZIP file blob.
+     * @private
+     * @param {EnhancedBookExportData} exportData - The complete data for the book.
+     * @returns {Promise<Blob>} A promise that resolves with the generated ZIP file blob.
      */
     private static async createEnhancedZipFile(exportData: EnhancedBookExportData): Promise<Blob> {
         const zip = new JSZip();
@@ -535,7 +574,10 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * Download ZIP file
+     * @description Triggers a browser download for the generated ZIP blob.
+     * @private
+     * @param {Blob} zipBlob - The ZIP file blob to download.
+     * @param {string} bookName - The name of the book, used for the filename.
      */
     private static downloadZipFile(zipBlob: Blob, bookName: string): void {
         const url = URL.createObjectURL(zipBlob);
@@ -552,7 +594,11 @@ export class EnhancedBookExportService {
     }
 
     /**
-     * Get export statistics
+     * @description Gathers and returns statistics about what will be included in an export,
+     * without actually creating the file.
+     * @param {string} bookName - The name of the book.
+     * @param {string} bookId - The ID of the book.
+     * @returns {Promise<any | null>} A promise that resolves with the export statistics, or null on error.
      */
     static async getExportStats(bookName: string, bookId: string): Promise<any> {
         try {

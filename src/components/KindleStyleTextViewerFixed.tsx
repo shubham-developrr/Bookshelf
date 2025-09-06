@@ -8,6 +8,16 @@ import {
   requestHapticPermission 
 } from '../utils/haptics';
 
+/**
+ * @interface WordElement
+ * @description Defines the structure of a single word element in the text viewer.
+ * @property {string} text - The text of the word.
+ * @property {number} x - The x-coordinate of the word.
+ * @property {number} y - The y-coordinate of the word.
+ * @property {number} width - The width of the word.
+ * @property {number} height - The height of the word.
+ * @property {number} lineIndex - The index of the line the word belongs to.
+ */
 interface WordElement {
   text: string;
   x: number;
@@ -17,6 +27,15 @@ interface WordElement {
   lineIndex: number;
 }
 
+/**
+ * @interface SelectionState
+ * @description Defines the state of the text selection.
+ * @property {boolean} isSelecting - Whether a selection is currently active.
+ * @property {number | null} startWord - The index of the starting word of the selection.
+ * @property {number | null} endWord - The index of the ending word of the selection.
+ * @property {DOMRect | null} selectionRect - The bounding rectangle of the selection.
+ * @property {boolean} [isStartingSelection] - Whether the selection is in the process of starting.
+ */
 interface SelectionState {
   isSelecting: boolean;
   startWord: number | null;
@@ -25,6 +44,17 @@ interface SelectionState {
   isStartingSelection?: boolean;
 }
 
+/**
+ * @interface HighlightRect
+ * @description Defines the structure of a highlight rectangle.
+ * @property {number} x - The x-coordinate of the rectangle.
+ * @property {number} y - The y-coordinate of the rectangle.
+ * @property {number} width - The width of the rectangle.
+ * @property {number} height - The height of the rectangle.
+ * @property {string} color - The color of the highlight.
+ * @property {string} highlightId - The ID of the highlight.
+ * @property {boolean} [isStarting] - Whether the highlight is in the process of being created.
+ */
 interface HighlightRect {
   x: number;
   y: number;
@@ -35,6 +65,16 @@ interface HighlightRect {
   isStarting?: boolean;
 }
 
+/**
+ * @interface Highlight
+ * @description Defines the structure of a highlight object.
+ * @property {string} id - The unique identifier for the highlight.
+ * @property {string} text - The highlighted text.
+ * @property {string} color - The color of the highlight.
+ * @property {string} chapterId - The ID of the chapter the highlight belongs to.
+ * @property {number} [startWordIndex] - The starting word index of the highlight.
+ * @property {number} [endWordIndex] - The ending word index of the highlight.
+ */
 interface Highlight {
   id: string;
   text: string;
@@ -44,6 +84,17 @@ interface Highlight {
   endWordIndex?: number;
 }
 
+/**
+ * @interface KindleStyleTextViewerProps
+ * @description Defines the props for the KindleStyleTextViewer component.
+ * @property {string} content - The text content to be displayed.
+ * @property {Highlight[]} highlights - An array of highlight objects.
+ * @property {function} [onHighlight] - Callback function to handle text highlighting.
+ * @property {function} [onRemoveHighlight] - Callback function to remove a highlight.
+ * @property {function} [onExplainWithAI] - Callback function to explain text with AI.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} [className] - An optional class name for the component.
+ */
 interface KindleStyleTextViewerProps {
   content: string;
   highlights: Highlight[];
@@ -54,6 +105,11 @@ interface KindleStyleTextViewerProps {
   className?: string;
 }
 
+/**
+ * @description A component that displays text in a Kindle-like style, with support for text selection, highlighting, and AI-powered explanations.
+ * @param {KindleStyleTextViewerProps} props - The props for the component.
+ * @returns {JSX.Element} The Kindle-style text viewer component.
+ */
 const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
   content,
   highlights,
@@ -106,7 +162,10 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
     }
   }, []);
 
-  // Canvas-based text measurement for mobile accuracy
+  /**
+   * @description Creates a text measurer using a canvas element for accurate text measurement.
+   * @returns {{measureText: (text: string) => {width: number, height: number}, spaceWidth: number} | null} A text measurer object, or null if a canvas context cannot be created.
+   */
   const createTextMeasurer = useCallback(() => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -125,7 +184,10 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
     };
   }, [fontSize, fontFamily]);
 
-  // Mobile-optimized text layout system
+  /**
+   * @description Parses and lays out the text content into individual word elements.
+   * @returns {WordElement[]} An array of word elements with their positions and dimensions.
+   */
   const parseAndLayoutText = useCallback(() => {
     if (!content || !containerRef.current) return [];
 
@@ -254,7 +316,12 @@ const KindleStyleTextViewer: React.FC<KindleStyleTextViewerProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, [parseAndLayoutText]);
 
-  // Find word at position with mobile-optimized hit detection
+  /**
+   * @description Finds the index of the word at a given client coordinate.
+   * @param {number} clientX - The x-coordinate.
+   * @param {number} clientY - The y-coordinate.
+   * @returns {number | null} The index of the word, or null if no word is found at the given position.
+   */
   const findWordAtPosition = (clientX: number, clientY: number): number | null => {
     if (!containerRef.current) return null;
     

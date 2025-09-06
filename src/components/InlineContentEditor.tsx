@@ -2,6 +2,14 @@ import React, { useState, useRef } from 'react';
 import { PlusIcon, TrashIcon } from './icons';
 import KindleStyleTextViewer from './KindleStyleTextViewerFixed';
 
+/**
+ * @interface ContentBlock
+ * @description Defines the structure of a content block, which can be either text or an image.
+ * @property {string} id - The unique identifier for the content block.
+ * @property {'text' | 'image'} type - The type of the content block.
+ * @property {string} content - The text content or image URL.
+ * @property {number} position - The position of the block in the content flow.
+ */
 interface ContentBlock {
     id: string;
     type: 'text' | 'image';
@@ -9,6 +17,23 @@ interface ContentBlock {
     position: number;
 }
 
+/**
+ * @interface InlineContentEditorProps
+ * @description Defines the props for the InlineContentEditor component.
+ * @property {string} subtopicId - The ID of the subtopic being edited.
+ * @property {string} initialContent - The initial text content.
+ * @property {string[]} images - An array of image URLs.
+ * @property {string[]} [imageCaptions] - An optional array of image captions.
+ * @property {function} onContentUpdate - Callback function to update the content.
+ * @property {function} onImageUpload - Callback function to handle image uploads.
+ * @property {string} [className] - An optional class name for the component.
+ * @property {boolean} [isEditing] - Whether the editor is in editing mode.
+ * @property {Array<object>} [highlights] - An optional array of highlight objects.
+ * @property {string} [currentBook] - The name of the current book.
+ * @property {function} [onHighlight] - Callback function to handle text highlighting.
+ * @property {function} [onRemoveHighlight] - Callback function to remove a highlight.
+ * @property {function} [onExplainWithAI] - Callback function to explain text with AI.
+ */
 interface InlineContentEditorProps {
     subtopicId: string;
     initialContent: string;
@@ -31,6 +56,11 @@ interface InlineContentEditorProps {
     onExplainWithAI?: (text: string, context: string) => void;
 }
 
+/**
+ * @description A component for editing and displaying inline content, including text and images, with support for highlighting.
+ * @param {InlineContentEditorProps} props - The props for the component.
+ * @returns {JSX.Element} The inline content editor component.
+ */
 const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
     subtopicId,
     initialContent,
@@ -56,7 +86,10 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
     
     const textareaRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
 
-    // Initialize content blocks from text and images
+    /**
+     * @description Initializes the content blocks from the initial text and images.
+     * @returns {ContentBlock[]} An array of content blocks.
+     */
     const initializeContentBlocks = (): ContentBlock[] => {
         const blocks: ContentBlock[] = [];
         let position = 0;
@@ -88,6 +121,11 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
 
     const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>(initializeContentBlocks());
 
+    /**
+     * @description Handles changes to a text block.
+     * @param {number} blockIndex - The index of the text block to update.
+     * @param {string} newText - The new text for the block.
+     */
     const handleTextChange = (blockIndex: number, newText: string) => {
         const updatedBlocks = textBlocks.map((block, index) => 
             index === blockIndex ? newText : block
@@ -95,6 +133,10 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
         setTextBlocks(updatedBlocks);
     };
 
+    /**
+     * @description Adds a new text block after the specified index.
+     * @param {number} afterIndex - The index after which to add the new text block.
+     */
     const addTextBlock = (afterIndex: number) => {
         const newBlocks = [...textBlocks];
         newBlocks.splice(afterIndex + 1, 0, '');
@@ -106,6 +148,10 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
         }, 100);
     };
 
+    /**
+     * @description Removes a text block at the specified index.
+     * @param {number} blockIndex - The index of the text block to remove.
+     */
     const removeTextBlock = (blockIndex: number) => {
         if (textBlocks.length > 1) {
             const updatedBlocks = textBlocks.filter((_, index) => index !== blockIndex);
@@ -113,6 +159,10 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
         }
     };
 
+    /**
+     * @description Opens a file dialog to add an image at the specified position.
+     * @param {number} afterIndex - The index after which to add the new image.
+     */
     const addImageAtPosition = (afterIndex: number) => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -132,6 +182,10 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
         document.body.removeChild(input);
     };
 
+    /**
+     * @description Adds a new text block at the specified position.
+     * @param {number} afterIndex - The index after which to add the new text block.
+     */
     const addTextBlockAtPosition = (afterIndex: number) => {
         const newBlocks = [...textBlocks];
         newBlocks.splice(afterIndex + 1, 0, '');
@@ -143,6 +197,11 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
         }, 0);
     };
 
+    /**
+     * @description Updates the caption for an image.
+     * @param {number} imageIndex - The index of the image to update.
+     * @param {string} caption - The new caption for the image.
+     */
     const updateImageCaption = (imageIndex: number, caption: string) => {
         const updatedCaptions = [...currentImageCaptions];
         updatedCaptions[imageIndex] = caption;
@@ -150,6 +209,10 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
         onContentUpdate(textBlocks.join('\n\n'), images, updatedCaptions);
     };
 
+    /**
+     * @description Removes an image at the specified index.
+     * @param {number} imageIndex - The index of the image to remove.
+     */
     const removeImage = (imageIndex: number) => {
         if (confirm('Are you sure you want to delete this image?')) {
             const updatedImages = images.filter((_, index) => index !== imageIndex);
@@ -159,6 +222,11 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
         }
     };
 
+    /**
+     * @description Moves an image up or down in the content flow.
+     * @param {number} imageIndex - The index of the image to move.
+     * @param {'up' | 'down'} direction - The direction to move the image.
+     */
     const moveImage = (imageIndex: number, direction: 'up' | 'down') => {
         const updatedImages = [...images];
         const updatedCaptions = [...currentImageCaptions];
@@ -172,6 +240,9 @@ const InlineContentEditor: React.FC<InlineContentEditorProps> = ({
         }
     };
 
+    /**
+     * @description Saves the content and exits editing mode.
+     */
     const handleSave = () => {
         const content = textBlocks.join('\n\n');
         onContentUpdate(content, images, currentImageCaptions);

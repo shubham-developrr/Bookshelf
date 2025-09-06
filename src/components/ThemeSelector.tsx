@@ -2,7 +2,23 @@ import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { CloseIcon } from './icons';
 
-const ThemeSelector: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+/**
+ * @interface ThemeSelectorProps
+ * @description Defines the props for the ThemeSelector component.
+ * @property {boolean} isOpen - Whether the theme selector is open.
+ * @property {function} onClose - Callback function to close the theme selector.
+ */
+interface ThemeSelectorProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+/**
+ * @description A component that allows the user to select a theme for the application.
+ * @param {ThemeSelectorProps} props - The props for the component.
+ * @returns {React.FC} The theme selector component.
+ */
+const ThemeSelector: React.FC<ThemeSelectorProps> = ({ isOpen, onClose }) => {
   const { themeMode, setThemeMode, availableThemes, setCustomTheme, customColors } = useTheme();
   const [showCustomThemeForm, setShowCustomThemeForm] = useState(false);
   const [customThemeColors, setCustomThemeColors] = useState({
@@ -29,13 +45,20 @@ const ThemeSelector: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
     custom: 'Your personalized color scheme',
   };
 
+  /**
+   * @description Handles the submission of the custom theme form.
+   */
   const handleCustomThemeSubmit = () => {
     setCustomTheme(customThemeColors);
     setShowCustomThemeForm(false);
     onClose();
   };
 
-  // Helper function to determine if accent color is light
+  /**
+   * @description Helper function to determine if an accent color is light or dark.
+   * @param {string} color - The hex color code.
+   * @returns {boolean} True if the color is light, false otherwise.
+   */
   const isLightAccent = (color: string): boolean => {
     const hex = color.replace('#', '');
     const r = parseInt(hex.substr(0, 2), 16);

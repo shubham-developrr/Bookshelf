@@ -7,6 +7,14 @@ import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { PencilIcon, EyeIcon, BookOpenIcon } from './icons';
 import 'katex/dist/katex.min.css';
 
+/**
+ * @interface RichTextEditorProps
+ * @description Defines the props for the RichTextEditor component.
+ * @property {string} tabName - The name of the tab containing the editor.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} currentChapter - The name of the current chapter.
+ * @property {string} [className] - An optional class name for the component.
+ */
 interface RichTextEditorProps {
     tabName: string;
     currentBook: string;
@@ -14,6 +22,11 @@ interface RichTextEditorProps {
     className?: string;
 }
 
+/**
+ * @description A rich text editor component that supports Markdown, LaTeX, and code syntax highlighting.
+ * @param {RichTextEditorProps} props - The props for the component.
+ * @returns {JSX.Element} The rich text editor component.
+ */
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
     tabName,
     currentBook,
@@ -32,7 +45,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         }
     }, [storageKey]);
 
-    // Save content to localStorage
+    /**
+     * @description Saves the current content to local storage.
+     */
     const handleSave = () => {
         localStorage.setItem(storageKey, content);
     };

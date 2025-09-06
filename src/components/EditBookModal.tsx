@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { CloseIcon, BookOpenIcon, UserIcon, AcademicCapIcon, TagIcon } from './icons';
 
+/**
+ * @interface EditBookModalProps
+ * @description Defines the props for the EditBookModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ * @property {function} onSave - Callback function to save the updated book data.
+ * @property {BookData | null} initialData - The initial data for the book being edited.
+ */
 interface EditBookModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -8,6 +16,16 @@ interface EditBookModalProps {
     initialData: BookData | null;
 }
 
+/**
+ * @interface BookData
+ * @description Defines the structure of the book data.
+ * @property {string} name - The name of the book.
+ * @property {string} [image] - The URL of the book's cover image.
+ * @property {string} creatorName - The name of the book's creator.
+ * @property {string} university - The university associated with the book.
+ * @property {string} semester - The semester associated with the book.
+ * @property {string} subjectCode - The subject code of the book.
+ */
 export interface BookData {
     name: string;
     image?: string;
@@ -17,6 +35,11 @@ export interface BookData {
     subjectCode: string;
 }
 
+/**
+ * @description A modal component for editing the details of an existing book.
+ * @param {EditBookModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The edit book modal component.
+ */
 const EditBookModal: React.FC<EditBookModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
     const [formData, setFormData] = useState<BookData>({
         name: '',
@@ -36,6 +59,10 @@ const EditBookModal: React.FC<EditBookModalProps> = ({ isOpen, onClose, onSave, 
         }
     }, [initialData]);
 
+    /**
+     * @description Handles the upload of a book cover image.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -48,10 +75,17 @@ const EditBookModal: React.FC<EditBookModalProps> = ({ isOpen, onClose, onSave, 
         }
     };
 
+    /**
+     * @description Triggers the file input to open the file selection dialog.
+     */
     const triggerFileUpload = () => {
         fileInputRef.current?.click();
     };
 
+    /**
+     * @description Handles the submission of the edit book form.
+     * @param {React.FormEvent} e - The form event.
+     */
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name.trim() || !formData.creatorName.trim() || !formData.university.trim()) {
@@ -63,6 +97,11 @@ const EditBookModal: React.FC<EditBookModalProps> = ({ isOpen, onClose, onSave, 
         onClose();
     };
 
+    /**
+     * @description Handles changes to the form's input fields.
+     * @param {keyof BookData} field - The field to update.
+     * @param {string} value - The new value for the field.
+     */
     const handleInputChange = (field: keyof BookData, value: string) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };

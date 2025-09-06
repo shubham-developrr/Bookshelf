@@ -8,6 +8,10 @@ import EvaluationReportsModal, { EvaluationReport } from '../components/Evaluati
 // import { generateAIGuruResponse } from '../services/githubModelsService';
 import Groq from 'groq-sdk';
 
+/**
+ * @interface QuestionPaper
+ * @description Defines the structure of a question paper object.
+ */
 interface QuestionPaper {
     id: string;
     title: string;
@@ -19,6 +23,10 @@ interface QuestionPaper {
     createdAt: Date;
 }
 
+/**
+ * @interface Section
+ * @description Defines the structure of a section within a question paper.
+ */
 interface Section {
     id: string;
     name: string;
@@ -27,6 +35,10 @@ interface Section {
     questions: Question[];
 }
 
+/**
+ * @interface QuestionOption
+ * @description Defines the structure of an option for a question.
+ */
 interface QuestionOption {
     id: string;
     text: string;
@@ -35,6 +47,10 @@ interface QuestionOption {
     explanation?: string;
 }
 
+/**
+ * @interface Question
+ * @description Defines the structure of a question.
+ */
 interface Question {
     id: string;
     questionNumber: number;
@@ -43,6 +59,10 @@ interface Question {
     questionOptions: QuestionOption[]; // Array of internal choice options (A, B, etc.)
 }
 
+/**
+ * @description A page for taking exams, with features for creating, editing, and evaluating question papers.
+ * @returns {React.FC} The exam mode page.
+ */
 const ExamModePage: React.FC = () => {
     const { subjectName, chapterName } = useParams<{ subjectName: string; chapterName: string }>();
     const navigate = useNavigate();

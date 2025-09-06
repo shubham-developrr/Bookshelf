@@ -7,18 +7,37 @@ import EnhancedAIResponse from './EnhancedAIResponse';
 // Use Groq with kimi-k2-instruct model - Keep for fallback reference
 // const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
+/**
+ * @interface Message
+ * @description Defines the structure of a chat message.
+ * @property {'user' | 'model' | 'error'} role - The role of the message sender.
+ * @property {string} text - The content of the message.
+ * @property {boolean} [isEnhanced] - Whether the message is an enhanced response.
+ */
 interface Message {
     role: 'user' | 'model' | 'error';
     text: string;
     isEnhanced?: boolean;
 }
 
+/**
+ * @interface EnhancedAIGuruModalProps
+ * @description Defines the props for the EnhancedAIGuruModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ * @property {string} initialPrompt - An initial prompt to send when the modal opens.
+ */
 interface EnhancedAIGuruModalProps {
     isOpen: boolean;
     onClose: () => void;
     initialPrompt: string;
 }
 
+/**
+ * @description A modal component that provides an enhanced AI Guru chat interface for educational purposes.
+ * @param {EnhancedAIGuruModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The enhanced AI Guru modal component.
+ */
 const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClose, initialPrompt }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
@@ -63,7 +82,11 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
         }
     }, [messages]);
 
-    // Create memory summary for context window
+    /**
+     * @description Creates a summary of the recent chat history to be used as context for the AI model.
+     * @param {Message[]} chatMessages - The array of chat messages.
+     * @returns {string} A summary of the recent chat history.
+     */
     const createMemorySummary = (chatMessages: Message[]): string => {
         if (chatMessages.length === 0) return '';
         
@@ -85,7 +108,9 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
         return summary;
     };
 
-    // Handle modal close with streaming completion
+    /**
+     * @description Handles closing the modal, completing any in-progress streaming response.
+     */
     const handleClose = () => {
         if (isStreaming && pendingResponseRef.current) {
             // Complete the streaming immediately
@@ -113,7 +138,11 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
     // Check if Premium AI is available
     const isPremiumAIActive = geminiAPIService.isAvailable();
 
-    // Detect when complex reasoning is needed for thinking config
+    /**
+     * @description Detects if a prompt requires complex reasoning, which influences the AI model's thinking configuration.
+     * @param {string} prompt - The user's prompt.
+     * @returns {boolean} True if the prompt is likely to require complex reasoning, false otherwise.
+     */
     const detectComplexReasoningNeeded = (prompt: string): boolean => {
         const complexityIndicators = [
             // Mathematical and analytical
@@ -147,7 +176,12 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
         return hasComplexityIndicators || isLongPrompt || hasMathContent;
     };
 
-    // Streaming text effect with stop functionality
+    /**
+     * @description Simulates a streaming text effect for the AI's response.
+     * @param {string} text - The full text of the response to be streamed.
+     * @param {function} onComplete - A callback function to execute when the streaming is complete.
+     * @returns {function} A cleanup function to clear the interval.
+     */
     const streamText = (text: string, onComplete: () => void) => {
         setStreamingText('');
         setIsStreaming(true);
@@ -187,7 +221,9 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
         };
     };
 
-    // Stop streaming function
+    /**
+     * @description Stops the in-progress text streaming.
+     */
     const stopStreaming = () => {
         setIsStopRequested(true);
         if (currentStreamTimer) {
@@ -209,7 +245,13 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
         pendingResponseRef.current = '';
     };
 
-    // Component for user messages with collapse functionality
+    /**
+     * @description A component that renders a user's message, with functionality to expand or collapse long messages.
+     * @param {object} props - The component props.
+     * @param {string} props.message - The content of the user's message.
+     * @param {number} props.index - The index of the message in the chat history.
+     * @returns {React.ReactElement} The rendered user message component.
+     */
     const UserMessage: React.FC<{ message: string; index: number }> = ({ message, index }) => {
         const isLong = message.length > 200;
         const isExpanded = expandedMessages.has(index);
@@ -252,6 +294,10 @@ const EnhancedAIGuruModal: React.FC<EnhancedAIGuruModalProps> = ({ isOpen, onClo
         }
     }, [messages]);
 
+    /**
+     * @description Handles sending a message to the AI service.
+     * @param {string} prompt - The user's prompt.
+     */
     const handleSend = React.useCallback(async (prompt: string) => {
         if (!prompt.trim()) return;
 
@@ -371,6 +417,10 @@ Focus on helping a college student understand both the concept and its applicati
         { text: "🎯 Break it down", prompt: "Break down this complex topic: " }
     ];
 
+    /**
+     * @description Handles the click of a quick action button, populating the input with the corresponding prompt.
+     * @param {string} prompt - The prompt associated with the quick action.
+     */
     const handleQuickAction = (prompt: string) => {
         setInput(prompt);
     };

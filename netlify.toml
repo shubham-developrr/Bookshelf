@@ -1,5 +1,8 @@
 # netlify.toml
 
+# This redirect rule is for single-page applications (SPAs).
+# It ensures that all requests are redirected to the main index.html file,
+# allowing client-side routing to handle the different paths.
 [[redirects]]
   from = "/*"
   to = "/index.html"

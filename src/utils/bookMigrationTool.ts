@@ -2,12 +2,15 @@ import { BookModule } from '../types/bookModule';
 import { bookLoader } from './bookModuleLoader';
 
 /**
- * Migration utility to convert existing hardcoded books to the new module format
+ * @class BookMigrationTool
+ * @description A utility class to convert existing hardcoded book data into the new, structured BookModule format.
  */
 export class BookMigrationTool {
   
   /**
-   * Convert existing hardcoded book structure to new BookModule format
+   * @description Takes a hardcoded array of book-like objects, converts them to the BookModule format
+   * using the bookLoader, and then attempts to load them into the system.
+   * @returns {BookModule[]} An array of the migrated book modules.
    */
   migrateExistingBooks(): BookModule[] {
     const existingBooks = [
@@ -221,7 +224,9 @@ Dynamic programming typically transforms exponential time algorithms into polyno
   }
 
   /**
-   * Export book modules to files for backup/distribution
+   * @description Exports an array of book modules into a map of book IDs to their JSON string representation.
+   * @param {BookModule[]} books - An array of book modules to export.
+   * @returns {{ [bookId: string]: string }} A map where keys are book IDs and values are the JSON strings.
    */
   exportBookModules(books: BookModule[]): { [bookId: string]: string } {
     const exports: { [bookId: string]: string } = {};
@@ -234,7 +239,8 @@ Dynamic programming typically transforms exponential time algorithms into polyno
   }
 
   /**
-   * Create downloadable book module files
+   * @description Creates a downloadable blob from a BookModule object and triggers a browser download.
+   * @param {BookModule} book - The book module to be downloaded.
    */
   createDownloadableBook(book: BookModule): void {
     const dataStr = JSON.stringify(book, null, 2);
@@ -252,4 +258,8 @@ Dynamic programming typically transforms exponential time algorithms into polyno
   }
 }
 
+/**
+ * @const migrationTool
+ * @description An exported instance of the BookMigrationTool class, ready for use.
+ */
 export const migrationTool = new BookMigrationTool();

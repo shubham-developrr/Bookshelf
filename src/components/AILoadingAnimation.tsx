@@ -1,5 +1,13 @@
 import React from 'react';
 
+/**
+ * @interface AILoadingAnimationProps
+ * @description Defines the props for the AILoadingAnimation component.
+ * @property {string} [message] - The loading message to display.
+ * @property {string} [emoji] - The emoji to display in the center of the spinner.
+ * @property {'sm' | 'md' | 'lg'} [size] - The size of the loading animation.
+ * @property {string} [className] - Additional CSS classes to apply to the component.
+ */
 interface AILoadingAnimationProps {
     message?: string;
     emoji?: string;
@@ -7,6 +15,13 @@ interface AILoadingAnimationProps {
     className?: string;
 }
 
+/**
+ * @description A component that displays a visually engaging loading indicator,
+ * specifically designed for AI-related processes. It includes a spinner, an emoji,
+ * a message, and animated dots.
+ * @param {AILoadingAnimationProps} props - The props for the component.
+ * @returns {JSX.Element} The AILoadingAnimation component.
+ */
 const AILoadingAnimation: React.FC<AILoadingAnimationProps> = ({ 
     message = "AI is processing...", 
     emoji = "🧠", 

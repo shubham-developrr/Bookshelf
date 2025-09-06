@@ -6,6 +6,10 @@ import { syllabus, chapterSubtopics } from '../constants/constants';
 import { useTheme } from '../contexts/ThemeContext';
 import { getBookImage } from '../assets/images/index';
 
+/**
+ * @description A page that allows users to search for content across all books, chapters, and subtopics.
+ * @returns {React.FC} The search page.
+ */
 const SearchPage: React.FC = () => {
     const navigate = useNavigate();
     const { theme } = useTheme();

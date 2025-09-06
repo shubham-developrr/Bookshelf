@@ -5,10 +5,23 @@ import EnhancedMarketplaceService, { MarketplaceBook } from '../services/Enhance
 import { MarketplaceBookImportService } from '../services/marketplaceImportService';
 import { BookOpenIcon, DownloadIcon, SearchIconSvg, StarIcon } from './icons';
 
+/**
+ * @interface BackendMarketplaceProps
+ * @description Defines the props for the BackendMarketplace component.
+ * @property {function} [onDownloadBook] - Callback function to be executed when a book is downloaded.
+ */
 interface BackendMarketplaceProps {
   onDownloadBook?: (book: any) => void;
 }
 
+/**
+ * @interface FilterOptions
+ * @description Defines the shape of the filter options for browsing the marketplace.
+ * @property {string} category - The selected category to filter by.
+ * @property {string} difficulty - The selected difficulty to filter by.
+ * @property {'popularity' | 'rating' | 'newest' | 'title'} sortBy - The criteria to sort the books by.
+ * @property {string} search - The search query.
+ */
 interface FilterOptions {
   category: string;
   difficulty: string;
@@ -16,6 +29,11 @@ interface FilterOptions {
   search: string;
 }
 
+/**
+ * @description A component that provides a UI for browsing and downloading books from the backend marketplace.
+ * @param {BackendMarketplaceProps} props - The props for the component.
+ * @returns {JSX.Element} The backend marketplace component.
+ */
 const BackendMarketplace: React.FC<BackendMarketplaceProps> = ({ onDownloadBook }) => {
   const { theme } = useTheme();
   const { state } = useUser();
@@ -40,6 +58,9 @@ const BackendMarketplace: React.FC<BackendMarketplaceProps> = ({ onDownloadBook 
     loadMarketplaceBooks();
   }, [filters]);
 
+  /**
+   * @description Asynchronously loads books from the marketplace based on the current filter settings.
+   */
   const loadMarketplaceBooks = async () => {
     try {
       setLoading(true);
@@ -66,6 +87,10 @@ const BackendMarketplace: React.FC<BackendMarketplaceProps> = ({ onDownloadBook 
     }
   };
 
+  /**
+   * @description Handles the downloading of a book from the marketplace.
+   * @param {MarketplaceBook} marketplaceBook - The book to be downloaded.
+   */
   const handleDownloadBook = async (marketplaceBook: MarketplaceBook) => {
     if (!state.isAuthenticated) {
       alert('Please sign in to download books');
@@ -117,6 +142,11 @@ const BackendMarketplace: React.FC<BackendMarketplaceProps> = ({ onDownloadBook 
     }
   };
 
+  /**
+   * @description Renders a single book card.
+   * @param {MarketplaceBook} book - The book to render.
+   * @returns {React.ReactElement} The rendered book card.
+   */
   const renderBookCard = (book: MarketplaceBook) => (
     <div key={book.id} className="card theme-transition p-4 flex flex-col">
       {/* Book Image/Icon */}

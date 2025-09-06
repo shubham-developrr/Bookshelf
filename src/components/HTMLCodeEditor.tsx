@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 
+/**
+ * @interface HTMLCodeEditorProps
+ * @description Defines the props for the HTMLCodeEditor component.
+ * @property {string} tabName - The name of the tab containing the editor.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} currentChapter - The name of the current chapter.
+ * @property {string} [className] - An optional class name for the component.
+ * @property {string} [customStorageKey] - An optional custom key for storing the editor's content in local storage.
+ */
 interface HTMLCodeEditorProps {
     tabName: string;
     currentBook: string;
@@ -8,6 +17,11 @@ interface HTMLCodeEditorProps {
     customStorageKey?: string;
 }
 
+/**
+ * @description A component that provides a simple HTML, CSS, and JavaScript code editor with a live preview.
+ * @param {HTMLCodeEditorProps} props - The props for the component.
+ * @returns {JSX.Element} The HTML code editor component.
+ */
 const HTMLCodeEditor: React.FC<HTMLCodeEditorProps> = ({
     tabName,
     currentBook,
@@ -109,7 +123,9 @@ const HTMLCodeEditor: React.FC<HTMLCodeEditorProps> = ({
         }
     }, [storageKey]);
 
-    // Save content to localStorage
+    /**
+     * @description Saves the current HTML code to local storage.
+     */
     const handleSave = () => {
         localStorage.setItem(storageKey, htmlCode);
         setSavedContent(htmlCode);
@@ -126,24 +142,33 @@ const HTMLCodeEditor: React.FC<HTMLCodeEditorProps> = ({
         }
     };
 
-    // Toggle preview mode
+    /**
+     * @description Toggles the preview mode.
+     */
     const handlePreview = () => {
         setIsPreviewMode(!isPreviewMode);
     };
 
-    // Toggle fullscreen mode
+    /**
+     * @description Toggles the fullscreen mode.
+     */
     const toggleFullScreen = () => {
         setIsFullScreen(!isFullScreen);
     };
 
-    // Reset to default template
+    /**
+     * @description Resets the editor's content to the default template.
+     */
     const handleReset = () => {
         if (confirm('Reset to default template? This will overwrite your current code.')) {
             setHtmlCode(defaultTemplate);
         }
     };
 
-    // Mobile detection
+    /**
+     * @description Detects if the current view is on a mobile device.
+     * @returns {boolean} True if the screen width is less than or equal to 768px, false otherwise.
+     */
     const isMobile = () => window.innerWidth <= 768;
 
     return (

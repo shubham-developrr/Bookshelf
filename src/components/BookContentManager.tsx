@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BookOpenIcon, PlusIcon, PencilIcon, TrashIcon, ArrowLeftIcon } from './icons';
 
+/**
+ * @interface Chapter
+ * @description Defines the structure of a chapter object.
+ * @property {string} id - The unique identifier for the chapter.
+ * @property {number} number - The chapter number.
+ * @property {string} name - The name of the chapter.
+ * @property {string[]} [subtopics] - An optional array of subtopic strings.
+ */
 interface Chapter {
     id: string;
     number: number;
@@ -9,11 +17,22 @@ interface Chapter {
     subtopics?: string[];
 }
 
+/**
+ * @interface BookContentManagerProps
+ * @description Defines the props for the BookContentManager component.
+ * @property {string} bookName - The name of the book.
+ * @property {Chapter[]} [initialChapters] - An optional array of initial chapters.
+ */
 interface BookContentManagerProps {
     bookName: string;
     initialChapters?: Chapter[];
 }
 
+/**
+ * @description A component for managing the content of a book, including adding, editing, and deleting chapters.
+ * @param {BookContentManagerProps} props - The props for the component.
+ * @returns {JSX.Element} The book content manager component.
+ */
 const BookContentManager: React.FC<BookContentManagerProps> = ({ bookName, initialChapters = [] }) => {
     const [chapters, setChapters] = useState<Chapter[]>(initialChapters);
     const [isAddingChapter, setIsAddingChapter] = useState(false);
@@ -22,6 +41,9 @@ const BookContentManager: React.FC<BookContentManagerProps> = ({ bookName, initi
     const navigate = useNavigate();
     const { bookId } = useParams();
 
+    /**
+     * @description Handles the addition of a new chapter.
+     */
     const handleAddChapter = () => {
         if (!newChapter.number.trim() || !newChapter.name.trim()) {
             alert('Please fill in both chapter number and name');
@@ -52,6 +74,11 @@ const BookContentManager: React.FC<BookContentManagerProps> = ({ bookName, initi
         setIsAddingChapter(false);
     };
 
+    /**
+     * @description Handles the editing of a chapter's name.
+     * @param {string} chapterId - The ID of the chapter to edit.
+     * @param {string} updatedName - The new name for the chapter.
+     */
     const handleEditChapter = (chapterId: string, updatedName: string) => {
         setChapters(prev => prev.map(ch => 
             ch.id === chapterId ? { ...ch, name: updatedName } : ch
@@ -59,6 +86,10 @@ const BookContentManager: React.FC<BookContentManagerProps> = ({ bookName, initi
         setEditingChapter(null);
     };
 
+    /**
+     * @description Handles the deletion of a chapter.
+     * @param {string} chapterId - The ID of the chapter to delete.
+     */
     const handleDeleteChapter = (chapterId: string) => {
         const chapter = chapters.find(ch => ch.id === chapterId);
         if (chapter && window.confirm(`Are you sure you want to delete Chapter ${chapter.number}: ${chapter.name}?`)) {
@@ -66,6 +97,10 @@ const BookContentManager: React.FC<BookContentManagerProps> = ({ bookName, initi
         }
     };
 
+    /**
+     * @description Handles the navigation to a chapter's content page.
+     * @param {Chapter} chapter - The chapter to navigate to.
+     */
     const handleChapterClick = (chapter: Chapter) => {
         // Navigate to chapter content (to be implemented)
         navigate(`/book/${bookId}/chapter/${chapter.id}`);

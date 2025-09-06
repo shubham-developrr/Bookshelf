@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import { supabaseUserService } from '../services/SupabaseUserService';
 
+/**
+ * @description A page that handles the OAuth callback from Supabase, processing the authentication and redirecting the user.
+ * @returns {React.FC} The authentication callback page.
+ */
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const { state } = useUser();

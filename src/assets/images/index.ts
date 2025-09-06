@@ -1,7 +1,16 @@
-// Image mapping for easy access (empty since default books are removed)
+/**
+ * @description A mapping of book titles to their cover images.
+ * This is currently empty as default books have been removed.
+ * @type {object}
+ */
 export const bookImages = {};
 
-// Function to get book image by title
+/**
+ * @description A function to get a book's cover image by its title.
+ * If no image is found, it returns a placeholder SVG image.
+ * @param {string} title - The title of the book.
+ * @returns {string} The URL or data URI of the book's cover image.
+ */
 export const getBookImage = (title: string): string => {
   // Return a placeholder image or data URL for books without images
   return `data:image/svg+xml;base64,${btoa(`

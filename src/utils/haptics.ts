@@ -1,8 +1,12 @@
 /**
- * Haptic feedback utility for enhanced mobile UX
- * Provides tactile feedback for text selection, highlighting, and UI interactions
+ * @file Haptic feedback utility for enhanced mobile UX.
+ * Provides tactile feedback for text selection, highlighting, and UI interactions.
  */
 
+/**
+ * @type HapticFeedbackType
+ * @description Defines the different types of haptic feedback available, corresponding to various UI interactions.
+ */
 export type HapticFeedbackType = 
   | 'selection'     // Light tap for text selection
   | 'highlight'     // Medium vibration for highlighting
@@ -12,7 +16,8 @@ export type HapticFeedbackType =
   | 'soft';         // Very light feedback for subtle interactions
 
 /**
- * Check if haptic feedback is supported on the current device
+ * @description Checks if the current device and browser support the Vibration API or related haptic feedback APIs.
+ * @returns {boolean} True if haptic feedback is supported, false otherwise.
  */
 export const isHapticSupported = (): boolean => {
   return typeof window !== 'undefined' && 
@@ -23,7 +28,9 @@ export const isHapticSupported = (): boolean => {
 };
 
 /**
- * Trigger haptic feedback based on the interaction type
+ * @description The core function that triggers a specific haptic feedback pattern. It handles
+ * different patterns for iOS and Android where possible and fails silently if not supported.
+ * @param {HapticFeedbackType} type - The type of haptic feedback to trigger.
  */
 export const triggerHapticFeedback = (type: HapticFeedbackType): void => {
   if (!isHapticSupported()) return;
@@ -85,49 +92,50 @@ export const triggerHapticFeedback = (type: HapticFeedbackType): void => {
 };
 
 /**
- * Trigger haptic feedback for text selection events
+ * @description Triggers a light haptic feedback for text selection events.
  */
 export const hapticTextSelection = (): void => {
   triggerHapticFeedback('selection');
 };
 
 /**
- * Trigger haptic feedback for highlighting actions
+ * @description Triggers a medium haptic feedback for highlighting actions.
  */
 export const hapticHighlight = (): void => {
   triggerHapticFeedback('highlight');
 };
 
 /**
- * Trigger haptic feedback for successful actions
+ * @description Triggers a success pattern haptic feedback for completed actions.
  */
 export const hapticSuccess = (): void => {
   triggerHapticFeedback('success');
 };
 
 /**
- * Trigger haptic feedback for errors
+ * @description Triggers an error pattern haptic feedback.
  */
 export const hapticError = (): void => {
   triggerHapticFeedback('error');
 };
 
 /**
- * Trigger soft haptic feedback for subtle interactions
+ * @description Triggers a very light haptic feedback for subtle interactions.
  */
 export const hapticSoft = (): void => {
   triggerHapticFeedback('soft');
 };
 
 /**
- * Trigger impact haptic feedback for important actions
+ * @description Triggers a heavy impact haptic feedback for important actions.
  */
 export const hapticImpact = (): void => {
   triggerHapticFeedback('impact');
 };
 
 /**
- * Request haptic permissions (required for some iOS devices)
+ * @description Requests permission for haptic feedback, which is required on some iOS devices.
+ * @returns {Promise<boolean>} A promise that resolves to true if permission is granted, false otherwise.
  */
 export const requestHapticPermission = async (): Promise<boolean> => {
   try {

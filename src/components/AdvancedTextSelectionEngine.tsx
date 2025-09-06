@@ -1,6 +1,18 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Highlight } from '../types/types';
 
+/**
+ * @interface AdvancedTextSelectionEngineProps
+ * @description Defines the props for the AdvancedTextSelectionEngine component.
+ * @property {string} content - The raw HTML content to be rendered and made selectable.
+ * @property {Highlight[]} highlights - An array of highlight objects to be rendered on the content.
+ * @property {string} currentBook - The identifier for the current book or chapter, used for new highlights.
+ * @property {(highlight: Omit<Highlight, 'id'>) => void} addHighlight - Callback to add a new highlight.
+ * @property {(id: string) => void} removeHighlight - Callback to remove an existing highlight.
+ * @property {string} [className] - Optional CSS classes for the container.
+ * @property {(selectedText: string, range: Range | null) => void} [onSelectionChange] - Optional callback for when text is selected.
+ * @property {(selectedText: string, context: string) => void} [onExplainWithAI] - Optional callback to trigger an AI explanation.
+ */
 interface AdvancedTextSelectionEngineProps {
   content: string;
   highlights: Highlight[];
@@ -12,6 +24,14 @@ interface AdvancedTextSelectionEngineProps {
   onExplainWithAI?: (selectedText: string, context: string) => void;
 }
 
+/**
+ * @description A sophisticated component that provides an interactive text container. It allows users to
+ * select text, which triggers a pop-up context menu. From this menu, users can apply colored highlights
+ * or trigger an "Explain with AI" action. The component intelligently renders existing highlights and
+ * handles complex user interactions for a smooth experience on both desktop and mobile.
+ * @param {AdvancedTextSelectionEngineProps} props - The props for the component.
+ * @returns {JSX.Element} The AdvancedTextSelectionEngine component.
+ */
 const AdvancedTextSelectionEngine: React.FC<AdvancedTextSelectionEngineProps> = ({
   content,
   highlights,

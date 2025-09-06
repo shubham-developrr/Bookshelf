@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
+/**
+ * @interface EvaluationQuestion
+ * @description Defines the structure for a single evaluated question.
+ * @property {string} questionId - The unique identifier for the question.
+ * @property {number} questionNumber - The number of the question in the exam.
+ * @property {'mcq' | 'long-answer'} questionType - The type of the question.
+ * @property {string} questionText - The text of the question.
+ * @property {string} userAnswer - The user's answer to the question.
+ * @property {string} correctAnswer - The correct answer to the question.
+ * @property {number} score - The score awarded for the user's answer.
+ * @property {number} maxScore - The maximum possible score for the question.
+ * @property {string} feedback - Feedback on the user's answer.
+ * @property {boolean} isCorrect - Whether the user's answer was correct.
+ * @property {string} sectionName - The name of the section the question belongs to.
+ * @property {number} [selectedOptionIndex] - The index of the selected option for internal choice questions.
+ * @property {any[]} [allOptions] - All available options for internal choice questions.
+ */
 interface EvaluationQuestion {
     questionId: string;
     questionNumber: number;
@@ -17,6 +34,16 @@ interface EvaluationQuestion {
     allOptions?: any[];
 }
 
+/**
+ * @interface DetailedEvaluationModalProps
+ * @description Defines the props for the DetailedEvaluationModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ * @property {object} evaluationResults - The results of the evaluation.
+ * @property {any} selectedExamPaper - The exam paper that was evaluated.
+ * @property {object} examAnswers - The user's answers to the exam questions.
+ * @property {function} onBackToSummary - Callback function to return to the summary view.
+ */
 interface DetailedEvaluationModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -32,6 +59,11 @@ interface DetailedEvaluationModalProps {
     onBackToSummary: () => void;
 }
 
+/**
+ * @description A modal component that displays a detailed evaluation of an exam, allowing users to navigate through questions and view feedback.
+ * @param {DetailedEvaluationModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The detailed evaluation modal component.
+ */
 const DetailedEvaluationModal: React.FC<DetailedEvaluationModalProps> = ({
     isOpen,
     onClose,
@@ -57,19 +89,28 @@ const DetailedEvaluationModal: React.FC<DetailedEvaluationModalProps> = ({
     const selectedOptionIndex = userAnswer?.selectedOption || 0;
     const selectedOption = originalQuestion?.questionOptions[selectedOptionIndex];
 
+    /**
+     * @description Navigates to the previous question in the evaluation.
+     */
     const goToPrevious = () => {
         if (currentQuestionIndex > 0) {
             setCurrentQuestionIndex(currentQuestionIndex - 1);
         }
     };
 
+    /**
+     * @description Navigates to the next question in the evaluation.
+     */
     const goToNext = () => {
         if (currentQuestionIndex < totalQuestions - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
         }
     };
 
-    // Mobile detection
+    /**
+     * @description Detects if the current view is on a mobile device.
+     * @returns {boolean} True if the screen width is less than or equal to 768px, false otherwise.
+     */
     const isMobile = () => window.innerWidth <= 768;
 
     return (

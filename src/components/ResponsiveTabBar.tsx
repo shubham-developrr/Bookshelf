@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-// Tab icons mapping - enhanced with better SVG icons from svg.html, theme-adaptive
+/**
+ * @description A function that returns an SVG icon for a given tab name.
+ * @param {string} tabName - The name of the tab.
+ * @returns {JSX.Element} The SVG icon for the tab.
+ */
 const getTabIcon = (tabName: string) => {
   const iconMap: { [key: string]: JSX.Element } = {
     read: (
@@ -126,6 +130,25 @@ const getTabIcon = (tabName: string) => {
   );
 };
 
+/**
+ * @interface ResponsiveTabBarProps
+ * @description Defines the props for the ResponsiveTabBar component.
+ * @property {string} activeTab - The currently active tab.
+ * @property {function} onTabChange - Callback function to change the active tab.
+ * @property {string[]} activeTabs - An array of active tab names.
+ * @property {function} [onDeleteTab] - Optional callback function to delete a tab.
+ * @property {function} [onRenameTab] - Optional callback function to rename a tab.
+ * @property {function} getTabDisplayName - Function to get the display name for a tab.
+ * @property {boolean} showTemplateSelector - Whether to show the template selector.
+ * @property {function} onToggleTemplateSelector - Callback function to toggle the template selector.
+ * @property {string | null} showRenameInput - The name of the tab currently being renamed, or null.
+ * @property {string} renameValue - The current value of the rename input.
+ * @property {function} onRenameValueChange - Callback function to update the rename value.
+ * @property {function} onStartRename - Callback function to start renaming a tab.
+ * @property {function} onHandleRename - Callback function to handle the renaming of a tab.
+ * @property {function} [onEditSvg] - Optional callback function to edit the SVG icon for a tab.
+ * @property {function} [getTabIcon] - Optional function to get the icon for a tab.
+ */
 interface ResponsiveTabBarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -144,6 +167,11 @@ interface ResponsiveTabBarProps {
   getTabIcon?: (tab: string) => JSX.Element;
 }
 
+/**
+ * @description A responsive tab bar component that displays tabs and handles tab selection, deletion, and renaming.
+ * @param {ResponsiveTabBarProps} props - The props for the component.
+ * @returns {JSX.Element} The responsive tab bar component.
+ */
 export const ResponsiveTabBar: React.FC<ResponsiveTabBarProps> = ({
   activeTab,
   onTabChange,
@@ -182,7 +210,11 @@ export const ResponsiveTabBar: React.FC<ResponsiveTabBarProps> = ({
   const shouldShowIconsOnly = isMobile;
   const shouldShowNamesDropdown = isMobile && dynamicTabs.length > 0;
 
-  // Handle rename functionality
+  /**
+   * @description Handles key presses for the rename input field.
+   * @param {React.KeyboardEvent} e - The keyboard event.
+   * @param {string} tab - The name of the tab being renamed.
+   */
   const handleRenameKeyPress = (e: React.KeyboardEvent, tab: string) => {
     if (e.key === 'Enter') {
       onHandleRename(tab);
@@ -192,6 +224,10 @@ export const ResponsiveTabBar: React.FC<ResponsiveTabBarProps> = ({
     }
   };
 
+  /**
+   * @description Handles the blur event for the rename input field.
+   * @param {string} tab - The name of the tab being renamed.
+   */
   const handleRenameBlur = (tab: string) => {
     onHandleRename(tab);
   };

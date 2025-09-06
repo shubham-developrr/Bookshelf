@@ -1,10 +1,9 @@
 import { supabase } from './supabaseClient';
 
 /**
- * TabPersistenceManager - Handles tab state persistence with backend sync
- * Uses localStorage for fast access and Supabase for cross-device sync
+ * @interface TabState
+ * @description Defines the structure for a single dynamic tab within a chapter.
  */
-
 interface TabState {
   id: string;
   title: string;
@@ -16,6 +15,10 @@ interface TabState {
   bookId: string;
 }
 
+/**
+ * @interface ChapterTabsState
+ * @description Defines the complete state for all tabs within a single chapter.
+ */
 interface ChapterTabsState {
   chapterId: string;
   bookId: string;
@@ -24,6 +27,11 @@ interface ChapterTabsState {
   lastAccessed: string;
 }
 
+/**
+ * @class TabPersistenceManager
+ * @description A singleton class to manage the state of dynamic tabs within a chapter,
+ * providing persistence through localStorage and synchronization with a backend (Supabase).
+ */
 export class TabPersistenceManager {
   private readonly CACHE_PREFIX = 'tabs_cache_';
   private readonly DEBOUNCE_DELAY = 500; // 500ms debounce for saves
@@ -32,6 +40,10 @@ export class TabPersistenceManager {
 
   // ==================== INITIALIZATION ====================
 
+  /**
+   * @description Initializes the manager for a specific user and performs an initial sync from the backend.
+   * @param {string} userId - The ID of the current user.
+   */
   async initialize(userId: string) {
     this.userId = userId;
     await this.syncFromBackend();
@@ -39,10 +51,22 @@ export class TabPersistenceManager {
 
   // ==================== LOCAL STORAGE MANAGEMENT ====================
 
+  /**
+   * @description Generates the localStorage key for a given chapter.
+   * @private
+   * @param {string} chapterId - The ID of the chapter.
+   * @returns {string} The localStorage key.
+   */
   private getLocalKey(chapterId: string): string {
     return `${this.CACHE_PREFIX}${this.userId}_${chapterId}`;
   }
 
+  /**
+   * @description Retrieves the tab state for a chapter from localStorage.
+   * @param {string} chapterId - The ID of the chapter.
+   * @param {string} bookId - The ID of the book.
+   * @returns {ChapterTabsState | null} The chapter's tab state, or null if not found.
+   */
   getChapterTabs(chapterId: string, bookId: string): ChapterTabsState | null {
     const cached = localStorage.getItem(this.getLocalKey(chapterId));
     if (cached) {
@@ -56,6 +80,10 @@ export class TabPersistenceManager {
     return null;
   }
 
+  /**
+   * @description Saves the tab state for a chapter to localStorage and triggers a debounced save to the backend.
+   * @param {ChapterTabsState} chapterTabsState - The tab state to save.
+   */
   saveChapterTabs(chapterTabsState: ChapterTabsState): void {
     // Save to localStorage immediately for fast access
     localStorage.setItem(
@@ -72,6 +100,11 @@ export class TabPersistenceManager {
 
   // ==================== BACKEND SYNCHRONIZATION ====================
 
+  /**
+   * @description Debounces the save operation to the backend to avoid excessive API calls.
+   * @private
+   * @param {ChapterTabsState} chapterTabsState - The tab state to save.
+   */
   private debouncedSaveToBackend(chapterTabsState: ChapterTabsState): void {
     const key = `${chapterTabsState.bookId}_${chapterTabsState.chapterId}`;
     
@@ -89,6 +122,11 @@ export class TabPersistenceManager {
     this.debounceTimers.set(key, timer);
   }
 
+  /**
+   * @description Saves the tab state to the backend (Supabase) by upserting it into the user_progress table.
+   * @private
+   * @param {ChapterTabsState} chapterTabsState - The tab state to save.
+   */
   private async saveToBackend(chapterTabsState: ChapterTabsState): Promise<void> {
     if (!this.userId) return;
 
@@ -119,6 +157,10 @@ export class TabPersistenceManager {
     }
   }
 
+  /**
+   * @description Fetches all tab states for the user from the backend and updates localStorage.
+   * @private
+   */
   private async syncFromBackend(): Promise<void> {
     if (!this.userId) return;
 
@@ -167,6 +209,13 @@ export class TabPersistenceManager {
 
   // ==================== TAB MANAGEMENT ====================
 
+  /**
+   * @description Adds a new tab to a chapter's tab state.
+   * @param {string} chapterId - The ID of the chapter.
+   * @param {string} bookId - The ID of the book.
+   * @param {Omit<TabState, 'id' | 'lastModified'>} tab - The new tab's data.
+   * @returns {string} The ID of the newly created tab.
+   */
   addTab(chapterId: string, bookId: string, tab: Omit<TabState, 'id' | 'lastModified'>): string {
     const tabId = crypto.randomUUID();
     const newTab: TabState = {
@@ -194,6 +243,13 @@ export class TabPersistenceManager {
     return tabId;
   }
 
+  /**
+   * @description Updates an existing tab within a chapter's tab state.
+   * @param {string} chapterId - The ID of the chapter.
+   * @param {string} bookId - The ID of the book.
+   * @param {string} tabId - The ID of the tab to update.
+   * @param {Partial<TabState>} updates - The properties of the tab to update.
+   */
   updateTab(chapterId: string, bookId: string, tabId: string, updates: Partial<TabState>): void {
     const chapterTabs = this.getChapterTabs(chapterId, bookId);
     if (!chapterTabs) return;
@@ -210,6 +266,12 @@ export class TabPersistenceManager {
     this.saveChapterTabs(chapterTabs);
   }
 
+  /**
+   * @description Deletes a tab from a chapter's tab state.
+   * @param {string} chapterId - The ID of the chapter.
+   * @param {string} bookId - The ID of the book.
+   * @param {string} tabId - The ID of the tab to delete.
+   */
   deleteTab(chapterId: string, bookId: string, tabId: string): void {
     const chapterTabs = this.getChapterTabs(chapterId, bookId);
     if (!chapterTabs) return;
@@ -224,6 +286,12 @@ export class TabPersistenceManager {
     this.saveChapterTabs(chapterTabs);
   }
 
+  /**
+   * @description Sets the active tab for a given chapter.
+   * @param {string} chapterId - The ID of the chapter.
+   * @param {string} bookId - The ID of the book.
+   * @param {string} tabId - The ID of the tab to set as active.
+   */
   setActiveTab(chapterId: string, bookId: string, tabId: string): void {
     const chapterTabs = this.getChapterTabs(chapterId, bookId);
     if (!chapterTabs) return;
@@ -234,6 +302,12 @@ export class TabPersistenceManager {
 
   // ==================== UTILITY METHODS ====================
 
+  /**
+   * @description Calculates a chapter's completion percentage based on the content of its tabs.
+   * @private
+   * @param {TabState[]} tabs - The array of tabs for the chapter.
+   * @returns {number} The calculated progress percentage.
+   */
   private calculateProgressFromTabs(tabs: TabState[]): number {
     if (tabs.length === 0) return 0;
     
@@ -251,6 +325,11 @@ export class TabPersistenceManager {
 
   // ==================== REAL-TIME SYNC ====================
 
+  /**
+   * @description Sets up a real-time subscription to receive tab state changes from other devices.
+   * @param {(chapterId: string, tabsState: ChapterTabsState) => void} callback - The function to call when changes are received.
+   * @returns {() => void} A function to unsubscribe.
+   */
   subscribeToTabChanges(callback: (chapterId: string, tabsState: ChapterTabsState) => void): () => void {
     if (!this.userId) return () => {};
 
@@ -299,6 +378,9 @@ export class TabPersistenceManager {
 
   // ==================== CLEANUP ====================
 
+  /**
+   * @description Clears all active debounce timers and resets the user ID. Should be called on logout.
+   */
   cleanup(): void {
     this.debounceTimers.forEach(timer => clearTimeout(timer));
     this.debounceTimers.clear();
@@ -306,5 +388,8 @@ export class TabPersistenceManager {
   }
 }
 
-// Create and export singleton instance
+/**
+ * @const tabPersistenceManager
+ * @description The exported singleton instance of the TabPersistenceManager class.
+ */
 export const tabPersistenceManager = new TabPersistenceManager();

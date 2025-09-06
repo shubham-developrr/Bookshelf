@@ -4,6 +4,14 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Set up PDF.js worker with matching version
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
+/**
+ * @interface OCRResult
+ * @description Defines the structure of the result from an OCR operation.
+ * @property {boolean} success - Indicates if the operation was successful.
+ * @property {string} text - The extracted text.
+ * @property {string} [error] - An error message if the operation failed.
+ * @property {number} [confidence] - The confidence score of the OCR result (0-100).
+ */
 export interface OCRResult {
     success: boolean;
     text: string;
@@ -11,21 +19,31 @@ export interface OCRResult {
     confidence?: number;
 }
 
+/**
+ * @interface OCRProgress
+ * @description Defines the structure for progress updates during an OCR operation.
+ * @property {string} status - A message describing the current status.
+ * @property {number} progress - The progress percentage (0-1).
+ */
 export interface OCRProgress {
     status: string;
     progress: number;
 }
 
 /**
- * Comprehensive OCR Service using Tesseract.js
- * Supports images, PDFs (converted to images), and various file formats
+ * @class OCRService
+ * @description A comprehensive service using Tesseract.js to extract text from images and PDFs.
+ * It manages a singleton worker instance to optimize performance.
  */
 export class OCRService {
     private worker: any = null;
     private isInitialized = false;
 
     /**
-     * Initialize OCR worker with optimized settings
+     * @description Initializes the Tesseract.js worker with optimized settings for educational content.
+     * This method is called automatically if not already initialized.
+     * @param {string} [language='eng'] - The language for OCR processing.
+     * @param {(progress: OCRProgress) => void} [progressCallback] - A callback function to receive progress updates.
      */
     async initialize(language: string = 'eng', progressCallback?: (progress: OCRProgress) => void): Promise<void> {
         if (this.isInitialized && this.worker) {
@@ -61,7 +79,10 @@ export class OCRService {
     }
 
     /**
-     * Extract text from image file
+     * @description Extracts text from a single image file.
+     * @param {File} imageFile - The image file to process.
+     * @param {(progress: OCRProgress) => void} [progressCallback] - A callback for progress updates.
+     * @returns {Promise<OCRResult>} A promise that resolves with the OCR result.
      */
     async extractTextFromImage(imageFile: File, progressCallback?: (progress: OCRProgress) => void): Promise<OCRResult> {
         try {
@@ -98,7 +119,10 @@ export class OCRService {
     }
 
     /**
-     * Extract text from base64 image
+     * @description Extracts text from a base64 encoded image string.
+     * @param {string} base64Data - The base64 encoded image data.
+     * @param {(progress: OCRProgress) => void} [progressCallback] - A callback for progress updates.
+     * @returns {Promise<OCRResult>} A promise that resolves with the OCR result.
      */
     async extractTextFromBase64(base64Data: string, progressCallback?: (progress: OCRProgress) => void): Promise<OCRResult> {
         try {
@@ -135,7 +159,10 @@ export class OCRService {
     }
 
     /**
-     * Extract text from PDF by converting pages to images
+     * @description Extracts text from a PDF file by converting each page to an image and running OCR on it.
+     * @param {File} pdfFile - The PDF file to process.
+     * @param {(progress: OCRProgress) => void} [progressCallback] - A callback for progress updates.
+     * @returns {Promise<OCRResult>} A promise that resolves with the combined text from all pages.
      */
     async extractTextFromPDF(pdfFile: File, progressCallback?: (progress: OCRProgress) => void): Promise<OCRResult> {
         try {
@@ -230,7 +257,10 @@ export class OCRService {
     }
 
     /**
-     * Process multiple images and combine results
+     * @description Processes an array of image files and combines the extracted text.
+     * @param {File[]} imageFiles - An array of image files to process.
+     * @param {(progress: OCRProgress) => void} [progressCallback] - A callback for progress updates.
+     * @returns {Promise<OCRResult>} A promise that resolves with the combined OCR result.
      */
     async extractTextFromMultipleImages(imageFiles: File[], progressCallback?: (progress: OCRProgress) => void): Promise<OCRResult> {
         try {
@@ -277,7 +307,10 @@ export class OCRService {
     }
 
     /**
-     * Smart file type detection and processing
+     * @description A smart method that detects the file type (image or PDF) and calls the appropriate extraction method.
+     * @param {File} file - The file to process.
+     * @param {(progress: OCRProgress) => void} [progressCallback] - A callback for progress updates.
+     * @returns {Promise<OCRResult>} A promise that resolves with the OCR result.
      */
     async extractTextFromFile(file: File, progressCallback?: (progress: OCRProgress) => void): Promise<OCRResult> {
         const fileType = file.type.toLowerCase();
@@ -317,7 +350,7 @@ export class OCRService {
     }
 
     /**
-     * Clean up and terminate worker
+     * @description Cleans up and terminates the Tesseract.js worker to free up resources.
      */
     async terminate(): Promise<void> {
         if (this.worker) {
@@ -333,7 +366,8 @@ export class OCRService {
     }
 
     /**
-     * Get supported file types
+     * @description Returns an array of supported MIME types for OCR.
+     * @returns {string[]} An array of supported MIME types.
      */
     static getSupportedFileTypes(): string[] {
         return [
@@ -347,7 +381,9 @@ export class OCRService {
     }
 
     /**
-     * Check if file type is supported
+     * @description Checks if a given file's type is supported by the OCR service.
+     * @param {File} file - The file to check.
+     * @returns {boolean} True if the file type is supported.
      */
     static isFileTypeSupported(file: File): boolean {
         const supportedTypes = OCRService.getSupportedFileTypes();
@@ -356,10 +392,18 @@ export class OCRService {
     }
 }
 
-// Singleton instance for app-wide use
+/**
+ * @const ocrService
+ * @description The exported singleton instance of the OCRService class for app-wide use.
+ */
 export const ocrService = new OCRService();
 
-// Export utility functions
+/**
+ * @description A convenience utility function to extract text from a single file using the ocrService instance.
+ * @param {File} file - The file to process.
+ * @param {(progress: OCRProgress) => void} [progressCallback] - A callback for progress updates.
+ * @returns {Promise<OCRResult>} A promise that resolves with the OCR result.
+ */
 export const extractTextFromFile = async (
     file: File, 
     progressCallback?: (progress: OCRProgress) => void
@@ -367,6 +411,12 @@ export const extractTextFromFile = async (
     return await ocrService.extractTextFromFile(file, progressCallback);
 };
 
+/**
+ * @description A convenience utility function to extract text from multiple files using the ocrService instance.
+ * @param {File[]} files - An array of files to process.
+ * @param {(progress: OCRProgress) => void} [progressCallback] - A callback for progress updates.
+ * @returns {Promise<OCRResult>} A promise that resolves with the combined OCR result.
+ */
 export const extractTextFromMultipleFiles = async (
     files: File[], 
     progressCallback?: (progress: OCRProgress) => void

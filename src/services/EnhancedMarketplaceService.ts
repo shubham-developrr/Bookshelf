@@ -2,9 +2,10 @@ import { supabase } from './supabaseClient';
 import BookManager, { BookMetadata } from '../utils/BookManager';
 
 /**
- * Enhanced Marketplace Service with Backend Integration
+ * @interface MarketplaceBook
+ * @description Defines the structure for a book as it is represented in the marketplace database.
+ * This includes all metadata, author information, and statistics.
  */
-
 export interface MarketplaceBook {
   id: string;
   book_id: string; // Global UUID
@@ -36,6 +37,10 @@ export interface MarketplaceBook {
   updated_at: string;
 }
 
+/**
+ * @interface BookVersion
+ * @description Represents a specific version of a book in the marketplace.
+ */
 export interface BookVersion {
   id: string;
   book_id: string;
@@ -49,6 +54,10 @@ export interface BookVersion {
   created_at: string;
 }
 
+/**
+ * @interface UserDownload
+ * @description Represents a record of a user downloading a book from the marketplace.
+ */
 export interface UserDownload {
   id: string;
   user_id: string;
@@ -63,6 +72,10 @@ export interface UserDownload {
   installation_path?: string;
 }
 
+/**
+ * @interface BookReview
+ * @description Represents a user's review and rating for a book.
+ */
 export interface BookReview {
   id: string;
   book_id: string;
@@ -75,6 +88,10 @@ export interface BookReview {
   updated_at: string;
 }
 
+/**
+ * @interface PublishBookOptions
+ * @description Defines the options required to publish a new book to the marketplace.
+ */
 export interface PublishBookOptions {
   book_id: string;
   title: string;
@@ -88,6 +105,10 @@ export interface PublishBookOptions {
   preview_data?: any;
 }
 
+/**
+ * @interface BookUpdateInfo
+ * @description Contains information about an available update for a book.
+ */
 export interface BookUpdateInfo {
   hasUpdate: boolean;
   currentVersion: string;
@@ -97,12 +118,20 @@ export interface BookUpdateInfo {
   isBreakingChange: boolean;
 }
 
+/**
+ * @class EnhancedMarketplaceService
+ * @description A service class with static methods to handle all interactions with the book marketplace,
+ * such as publishing, browsing, downloading, and reviewing books, using Supabase as the backend.
+ */
 export class EnhancedMarketplaceService {
   
   // ==================== BOOK PUBLISHING ====================
   
   /**
-   * Publish a book to the marketplace
+   * @description Publishes a new book to the marketplace. This involves creating a record in the
+   * `marketplace_books` table and an initial version record.
+   * @param {PublishBookOptions} options - The data for the book to be published.
+   * @returns {Promise<{success: boolean; marketplaceId?: string; error?: string}>} The result of the operation.
    */
   static async publishBook(options: PublishBookOptions): Promise<{
     success: boolean;
@@ -194,7 +223,11 @@ export class EnhancedMarketplaceService {
   }
 
   /**
-   * Update an existing marketplace book
+   * @description Updates an existing book in the marketplace. Can also be used to publish a new version.
+   * @param {string} marketplaceId - The ID of the book in the marketplace.
+   * @param {Partial<MarketplaceBook>} updates - The fields to update on the book.
+   * @param {object} [newVersion] - Optional data for a new version release.
+   * @returns {Promise<{success: boolean; error?: string}>} The result of the operation.
    */
   static async updateMarketplaceBook(
     marketplaceId: string, 
@@ -263,7 +296,9 @@ export class EnhancedMarketplaceService {
   // ==================== MARKETPLACE BROWSING ====================
 
   /**
-   * Browse marketplace books with filters
+   * @description Fetches books from the marketplace with optional filtering, sorting, and pagination.
+   * @param {object} [options={}] - The options for browsing.
+   * @returns {Promise<{books: MarketplaceBook[]; total: number; error?: string}>} An object with the list of books, total count, and optional error.
    */
   static async browseMarketplace(options: {
     category?: string;
@@ -348,7 +383,9 @@ export class EnhancedMarketplaceService {
   }
 
   /**
-   * Get detailed book information
+   * @description Retrieves detailed information for a single book, including its versions and reviews.
+   * @param {string} bookId - The global UUID of the book.
+   * @returns {Promise<{book: MarketplaceBook | null; versions: BookVersion[]; reviews: BookReview[]; error?: string}>} The detailed book information.
    */
   static async getBookDetails(bookId: string): Promise<{
     book: MarketplaceBook | null;
@@ -403,7 +440,9 @@ export class EnhancedMarketplaceService {
   // ==================== BOOK DOWNLOADS ====================
 
   /**
-   * Download a book from marketplace
+   * @description Records a book download for the current user and returns the book data.
+   * @param {string} bookId - The global UUID of the book to download.
+   * @returns {Promise<{success: boolean; downloadData?: any; error?: string}>} The result of the download operation.
    */
   static async downloadBook(bookId: string): Promise<{
     success: boolean;
@@ -478,7 +517,9 @@ export class EnhancedMarketplaceService {
   // ==================== UPDATE MANAGEMENT ====================
 
   /**
-   * Check for updates for user's downloaded books
+   * @description Checks for available updates for all of a user's downloaded books.
+   * @param {string} userId - The ID of the user.
+   * @returns {Promise<BookUpdateInfo[]>} A promise that resolves with an array of available updates.
    */
   static async checkForUpdates(userId: string): Promise<BookUpdateInfo[]> {
     try {
@@ -524,7 +565,10 @@ export class EnhancedMarketplaceService {
   }
 
   /**
-   * Mark updates as available for a book
+   * @description Marks a book as having an update available for all users who have downloaded it.
+   * @private
+   * @param {string} bookId - The global UUID of the book.
+   * @param {string} newVersion - The new version string.
    */
   private static async markUpdatesAvailable(bookId: string, newVersion: string): Promise<void> {
     try {
@@ -546,7 +590,11 @@ export class EnhancedMarketplaceService {
   // ==================== REVIEWS AND RATINGS ====================
 
   /**
-   * Submit a book review
+   * @description Submits or updates a review for a book.
+   * @param {string} bookId - The global UUID of the book to review.
+   * @param {number} rating - The rating from 1 to 5.
+   * @param {string} [reviewText] - The optional text content of the review.
+   * @returns {Promise<{success: boolean; error?: string}>} The result of the operation.
    */
   static async submitReview(
     bookId: string, 
@@ -599,7 +647,10 @@ export class EnhancedMarketplaceService {
   // ==================== ANALYTICS ====================
 
   /**
-   * Track marketplace events
+   * @description Tracks a marketplace event, such as a view or download.
+   * @param {'view' | 'download' | 'review' | 'rating'} eventType - The type of event to track.
+   * @param {string} bookId - The global UUID of the book associated with the event.
+   * @param {any} [metadata] - Additional metadata for the event.
    */
   static async trackEvent(
     eventType: 'view' | 'download' | 'review' | 'rating',
@@ -626,7 +677,8 @@ export class EnhancedMarketplaceService {
   // ==================== MY LIBRARY MANAGEMENT ====================
 
   /**
-   * Get user's published books
+   * @description Retrieves all books published by the current user.
+   * @returns {Promise<{success: boolean; books?: any[]; error?: string}>} The result of the operation, including the user's books.
    */
   static async getUserPublishedBooks(): Promise<{
     success: boolean;
@@ -660,7 +712,10 @@ export class EnhancedMarketplaceService {
   }
 
   /**
-   * Update book visibility
+   * @description Updates the visibility of a user's published book.
+   * @param {string} bookId - The marketplace ID of the book.
+   * @param {boolean} isPublished - The new visibility status.
+   * @returns {Promise<{success: boolean; error?: string}>} The result of the operation.
    */
   static async updateBookVisibility(bookId: string, isPublished: boolean): Promise<{
     success: boolean;
@@ -693,7 +748,9 @@ export class EnhancedMarketplaceService {
   }
 
   /**
-   * Delete published book from marketplace
+   * @description Deletes a user's published book from the marketplace and all associated data.
+   * @param {string} bookId - The marketplace ID of the book to delete.
+   * @returns {Promise<{success: boolean; error?: string}>} The result of the operation.
    */
   static async deletePublishedBook(bookId: string): Promise<{
     success: boolean;

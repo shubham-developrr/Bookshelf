@@ -1,16 +1,23 @@
 import { GoogleGenAI } from '@google/genai';
 
 /**
- * GeminiAPIService - Handle Google Gemini API access with user's API key
- * Allows users to input their own API key to utilize their quota
+ * @interface UserGeminiConfig
+ * @description Defines the structure for storing a user's Gemini API key configuration.
+ * @property {string} apiKey - The user's Gemini API key.
+ * @property {boolean} isValid - Whether the key has been validated.
+ * @property {string} [lastValidated] - ISO string of the last validation date.
  */
-
 interface UserGeminiConfig {
   apiKey: string;
   isValid: boolean;
   lastValidated?: string;
 }
 
+/**
+ * @class GeminiAPIService
+ * @description A singleton service to manage a user-provided Google Gemini API key
+ * and handle API calls with it.
+ */
 export class GeminiAPIService {
   private static instance: GeminiAPIService;
   private userApiKey: string | null = null;
@@ -21,6 +28,10 @@ export class GeminiAPIService {
     this.loadApiKeyFromStorage();
   }
 
+  /**
+   * @description Gets the singleton instance of the GeminiAPIService.
+   * @returns {GeminiAPIService} The singleton instance.
+   */
   static getInstance(): GeminiAPIService {
     if (!GeminiAPIService.instance) {
       GeminiAPIService.instance = new GeminiAPIService();
@@ -29,7 +40,9 @@ export class GeminiAPIService {
   }
 
   /**
-   * Set user's Gemini API key
+   * @description Sets and validates a user-provided Gemini API key.
+   * @param {string} apiKey - The user's Gemini API key.
+   * @returns {Promise<boolean>} A promise that resolves to true if the key is valid and set, false otherwise.
    */
   async setUserApiKey(apiKey: string): Promise<boolean> {
     try {
@@ -56,7 +69,9 @@ export class GeminiAPIService {
   }
 
   /**
-   * Test if the API key works
+   * @description Tests a given API key for validity by making a simple request.
+   * @param {string} apiKey - The API key to test.
+   * @returns {Promise<boolean>} A promise that resolves to true if the key is valid, false otherwise.
    */
   async testApiKey(apiKey: string): Promise<boolean> {
     try {
@@ -88,14 +103,16 @@ export class GeminiAPIService {
   }
 
   /**
-   * Check if we have a valid user API key
+   * @description Checks if a valid, initialized API key is currently stored in the service.
+   * @returns {boolean} True if a valid key is available.
    */
   hasValidApiKey(): boolean {
     return this.userApiKey !== null && this.geminiClient !== null;
   }
 
   /**
-   * Get masked API key for display
+   * @description Returns a masked version of the API key for safe display in the UI.
+   * @returns {string | null} The masked API key, or null if no key is set.
    */
   getMaskedApiKey(): string | null {
     if (!this.userApiKey) return null;
@@ -104,7 +121,12 @@ export class GeminiAPIService {
   }
 
   /**
-   * Make request to Gemini API using user's key with cascading model fallback
+   * @description Generates content using the Gemini API with a cascading model fallback strategy
+   * to ensure reliability and performance.
+   * @param {string} prompt - The prompt to send to the AI.
+   * @param {boolean} [fastMode=false] - If true, prioritizes faster models.
+   * @param {boolean} [enableThinking=false] - If true, enables deeper reasoning for supported models.
+   * @returns {Promise<any>} A promise that resolves with the response data from the API.
    */
   async generateContent(prompt: string, fastMode: boolean = false, enableThinking: boolean = false): Promise<any> {
     if (!this.geminiClient) {
@@ -252,7 +274,7 @@ export class GeminiAPIService {
   }
 
   /**
-   * Clear stored API key
+   * @description Removes the user's API key from the service and from localStorage.
    */
   clearApiKey(): void {
     this.userApiKey = null;
@@ -261,7 +283,8 @@ export class GeminiAPIService {
   }
 
   /**
-   * Get instructions for users on how to get their API key
+   * @description Provides a structured set of instructions for users on how to obtain a Gemini API key.
+   * @returns {object} An object containing the title, steps, benefits, and quota information.
    */
   getApiKeyInstructions(): {
     title: string;
@@ -290,14 +313,16 @@ export class GeminiAPIService {
   }
 
   /**
-   * Check if Gemini API is available (user has configured key)
+   * @description A convenience method to check if the service is ready to make API calls.
+   * @returns {boolean} True if the service has a valid API key.
    */
   isAvailable(): boolean {
     return this.hasValidApiKey();
   }
 
   /**
-   * Get current configuration status
+   * @description Returns the current configuration status of the service.
+   * @returns {object} An object containing the configuration status.
    */
   getStatus(): {
     configured: boolean;
@@ -313,6 +338,10 @@ export class GeminiAPIService {
 
   // ==================== PRIVATE METHODS ====================
 
+  /**
+   * @description Saves the current user API key to localStorage.
+   * @private
+   */
   private saveApiKeyToStorage(): void {
     if (this.userApiKey) {
       localStorage.setItem(this.storageKey, this.userApiKey);
@@ -320,6 +349,10 @@ export class GeminiAPIService {
     }
   }
 
+  /**
+   * @description Loads the user API key from localStorage on initialization.
+   * @private
+   */
   private loadApiKeyFromStorage(): void {
     const stored = localStorage.getItem(this.storageKey);
     if (stored) {
@@ -335,5 +368,8 @@ export class GeminiAPIService {
   }
 }
 
-// Export singleton instance
+/**
+ * @const geminiAPIService
+ * @description The exported singleton instance of the GeminiAPIService class.
+ */
 export const geminiAPIService = GeminiAPIService.getInstance();

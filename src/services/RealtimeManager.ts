@@ -2,17 +2,20 @@ import { supabase } from './supabaseClient';
 import type { UserProgress, UserHighlight } from '../contexts/UserContext';
 
 /**
- * RealtimeManager - Handles real-time subscriptions for user data
- * Provides centralized subscription management and automatic cleanup
+ * @class RealtimeManager
+ * @description A singleton class to manage real-time subscriptions for user data (progress and highlights)
+ * using Supabase, and provide a centralized way to handle incoming real-time events.
  */
-export class RealtimeManager {
+class RealtimeManagerSingleton {
   private subscriptions: { [key: string]: any } = {};
   private currentUserId: string | null = null;
 
   // ==================== SUBSCRIPTION MANAGEMENT ====================
 
   /**
-   * Initialize real-time subscriptions for a user
+   * @description Initializes all necessary real-time subscriptions for a specific user.
+   * Cleans up any existing subscriptions before creating new ones.
+   * @param {string} userId - The ID of the user to subscribe for.
    */
   async initializeForUser(userId: string) {
     this.currentUserId = userId;
@@ -24,7 +27,8 @@ export class RealtimeManager {
   }
 
   /**
-   * Clean up all subscriptions
+   * @description Unsubscribes from all active real-time channels.
+   * Typically used on logout or re-initialization.
    */
   cleanup() {
     Object.values(this.subscriptions).forEach(subscription => {
@@ -34,7 +38,8 @@ export class RealtimeManager {
   }
 
   /**
-   * Check if user is connected to real-time
+   * @description Checks if there are any active subscriptions.
+   * @returns {boolean} True if connected, false otherwise.
    */
   isConnected(): boolean {
     return Object.keys(this.subscriptions).length > 0;
@@ -42,6 +47,10 @@ export class RealtimeManager {
 
   // ==================== PROGRESS SUBSCRIPTIONS ====================
 
+  /**
+   * @description Sets up the Supabase channel subscription for user progress changes.
+   * @private
+   */
   private subscribeToUserProgress() {
     if (!this.currentUserId) return;
 
@@ -64,6 +73,11 @@ export class RealtimeManager {
     this.subscriptions.progress = subscription;
   }
 
+  /**
+   * @description Processes incoming payloads from the user_progress channel and calls notification methods.
+   * @private
+   * @param {any} payload - The payload from the Supabase real-time event.
+   */
   private handleProgressChange(payload: any) {
     const { eventType, new: newData, old: oldData } = payload;
     
@@ -93,6 +107,10 @@ export class RealtimeManager {
 
   // ==================== HIGHLIGHTS SUBSCRIPTIONS ====================
 
+  /**
+   * @description Sets up the Supabase channel subscription for user highlight changes.
+   * @private
+   */
   private subscribeToUserHighlights() {
     if (!this.currentUserId) return;
 
@@ -115,6 +133,11 @@ export class RealtimeManager {
     this.subscriptions.highlights = subscription;
   }
 
+  /**
+   * @description Processes incoming payloads from the user_highlights channel and calls notification methods.
+   * @private
+   * @param {any} payload - The payload from the Supabase real-time event.
+   */
   private handleHighlightChange(payload: any) {
     const { eventType, new: newData, old: oldData } = payload;
     
@@ -152,7 +175,9 @@ export class RealtimeManager {
   private highlightDeleteCallbacks: ((highlightId: string) => void)[] = [];
 
   /**
-   * Subscribe to progress updates
+   * @description Allows other parts of the application to subscribe to real-time progress updates.
+   * @param {(progress: UserProgress, event: string) => void} callback - The function to call on update.
+   * @returns {() => void} A function to unsubscribe.
    */
   onProgressUpdate(callback: (progress: UserProgress, event: string) => void) {
     this.progressCallbacks.push(callback);
@@ -165,7 +190,9 @@ export class RealtimeManager {
   }
 
   /**
-   * Subscribe to progress deletions
+   * @description Allows other parts of the application to subscribe to real-time progress deletions.
+   * @param {(bookId: string, chapterId: string) => void} callback - The function to call on delete.
+   * @returns {() => void} A function to unsubscribe.
    */
   onProgressDelete(callback: (bookId: string, chapterId: string) => void) {
     this.progressDeleteCallbacks.push(callback);
@@ -178,7 +205,9 @@ export class RealtimeManager {
   }
 
   /**
-   * Subscribe to highlight updates
+   * @description Allows other parts of the application to subscribe to real-time highlight updates.
+   * @param {(highlight: UserHighlight, event: string) => void} callback - The function to call on update.
+   * @returns {() => void} A function to unsubscribe.
    */
   onHighlightUpdate(callback: (highlight: UserHighlight, event: string) => void) {
     this.highlightCallbacks.push(callback);
@@ -191,7 +220,9 @@ export class RealtimeManager {
   }
 
   /**
-   * Subscribe to highlight deletions
+   * @description Allows other parts of the application to subscribe to real-time highlight deletions.
+   * @param {(highlightId: string) => void} callback - The function to call on delete.
+   * @returns {() => void} A function to unsubscribe.
    */
   onHighlightDelete(callback: (highlightId: string) => void) {
     this.highlightDeleteCallbacks.push(callback);
@@ -205,6 +236,10 @@ export class RealtimeManager {
 
   // ==================== INTERNAL NOTIFICATION METHODS ====================
 
+  /**
+   * @description Invokes all registered progress update callbacks.
+   * @private
+   */
   private notifyProgressUpdate(progress: UserProgress, event: string) {
     this.progressCallbacks.forEach(callback => {
       try {
@@ -215,6 +250,10 @@ export class RealtimeManager {
     });
   }
 
+  /**
+   * @description Invokes all registered progress delete callbacks.
+   * @private
+   */
   private notifyProgressDelete(bookId: string, chapterId: string) {
     this.progressDeleteCallbacks.forEach(callback => {
       try {
@@ -225,6 +264,10 @@ export class RealtimeManager {
     });
   }
 
+  /**
+   * @description Invokes all registered highlight update callbacks.
+   * @private
+   */
   private notifyHighlightUpdate(highlight: UserHighlight, event: string) {
     this.highlightCallbacks.forEach(callback => {
       try {
@@ -235,6 +278,10 @@ export class RealtimeManager {
     });
   }
 
+  /**
+   * @description Invokes all registered highlight delete callbacks.
+   * @private
+   */
   private notifyHighlightDelete(highlightId: string) {
     this.highlightDeleteCallbacks.forEach(callback => {
       try {
@@ -248,7 +295,9 @@ export class RealtimeManager {
   // ==================== CONNECTION STATUS ====================
 
   /**
-   * Subscribe to real-time connection status changes
+   * @description Subscribes to real-time connection status changes.
+   * @param {(status: 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR') => void} callback - The function to call on status change.
+   * @returns {() => void} A function to unsubscribe.
    */
   onConnectionStatus(callback: (status: 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR') => void) {
     const subscription = supabase
@@ -261,7 +310,7 @@ export class RealtimeManager {
   }
 
   /**
-   * Force reconnection to real-time services
+   * @description Forces a reconnection to the real-time services by cleaning up and re-initializing subscriptions.
    */
   async reconnect() {
     if (this.currentUserId) {
@@ -272,5 +321,8 @@ export class RealtimeManager {
   }
 }
 
-// Create and export singleton instance
-export const realtimeManager = new RealtimeManager();
+/**
+ * @const realtimeManager
+ * @description The exported singleton instance of the RealtimeManager class.
+ */
+export const realtimeManager = new RealtimeManagerSingleton();

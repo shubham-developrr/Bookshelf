@@ -7,12 +7,24 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 
+/**
+ * @interface EnhancedAIResponseProps
+ * @description Defines the props for the EnhancedAIResponse component.
+ * @property {string} content - The markdown content to be rendered.
+ * @property {boolean} [isLoading] - Whether the component is in a loading state.
+ */
 interface EnhancedAIResponseProps {
   content: string;
   isLoading?: boolean;
 }
 
-// Custom code block component with copy functionality like modern chatbots
+/**
+ * @description A custom code block component that provides syntax highlighting and a copy-to-clipboard functionality.
+ * @param {object} props - The component props.
+ * @param {string} [props.className] - The class name for the code block, used to determine the language.
+ * @param {React.ReactNode} props.children - The code to be rendered.
+ * @returns {React.ReactElement} The rendered code block component.
+ */
 const CodeBlock = ({ className = '', children, ...props }: any) => {
   const [copied, setCopied] = useState(false);
   const match = /language-(\w+)/.exec(className || '');
@@ -85,7 +97,9 @@ const CodeBlock = ({ className = '', children, ...props }: any) => {
   );
 };
 
-// Custom components for enhanced markdown rendering
+/**
+ * @description An object containing custom components for rendering markdown elements with enhanced styling.
+ */
 const MarkdownComponents = {
   // Headers with better spacing and styling
   h1: ({ children, ...props }: any) => (
@@ -193,6 +207,11 @@ const MarkdownComponents = {
   )
 };
 
+/**
+ * @description A component that renders an enhanced AI response, with support for markdown, LaTeX, and code syntax highlighting.
+ * @param {EnhancedAIResponseProps} props - The props for the component.
+ * @returns {JSX.Element} The enhanced AI response component.
+ */
 const EnhancedAIResponse: React.FC<EnhancedAIResponseProps> = ({ content, isLoading = false }) => {
   if (isLoading) {
     return (

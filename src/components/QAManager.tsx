@@ -5,6 +5,17 @@ import { OCRService } from '../utils/ocrService';
 import AILoadingAnimation from './AILoadingAnimation';
 import { QATest } from './TestComponents';
 
+/**
+ * @interface QAQuestion
+ * @description Defines the structure of a question and answer pair.
+ * @property {string} id - The unique identifier for the question.
+ * @property {string} question - The text of the question.
+ * @property {string} answer - The text of the answer.
+ * @property {number} marks - The number of marks the question is worth.
+ * @property {string} [category] - An optional category for the question.
+ * @property {'easy' | 'medium' | 'hard'} [difficulty] - An optional difficulty level for the question.
+ * @property {Date} timestamp - The date the question was created.
+ */
 interface QAQuestion {
     id: string;
     question: string;
@@ -15,6 +26,14 @@ interface QAQuestion {
     timestamp: Date;
 }
 
+/**
+ * @interface QAManagerProps
+ * @description Defines the props for the QAManager component.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} currentChapter - The name of the current chapter.
+ * @property {string} [tabId] - An optional unique identifier for the tab to isolate storage.
+ * @property {string} [className] - An optional class name for the component.
+ */
 interface QAManagerProps {
     currentBook: string;
     currentChapter: string;
@@ -22,6 +41,11 @@ interface QAManagerProps {
     className?: string;
 }
 
+/**
+ * @description A component for managing and practicing with question and answer pairs.
+ * @param {QAManagerProps} props - The props for the component.
+ * @returns {JSX.Element} The Q&A manager component.
+ */
 const QAManager: React.FC<QAManagerProps> = ({
     currentBook,
     currentChapter,
@@ -58,16 +82,25 @@ const QAManager: React.FC<QAManagerProps> = ({
     // Base marks options
     const baseMarksOptions = [1, 2, 5, 7, 10];
     
-    // Get all marks options (base + custom)
+    /**
+     * @description Returns an array of all available marks options, including custom ones.
+     * @returns {number[]} An array of marks options.
+     */
     const getAllMarksOptions = () => {
         const allMarks = [...baseMarksOptions, ...customMarks];
         return [...new Set(allMarks)].sort((a, b) => a - b);
     };
 
-    // Get marks that actually have questions
-    // Mobile detection
+    /**
+     * @description Detects if the current view is on a mobile device.
+     * @returns {boolean} True if the screen width is less than or equal to 768px, false otherwise.
+     */
     const isMobile = () => window.innerWidth <= 768;
 
+    /**
+     * @description Returns an array of marks that have associated questions.
+     * @returns {number[]} An array of available marks.
+     */
     const getAvailableMarks = () => {
         const questionMarks = qaQuestions.map(q => q.marks);
         return getAllMarksOptions().filter(mark => questionMarks.includes(mark));
@@ -85,13 +118,18 @@ const QAManager: React.FC<QAManagerProps> = ({
         }
     }, [storageKey]);
 
-    // Save Q&As to localStorage
+    /**
+     * @description Saves an array of Q&A questions to local storage.
+     * @param {QAQuestion[]} questions - The array of questions to save.
+     */
     const saveQaQuestions = (questions: QAQuestion[]) => {
         localStorage.setItem(storageKey, JSON.stringify(questions));
         setQaQuestions(questions);
     };
 
-    // Create new Q&A
+    /**
+     * @description Handles the creation or editing of a Q&A question.
+     */
     const handleAddQuestion = () => {
         if (newQuestion.trim() && newAnswer.trim()) {
             if (editingQuestion) {
@@ -133,7 +171,10 @@ const QAManager: React.FC<QAManagerProps> = ({
         }
     };
 
-    // Handle AI-powered smart import with OCR support
+    /**
+     * @description Handles the AI-powered import of Q&A questions from a file, with support for OCR.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleSmartImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -197,7 +238,10 @@ const QAManager: React.FC<QAManagerProps> = ({
         }
     };
 
-    // Handle file import
+    /**
+     * @description Handles the import of Q&A questions from a text file.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -218,7 +262,10 @@ const QAManager: React.FC<QAManagerProps> = ({
         event.target.value = '';
     };
 
-    // Process text import based on selected format
+    /**
+     * @description Processes a string of text to import Q&A questions based on the selected format.
+     * @param {string} text - The text to process.
+     */
     const processTextImport = async (text: string) => {
         const lines = text.trim().split('\n').filter(line => line.trim());
         const importedQuestions: QAQuestion[] = [];
@@ -261,7 +308,9 @@ const QAManager: React.FC<QAManagerProps> = ({
         }
     };
 
-    // Process manual text input
+    /**
+     * @description Processes a string of manually entered text to import Q&A questions.
+     */
     const handleManualImport = async () => {
         const textarea = document.querySelector('textarea[placeholder*="Question"]') as HTMLTextAreaElement;
         if (textarea && textarea.value.trim()) {
@@ -270,7 +319,9 @@ const QAManager: React.FC<QAManagerProps> = ({
         }
     };
 
-    // Copy format to clipboard
+    /**
+     * @description Copies the selected import format to the clipboard.
+     */
     const copyFormatToClipboard = async () => {
         const formats = {
             tab: "Question[TAB]Answer[TAB]Marks[TAB]Category",
@@ -287,12 +338,17 @@ const QAManager: React.FC<QAManagerProps> = ({
         }
     };
 
-    // Show format example
+    /**
+     * @description Shows the format example modal.
+     */
     const showFormatExample = () => {
         setShowFormatModal(true);
     };
 
-    // Filter questions by selected marks
+    /**
+     * @description Filters the questions by the selected marks.
+     * @returns {QAQuestion[]} The filtered array of questions.
+     */
     const getFilteredQuestions = () => {
         if (selectedMarks.length === 0) return qaQuestions;
         return qaQuestions.filter(q => selectedMarks.includes(q.marks));
@@ -300,7 +356,10 @@ const QAManager: React.FC<QAManagerProps> = ({
 
     const filteredQuestions = getFilteredQuestions();
 
-    // Format example modal
+    /**
+     * @description A modal component that displays an example of the selected import format.
+     * @returns {React.ReactElement | null} The format example modal component, or null if it is not open.
+     */
     const FormatExampleModal = () => {
         if (!showFormatModal) return null;
         

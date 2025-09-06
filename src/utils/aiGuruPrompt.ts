@@ -1,3 +1,8 @@
+/**
+ * @const ENHANCED_AI_GURU_PROMPT
+ * @description A detailed system prompt for the AI Guru, outlining its core principles,
+ * response structure, and special instructions for handling different types of content.
+ */
 export const ENHANCED_AI_GURU_PROMPT = `
 You are AI Guru, an advanced educational assistant designed specifically for college students. Your mission is to provide clear, concise, and immediately actionable explanations that help students learn effectively.
 
@@ -98,6 +103,11 @@ Remember: Your goal is to create an "aha!" moment where the student not only und
 When responding, prefix your answer with "[AI_GURU]" and ensure you're following these guidelines for maximum learning impact.
 `;
 
+/**
+ * @const AI_GURU_SYSTEM_CONTEXT
+ * @description Provides additional context for the AI, defining its role,
+ * the user it's interacting with, and the learning objectives.
+ */
 export const AI_GURU_SYSTEM_CONTEXT = `
 Context: You are responding to a college student's question about academic content. The student is using an interactive study platform and expects clear, educational explanations that help them understand and apply concepts effectively.
 

@@ -4,12 +4,29 @@ import { processAIImport } from '../utils/aiImportService';
 import { MCQTest } from './TestComponents';
 import AILoadingAnimation from './AILoadingAnimation';
 
+/**
+ * @interface MCQOption
+ * @description Defines the structure of a multiple-choice option.
+ * @property {string} id - The unique identifier for the option.
+ * @property {string} text - The text of the option.
+ * @property {boolean} isCorrect - Whether the option is the correct answer.
+ */
 interface MCQOption {
     id: string;
     text: string;
     isCorrect: boolean;
 }
 
+/**
+ * @interface MCQQuestion
+ * @description Defines the structure of a multiple-choice question.
+ * @property {string} id - The unique identifier for the question.
+ * @property {string} question - The text of the question.
+ * @property {MCQOption[]} options - An array of possible answers.
+ * @property {string} [explanation] - An optional explanation for the correct answer.
+ * @property {string} [category] - An optional category for the question.
+ * @property {'easy' | 'medium' | 'hard'} [difficulty] - An optional difficulty level for the question.
+ */
 interface MCQQuestion {
     id: string;
     question: string;
@@ -19,6 +36,14 @@ interface MCQQuestion {
     difficulty?: 'easy' | 'medium' | 'hard';
 }
 
+/**
+ * @interface MCQManagerProps
+ * @description Defines the props for the MCQManager component.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} currentChapter - The name of the current chapter.
+ * @property {string} [tabId] - An optional unique identifier for the tab to isolate storage.
+ * @property {string} [className] - An optional class name for the component.
+ */
 interface MCQManagerProps {
     currentBook: string;
     currentChapter: string;
@@ -26,6 +51,11 @@ interface MCQManagerProps {
     className?: string;
 }
 
+/**
+ * @description A component for managing and practicing multiple-choice questions.
+ * @param {MCQManagerProps} props - The props for the component.
+ * @returns {JSX.Element} The MCQ manager component.
+ */
 const MCQManager: React.FC<MCQManagerProps> = ({
     currentBook,
     currentChapter,
@@ -63,13 +93,18 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         }
     }, [storageKey]);
 
-    // Save MCQs to localStorage
+    /**
+     * @description Saves an array of MCQ questions to local storage.
+     * @param {MCQQuestion[]} questions - The array of questions to save.
+     */
     const saveMcqQuestions = (questions: MCQQuestion[]) => {
         localStorage.setItem(storageKey, JSON.stringify(questions));
         setMcqQuestions(questions);
     };
 
-    // Handle adding/editing MCQ questions
+    /**
+     * @description Handles the addition or editing of an MCQ question.
+     */
     const handleAddMCQ = () => {
         if (!newQuestion.trim() || newOptions.some(opt => !opt.trim())) {
             return;
@@ -121,7 +156,10 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         setMode('practice');
     };
 
-    // Handle AI-powered import
+    /**
+     * @description Handles the AI-powered import of MCQ questions from a text file.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleSmartImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -162,7 +200,11 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         }
     };
 
-    // Handle standard format file import (pipe, semicolon, JSON)
+    /**
+     * @description Handles the import of MCQ questions from a file with a standard format.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     * @param {'text' | 'pdf'} type - The type of the file being imported.
+     */
     const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>, type: 'text' | 'pdf') => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -189,7 +231,10 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         event.target.value = '';
     };
 
-    // Process text import based on selected format
+    /**
+     * @description Processes a string of text to import MCQ questions based on the selected format.
+     * @param {string} text - The text to process.
+     */
     const processTextImport = async (text: string) => {
         const lines = text.trim().split('\n').filter(line => line.trim());
         const importedQuestions: MCQQuestion[] = [];
@@ -262,7 +307,9 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         }
     };
 
-    // Process manual text input
+    /**
+     * @description Processes a string of manually entered text to import MCQ questions.
+     */
     const handleManualImport = async () => {
         const textarea = document.querySelector('textarea[placeholder*="Paste your MCQ"]') as HTMLTextAreaElement;
         if (textarea && textarea.value.trim()) {
@@ -271,7 +318,9 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         }
     };
 
-    // Copy format to clipboard
+    /**
+     * @description Copies the selected import format to the clipboard.
+     */
     const copyFormatToClipboard = async () => {
         const formats = {
             pipe: "Question|Option A|Option B|Option C|Option D|Correct Answer|Explanation (optional)",
@@ -288,7 +337,9 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         }
     };
 
-    // Show format example
+    /**
+     * @description Shows the format example modal.
+     */
     const showFormatExample = () => {
         setShowFormatModal(true);
     };
@@ -471,7 +522,10 @@ const MCQManager: React.FC<MCQManagerProps> = ({
         );
     }
 
-    // Format example modal
+    /**
+     * @description A modal component that displays an example of the selected import format.
+     * @returns {React.ReactElement | null} The format example modal component, or null if it is not open.
+     */
     const FormatExampleModal = () => {
         if (!showFormatModal) return null;
         

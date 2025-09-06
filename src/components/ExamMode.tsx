@@ -2,6 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 
+/**
+ * @interface Question
+ * @description Defines the structure of an exam question.
+ * @property {string} id - The unique identifier for the question.
+ * @property {string} question - The text of the question.
+ * @property {string[]} options - An array of possible answers.
+ * @property {number} correctAnswer - The index of the correct answer in the options array.
+ * @property {string} [explanation] - An optional explanation for the correct answer.
+ */
 interface Question {
     id: string;
     question: string;
@@ -10,6 +19,14 @@ interface Question {
     explanation?: string;
 }
 
+/**
+ * @interface ExamModeProps
+ * @description Defines the props for the ExamMode component.
+ * @property {boolean} isOpen - Whether the exam mode is active.
+ * @property {function} onClose - Callback function to close the exam mode.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} currentChapter - The name of the current chapter.
+ */
 interface ExamModeProps {
     isOpen: boolean;
     onClose: () => void;
@@ -17,6 +34,11 @@ interface ExamModeProps {
     currentChapter: string;
 }
 
+/**
+ * @description A component that provides a timed exam mode for a selected book and chapter.
+ * @param {ExamModeProps} props - The props for the component.
+ * @returns {JSX.Element | null} The exam mode component.
+ */
 const ExamMode: React.FC<ExamModeProps> = ({ isOpen, onClose, currentBook, currentChapter }) => {
     const { theme } = useTheme();
     const navigate = useNavigate();
@@ -95,13 +117,20 @@ const ExamMode: React.FC<ExamModeProps> = ({ isOpen, onClose, currentBook, curre
         }
     }, [examStarted, showResults, timeRemaining]);
 
-    // Format time display
+    /**
+     * @description Formats a given number of seconds into a mm:ss time format.
+     * @param {number} seconds - The number of seconds to format.
+     * @returns {string} The formatted time string.
+     */
     const formatTime = (seconds: number) => {
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
         return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
+    /**
+     * @description Starts the exam.
+     */
     const handleStartExam = () => {
         if (!selectedCategory) return;
         setQuestions(sampleQuestions);
@@ -111,6 +140,10 @@ const ExamMode: React.FC<ExamModeProps> = ({ isOpen, onClose, currentBook, curre
         setTimeRemaining(30 * 60);
     };
 
+    /**
+     * @description Handles the selection of an answer for the current question.
+     * @param {number} answerIndex - The index of the selected answer.
+     */
     const handleAnswerSelect = (answerIndex: number) => {
         setUserAnswers(prev => ({
             ...prev,
@@ -118,22 +151,35 @@ const ExamMode: React.FC<ExamModeProps> = ({ isOpen, onClose, currentBook, curre
         }));
     };
 
+    /**
+     * @description Navigates to the next question.
+     */
     const handleNextQuestion = () => {
         if (currentQuestionIndex < questions.length - 1) {
             setCurrentQuestionIndex(prev => prev + 1);
         }
     };
 
+    /**
+     * @description Navigates to the previous question.
+     */
     const handlePreviousQuestion = () => {
         if (currentQuestionIndex > 0) {
             setCurrentQuestionIndex(prev => prev - 1);
         }
     };
 
+    /**
+     * @description Finishes the exam and displays the results.
+     */
     const handleFinishExam = () => {
         setShowResults(true);
     };
 
+    /**
+     * @description Calculates the user's score.
+     * @returns {{correct: number, total: number, percentage: number}} The user's score.
+     */
     const calculateScore = () => {
         let correct = 0;
         questions.forEach((question, index) => {
@@ -144,6 +190,9 @@ const ExamMode: React.FC<ExamModeProps> = ({ isOpen, onClose, currentBook, curre
         return { correct, total: questions.length, percentage: Math.round((correct / questions.length) * 100) };
     };
 
+    /**
+     * @description Exits the exam and resets the state.
+     */
     const handleExitExam = () => {
         setShowExitConfirm(false);
         setExamStarted(false);

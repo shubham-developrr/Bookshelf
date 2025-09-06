@@ -1,13 +1,21 @@
 /**
- * GitHub Models API Service
- * Provides AI inference using GitHub Models API with Mistral AI
+ * @file GitHub Models API Service
+ * @description Provides a service for AI inference using the GitHub Models API with Mistral AI.
  */
 
+/**
+ * @interface GitHubModelsMessage
+ * @description Defines the structure for a single message in a chat completion request.
+ */
 export interface GitHubModelsMessage {
     role: 'system' | 'user' | 'assistant';
     content: string;
 }
 
+/**
+ * @interface GitHubModelsResponse
+ * @description Defines the structure of the response from the GitHub Models API.
+ */
 export interface GitHubModelsResponse {
     choices: Array<{
         message: {
@@ -23,11 +31,18 @@ export interface GitHubModelsResponse {
     };
 }
 
+/**
+ * @class GitHubModelsService
+ * @description A service to interact with the GitHub Models API for AI chat completions, specifically using a Mistral model.
+ */
 export class GitHubModelsService {
     private apiKey: string;
     private baseUrl = 'https://models.github.ai/inference/chat/completions';
     private model = 'mistral-ai/mistral-medium-2505';
 
+    /**
+     * @description The constructor initializes the service and retrieves the API key from environment variables.
+     */
     constructor() {
         this.apiKey = import.meta.env.VITE_GITHUB_MODELS_TOKEN;
         if (!this.apiKey) {
@@ -35,6 +50,12 @@ export class GitHubModelsService {
         }
     }
 
+    /**
+     * @description The core method for making a `chat/completions` request to the API.
+     * @param {GitHubModelsMessage[]} messages - An array of message objects for the chat.
+     * @param {object} [options={}] - Optional parameters for the request, like temperature and max_tokens.
+     * @returns {Promise<GitHubModelsResponse>} A promise that resolves with the API response.
+     */
     async chatCompletion(
         messages: GitHubModelsMessage[],
         options: {
@@ -74,6 +95,14 @@ export class GitHubModelsService {
         }
     }
 
+    /**
+     * @description A higher-level convenience method for generating a response from a simple prompt,
+     * with optional system context and conversation history.
+     * @param {string} prompt - The user's prompt.
+     * @param {string} [systemContext] - Optional system context to guide the AI.
+     * @param {GitHubModelsMessage[]} [conversationHistory=[]] - The previous messages in the conversation.
+     * @returns {Promise<string>} A promise that resolves with the AI's response text.
+     */
     async generateResponse(
         prompt: string,
         systemContext?: string,
@@ -107,10 +136,20 @@ export class GitHubModelsService {
     }
 }
 
-// Create a singleton instance
+/**
+ * @const githubModelsService
+ * @description The exported singleton instance of the GitHubModelsService class.
+ */
 export const githubModelsService = new GitHubModelsService();
 
-// Helper function for AI Guru specifically
+/**
+ * @description A specific helper function for the AI Guru feature, which formats the
+ * conversation history correctly for the GitHub Models API.
+ * @param {string} prompt - The user's current prompt.
+ * @param {string} systemPrompt - The system prompt that defines the AI's role and behavior.
+ * @param {Array<{ role: 'user' | 'assistant'; content: string }>} [conversationHistory=[]] - The history of the conversation.
+ * @returns {Promise<string>} A promise that resolves with the AI's response text.
+ */
 export const generateAIGuruResponse = async (
     prompt: string,
     systemPrompt: string,

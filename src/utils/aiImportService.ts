@@ -3,8 +3,20 @@ import { MCQ_IMPORT_PROMPT, QA_IMPORT_PROMPT, FLASHCARD_IMPORT_PROMPT } from './
 
 const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
+/**
+ * @type ImportFormat
+ * @description Defines the possible formats for AI-powered content import.
+ */
 export type ImportFormat = 'mcq' | 'qa' | 'flashcard';
 
+/**
+ * @interface AIImportResult
+ * @description Represents the result of an AI import process.
+ * @property {boolean} success - Indicates if the import was successful.
+ * @property {any[]} data - The array of imported and structured data.
+ * @property {string} [error] - An error message if the import failed.
+ * @property {string} message - A user-friendly message describing the outcome.
+ */
 interface AIImportResult {
     success: boolean;
     data: any[];
@@ -13,10 +25,12 @@ interface AIImportResult {
 }
 
 /**
- * Process text content using AI to extract structured learning materials
- * @param textContent - The raw text content to process
- * @param format - The format to extract (mcq, qa, flashcard)
- * @returns Promise with AI processing results
+ * @description Processes raw text using an AI to extract structured learning materials.
+ * It checks for API keys, sends the content to the AI with a specific prompt,
+ * and then parses, validates, and cleans the response.
+ * @param {string} textContent - The raw text content to process.
+ * @param {ImportFormat} format - The format to extract (mcq, qa, flashcard).
+ * @returns {Promise<AIImportResult>} A promise that resolves with the AI processing results.
  */
 export const processAIImport = async (textContent: string, format: ImportFormat): Promise<AIImportResult> => {
     try {
@@ -140,7 +154,9 @@ export const processAIImport = async (textContent: string, format: ImportFormat)
 };
 
 /**
- * Get the appropriate prompt for the specified format
+ * @description Returns the appropriate system prompt based on the specified import format.
+ * @param {ImportFormat} format - The desired import format.
+ * @returns {string} The system prompt string.
  */
 function getPromptForFormat(format: ImportFormat): string {
     switch (format) {
@@ -156,7 +172,11 @@ function getPromptForFormat(format: ImportFormat): string {
 }
 
 /**
- * Validate and clean the AI response data based on format requirements
+ * @description Iterates through raw AI response data, validating and cleaning each item
+ * against the expected format.
+ * @param {any[]} data - The raw array of items from the AI response.
+ * @param {ImportFormat} format - The format to validate against.
+ * @returns {any[]} An array of validated and cleaned items.
  */
 function validateAndCleanData(data: any[], format: ImportFormat): any[] {
     const validatedItems: any[] = [];
@@ -193,7 +213,10 @@ function validateAndCleanData(data: any[], format: ImportFormat): any[] {
 }
 
 /**
- * Validate and clean MCQ data structure
+ * @description Validates and cleans a single MCQ item from the AI response.
+ * It ensures the item has a question, exactly 4 options, and exactly one correct answer.
+ * @param {any} item - The raw MCQ item object.
+ * @returns {any | null} The validated and cleaned item, or null if invalid.
  */
 function validateMCQItem(item: any): any {
     if (!item.question || !item.options || !Array.isArray(item.options)) {
@@ -237,7 +260,9 @@ function validateMCQItem(item: any): any {
 }
 
 /**
- * Validate and clean Q&A data structure
+ * @description Validates and cleans a single Q&A item from the AI response.
+ * @param {any} item - The raw Q&A item object.
+ * @returns {any | null} The validated and cleaned item, or null if invalid.
  */
 function validateQAItem(item: any): any {
     if (!item.question || !item.answer) {
@@ -266,7 +291,9 @@ function validateQAItem(item: any): any {
 }
 
 /**
- * Validate and clean FlashCard data structure
+ * @description Validates and cleans a single flashcard item from the AI response.
+ * @param {any} item - The raw flashcard item object.
+ * @returns {any | null} The validated and cleaned item, or null if invalid.
  */
 function validateFlashCardItem(item: any): any {
     if (!item.question || !item.answer) {
@@ -283,7 +310,8 @@ function validateFlashCardItem(item: any): any {
 }
 
 /**
- * Generate a unique ID for database items
+ * @description Generates a simple, reasonably unique ID string based on the current timestamp and a random number.
+ * @returns {string} A unique ID string.
  */
 function generateUniqueId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);

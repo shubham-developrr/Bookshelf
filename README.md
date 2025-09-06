@@ -91,42 +91,53 @@ Each subject includes detailed chapters and subtopics with structured learning p
    npm run preview
    ```
 
+## 📖 JSDoc Documentation
+
+The codebase is thoroughly documented using JSDoc comments. This ensures that the purpose and usage of each component, function, and type are clear and easy to understand. The documentation is written in a way that it can be used to automatically generate a comprehensive documentation website.
+
+### Documentation Philosophy
+- **Clarity**: Comments are written to be as clear and concise as possible.
+- **Completeness**: All components, props, functions, and types are documented.
+- **Consistency**: A consistent style is used across all documentation.
+
 ## 🏗️ Project Structure
 
 ```
 Bookshelf/
 ├── 📁 src/                    # Source code
+│   ├── 📁 assets/            # Static assets
+│   │   └── 📁 images/        # Application images
 │   ├── 📁 components/         # React components
 │   │   ├── App.tsx           # Main application component
 │   │   ├── EnhancedAIGuruModal.tsx  # AI tutor interface
-│   │   ├── EnhancedAIResponse.tsx   # AI response renderer
 │   │   ├── TextHighlighter.tsx      # Text highlighting engine
-│   │   └── ThemeSelector.tsx        # Theme switching component
+│   │   └── ...               # Other components
 │   ├── 📁 pages/             # Page components
-│   │   ├── BookshelfPage.tsx # Main bookshelf view
+│   │   ├── EnhancedBookshelfPage.tsx # Main bookshelf view
 │   │   ├── SubjectPage.tsx   # Subject chapter listing
-│   │   ├── ReaderPage.tsx    # Reading interface
-│   │   ├── SearchPage.tsx    # Search functionality
-│   │   └── HighlightsPage.tsx # Highlights management
+│   │   ├── EnhancedReaderPage.tsx    # Reading interface
+│   │   └── ...               # Other pages
 │   ├── 📁 contexts/          # React contexts
-│   │   └── ThemeContext.tsx  # Theme management
+│   │   ├── ThemeContext.tsx  # Theme management
+│   │   └── UserContext.tsx   # User state management
+│   ├── 📁 services/          # Application services
+│   │   ├── EnhancedAIService.ts # AI service abstraction
+│   │   ├── SupabaseUserService.ts # User service for Supabase
+│   │   └── ...               # Other services
 │   ├── 📁 types/             # TypeScript definitions
-│   │   └── types.ts          # Application types
+│   │   ├── types.ts          # General application types
+│   │   └── bookModule.ts     # Book module types
 │   ├── 📁 utils/             # Utility functions
-│   │   ├── search.ts         # Search algorithms
-│   │   └── aiGuruPrompt.ts   # AI prompt engineering
+│   │   ├── BookManager.ts    # Book management utilities
+│   │   └── ...               # Other utilities
 │   ├── 📁 constants/         # Application constants
 │   │   └── constants.tsx     # Subject and chapter data
-│   └── 📁 assets/            # Static assets
-│       ├── 📁 images/        # Application images
-│       └── 📁 docs/          # Documentation assets
-├── 📁 docs/                  # Documentation files
-├── 📁 screenshots/           # Application screenshots
-├── 📁 misc/                  # Miscellaneous files
-├── 📄 package.json          # Dependencies and scripts
-├── 📄 tsconfig.json         # TypeScript configuration
-├── 📄 vite.config.ts        # Vite configuration
-└── 📄 README.md             # This file
+│   └── 📄 index.tsx          # Main entry point for the React app
+├── 📄 .env.local              # Environment variables
+├── 📄 netlify.toml            # Netlify deployment configuration
+├── 📄 package.json            # Dependencies and scripts
+├── 📄 tsconfig.json           # TypeScript configuration
+└── 📄 README.md               # This file
 ```
 
 ## 🛠️ Tech Stack
@@ -209,6 +220,15 @@ VITE_API_BASE_URL=https://api.groq.com
 
 ### Build Configuration
 The project uses Vite for optimal build performance. Configuration can be modified in `vite.config.ts`.
+
+### TypeScript Configuration
+The `tsconfig.json` file is configured to support a modern React project with Vite. Here are some of the key settings:
+- **`target: "ES2022"`**: Compiles TypeScript to a modern version of JavaScript, which is supported by all major browsers.
+- **`module: "ESNext"`**: Uses the latest ECMAScript module syntax.
+- **`jsx: "react-jsx"`**: Uses the new JSX transform from React 17.
+- **`moduleResolution: "bundler"`**:  A modern module resolution strategy that works well with bundlers like Vite.
+- **`paths`**: Allows for absolute imports starting with `@/` (e.g., `import MyComponent from '@/components/MyComponent'`).
+- **`skipLibCheck: true`**: Speeds up compilation by not type-checking library declaration files.
 
 ## 📖 Usage Guide
 

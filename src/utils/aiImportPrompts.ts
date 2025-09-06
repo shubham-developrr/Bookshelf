@@ -1,3 +1,8 @@
+/**
+ * @const MCQ_IMPORT_PROMPT
+ * @description A system prompt for an AI assistant, instructing it to convert unstructured text
+ * into a specific JSON format for Multiple Choice Questions (MCQs).
+ */
 export const MCQ_IMPORT_PROMPT = `
 You are an AI assistant specialized in converting unstructured text into properly formatted Multiple Choice Questions (MCQs). 
 
@@ -38,6 +43,11 @@ EXAMPLE OUTPUT: [{"question":"What is HTML?","options":[{"text":"HyperText Marku
 TEXT TO PROCESS:
 `;
 
+/**
+ * @const QA_IMPORT_PROMPT
+ * @description A system prompt for an AI assistant, instructing it to convert unstructured text
+ * into a specific JSON format for Question & Answer pairs.
+ */
 export const QA_IMPORT_PROMPT = `
 You are an AI assistant specialized in converting unstructured text into properly formatted Question & Answer pairs for educational practice.
 
@@ -78,6 +88,11 @@ EXAMPLE OUTPUT: [{"question":"What is photosynthesis?","answer":"The process by 
 TEXT TO PROCESS:
 `;
 
+/**
+ * @const FLASHCARD_IMPORT_PROMPT
+ * @description A system prompt for an AI assistant, instructing it to create ANKI-style flashcards
+ * from text, outputting them in a specific JSON format.
+ */
 export const FLASHCARD_IMPORT_PROMPT = `
 You are an AI assistant specialized in creating ANKI-style flash cards from any text content. You are the BEST flash card generator that creates effective, memorable, and optimized study cards.
 

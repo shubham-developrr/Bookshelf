@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 
 /**
- * SupabaseStatusChecker - Component to verify Supabase integration
- * Shows connection status and environment variables
+ * @description A component to verify Supabase integration, showing connection status and environment variables.
+ * @returns {JSX.Element} The SupabaseStatusChecker component.
  */
 export function SupabaseStatusChecker() {
   const [status, setStatus] = useState<{

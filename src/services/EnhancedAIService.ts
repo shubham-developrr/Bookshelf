@@ -1,18 +1,37 @@
 import Groq from 'groq-sdk';
 import { geminiAPIService } from './GeminiAPIService';
 
-interface AIResponse {
+/**
+ * @interface AIResponse
+ * @description Defines the standardized structure for a response from any AI provider.
+ * @property {string} text - The main text content of the AI's response.
+ * @property {string} model - The name of the AI model that generated the response.
+ * @property {'gemini' | 'groq'} provider - The AI provider used.
+ * @property {any} [usage] - Optional usage statistics from the API call.
+ */
+export interface AIResponse {
   text: string;
   model: string;
   provider: 'gemini' | 'groq';
   usage?: any;
 }
 
-interface AIServiceConfig {
+/**
+ * @interface AIServiceConfig
+ * @description Defines the configuration options for the EnhancedAIService.
+ * @property {boolean} preferGemini - If true, the service will try Gemini first.
+ * @property {boolean} fallbackToGroq - If true, the service will fall back to Groq if Gemini fails.
+ */
+export interface AIServiceConfig {
   preferGemini: boolean;
   fallbackToGroq: boolean;
 }
 
+/**
+ * @class EnhancedAIService
+ * @description A singleton service to manage and abstract AI API calls,
+ * with a preference for Gemini and a fallback to Groq.
+ */
 export class EnhancedAIService {
   private static instance: EnhancedAIService;
   private groqClient: Groq | null = null;
@@ -21,10 +40,18 @@ export class EnhancedAIService {
     fallbackToGroq: true
   };
 
+  /**
+   * @description The private constructor ensures the singleton pattern and initializes the Groq client.
+   * @private
+   */
   private constructor() {
     this.initializeGroq();
   }
 
+  /**
+   * @description Implements the singleton pattern, ensuring only one instance of the service exists.
+   * @returns {EnhancedAIService} The singleton instance of the EnhancedAIService.
+   */
   static getInstance(): EnhancedAIService {
     if (!EnhancedAIService.instance) {
       EnhancedAIService.instance = new EnhancedAIService();
@@ -32,6 +59,10 @@ export class EnhancedAIService {
     return EnhancedAIService.instance;
   }
 
+  /**
+   * @description Initializes the Groq client if an API key is available in the environment variables.
+   * @private
+   */
   private initializeGroq(): void {
     const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
     if (groqApiKey) {
@@ -43,7 +74,12 @@ export class EnhancedAIService {
   }
 
   /**
-   * Generate AI response with intelligent provider selection
+   * @description The main method for generating an AI response. It intelligently selects the best provider
+   * based on configuration and availability, with a fallback mechanism.
+   * @param {string} prompt - The user's prompt to send to the AI.
+   * @param {boolean} [fastMode=false] - If true, prefers faster models.
+   * @param {boolean} [enableThinking=false] - If true, may enable more complex reasoning in models that support it.
+   * @returns {Promise<AIResponse>} A promise that resolves with the standardized AI response.
    */
   async generateResponse(prompt: string, fastMode: boolean = false, enableThinking: boolean = false): Promise<AIResponse> {
     // Try Gemini first if user has configured it and prefers it
@@ -108,7 +144,8 @@ export class EnhancedAIService {
   }
 
   /**
-   * Get available providers and their status
+   * @description Returns the current status and configuration of the available AI providers.
+   * @returns {{ gemini: object; groq: object }} An object with status details for Gemini and Groq.
    */
   getProviderStatus(): {
     gemini: { available: boolean; configured: boolean; apiKey?: string };
@@ -130,21 +167,24 @@ export class EnhancedAIService {
   }
 
   /**
-   * Configure AI service preferences
+   * @description Allows updating the service's configuration.
+   * @param {Partial<AIServiceConfig>} config - An object with the configuration properties to update.
    */
   setConfig(config: Partial<AIServiceConfig>): void {
     this.config = { ...this.config, ...config };
   }
 
   /**
-   * Get current configuration
+   * @description Returns the current configuration of the service.
+   * @returns {AIServiceConfig} The current service configuration.
    */
   getConfig(): AIServiceConfig {
     return { ...this.config };
   }
 
   /**
-   * Test connectivity to all available providers
+   * @description Tests the connection to all available AI providers.
+   * @returns {Promise<{ gemini: object; groq: object }>} A promise that resolves to an object with connectivity test results.
    */
   async testConnectivity(): Promise<{
     gemini: { success: boolean; error?: string };
@@ -187,5 +227,8 @@ export class EnhancedAIService {
   }
 }
 
-// Export singleton instance
+/**
+ * @const enhancedAIService
+ * @description The exported singleton instance of the EnhancedAIService class.
+ */
 export const enhancedAIService = EnhancedAIService.getInstance();

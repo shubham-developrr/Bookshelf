@@ -1,6 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { PlusIcon, TrashIcon, FileIcon, ImageIcon } from './icons';
 
+/**
+ * @interface MindMapItem
+ * @description Defines the structure of a mind map item.
+ * @property {string} id - The unique identifier for the mind map item.
+ * @property {string} label - The label for the mind map.
+ * @property {'image' | 'pdf'} type - The type of the mind map file.
+ * @property {string} fileUrl - The URL of the mind map file.
+ * @property {string} fileName - The name of the mind map file.
+ * @property {string} [fileSize] - The size of the mind map file.
+ * @property {Date} timestamp - The date the mind map was created.
+ */
 interface MindMapItem {
     id: string;
     label: string;
@@ -11,6 +22,14 @@ interface MindMapItem {
     timestamp: Date;
 }
 
+/**
+ * @interface MindMapManagerProps
+ * @description Defines the props for the MindMapManager component.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} currentChapter - The name of the current chapter.
+ * @property {string} [tabId] - An optional unique identifier for the tab to isolate storage.
+ * @property {string} [className] - An optional class name for the component.
+ */
 interface MindMapManagerProps {
     currentBook: string;
     currentChapter: string;
@@ -18,6 +37,11 @@ interface MindMapManagerProps {
     className?: string;
 }
 
+/**
+ * @description A component for managing and viewing mind maps.
+ * @param {MindMapManagerProps} props - The props for the component.
+ * @returns {JSX.Element} The mind map manager component.
+ */
 const MindMapManager: React.FC<MindMapManagerProps> = ({
     currentBook,
     currentChapter,
@@ -51,13 +75,19 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
         }
     }, [storageKey]);
 
-    // Save mind maps to localStorage
+    /**
+     * @description Saves an array of mind maps to local storage.
+     * @param {MindMapItem[]} mapList - The array of mind maps to save.
+     */
     const saveMindMaps = (mapList: MindMapItem[]) => {
         localStorage.setItem(storageKey, JSON.stringify(mapList));
         setMindMaps(mapList);
     };
 
-    // Handle file upload
+    /**
+     * @description Handles the initial file upload, checking the file type and storing the file if a label is not yet provided.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -83,7 +113,10 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
         processFileUpload(file);
     };
 
-    // Process file upload with label
+    /**
+     * @description Processes the uploaded file, creating a new mind map item and saving it.
+     * @param {File} file - The file to process.
+     */
     const processFileUpload = (file: File) => {
         const fileType = file.type;
         const isImage = fileType.startsWith('image/');
@@ -122,14 +155,19 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
         }
     };
 
-    // Save pending file when label is provided
+    /**
+     * @description Saves a pending file after a label has been provided.
+     */
     const handleSavePendingFile = () => {
         if (pendingFile && newLabel.trim()) {
             processFileUpload(pendingFile);
         }
     };
 
-    // Delete mind map
+    /**
+     * @description Deletes a mind map.
+     * @param {string} id - The ID of the mind map to delete.
+     */
     const deleteMindMap = (id: string) => {
         const mapToDelete = mindMaps.find(m => m.id === id);
         if (mapToDelete) {
@@ -140,13 +178,18 @@ const MindMapManager: React.FC<MindMapManagerProps> = ({
         }
     };
 
-    // Open full screen view
+    /**
+     * @description Opens a mind map in full screen view.
+     * @param {MindMapItem} item - The mind map item to open.
+     */
     const openFullScreen = (item: MindMapItem) => {
         setFullScreenItem(item);
         document.body.style.overflow = 'hidden'; // Prevent background scrolling
     };
 
-    // Close full screen view
+    /**
+     * @description Closes the full screen view.
+     */
     const closeFullScreen = () => {
         setFullScreenItem(null);
         document.body.style.overflow = 'auto'; // Restore scrolling

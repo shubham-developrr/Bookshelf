@@ -3,11 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import { SearchIconSvg, CloseIcon } from './icons';
 import { getBookImage } from '../assets/images/index';
 
+/**
+ * @interface SearchModalProps
+ * @description Defines the props for the SearchModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ */
 interface SearchModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
+/**
+ * @interface SearchResult
+ * @description Defines the structure of a search result object.
+ * @property {'book' | 'chapter' | 'subtopic'} type - The type of the search result.
+ * @property {string} title - The title of the search result.
+ * @property {string} [bookName] - The name of the book for chapter and subtopic results.
+ * @property {string} [chapterName] - The name of the chapter for subtopic results.
+ * @property {string} path - The path to navigate to for the search result.
+ */
 interface SearchResult {
     type: 'book' | 'chapter' | 'subtopic';
     title: string;
@@ -16,12 +31,20 @@ interface SearchResult {
     path: string;
 }
 
+/**
+ * @description A modal component for searching through books, chapters, and subtopics.
+ * @param {SearchModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The search modal component.
+ */
 const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
-    // Get actual available books and chapters
+    /**
+     * @description Retrieves all available content (books, chapters, subtopics) from local storage.
+     * @returns {SearchResult[]} An array of all available content.
+     */
     const getAvailableContent = (): SearchResult[] => {
         const results: SearchResult[] = [];
         
@@ -108,6 +131,11 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
         return results;
     };
 
+    /**
+     * @description Filters the available content based on a search query.
+     * @param {string} query - The search query.
+     * @returns {SearchResult[]} An array of filtered and sorted search results.
+     */
     const filterResults = (query: string): SearchResult[] => {
         if (!query.trim()) return getAvailableContent().slice(0, 6); // Show first 6 items when no search
         
@@ -144,11 +172,20 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
         setSearchResults(filterResults(searchQuery));
     }, [searchQuery]);
 
+    /**
+     * @description Handles the click of a search result, navigating to the corresponding page.
+     * @param {SearchResult} result - The clicked search result.
+     */
     const handleResultClick = (result: SearchResult) => {
         navigate(result.path);
         onClose();
     };
 
+    /**
+     * @description Returns an icon for a given search result type.
+     * @param {string} type - The type of the search result.
+     * @returns {string} The icon for the search result type.
+     */
     const getResultIcon = (type: string) => {
         switch (type) {
             case 'book': return '📚';
@@ -158,6 +195,11 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
         }
     };
 
+    /**
+     * @description Returns a subtext for a given search result.
+     * @param {SearchResult} result - The search result.
+     * @returns {string} The subtext for the search result.
+     */
     const getResultSubtext = (result: SearchResult) => {
         if (result.type === 'book') return 'Book';
         if (result.type === 'chapter') return `Chapter in ${result.bookName}`;

@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SparklesIcon, PlusIcon, TrashIcon, FileIcon } from './icons';
 
+/**
+ * @interface AnkiCard
+ * @description Defines the detailed structure of a single flashcard, including spaced repetition metadata based on the Anki SM-2 algorithm.
+ * @property {string} id - Unique identifier for the card.
+ * @property {string} front - The question or prompt side of the card.
+ * @property {string} back - The answer side of the card.
+ * @property {Date} created - The date the card was created.
+ * @property {Date} [lastReviewed] - The date the card was last reviewed.
+ * @property {'new' | 'learning' | 'review'} difficulty - The current phase of the card in the learning process.
+ * @property {number} interval - The number of days until the next review is due.
+ * @property {number} easeFactor - A factor that determines how quickly the interval grows.
+ * @property {number} reviews - The number of successful reviews.
+ * @property {number} lapses - The number of times the user failed to recall the card.
+ * @property {string[]} [tags] - Optional tags for organizing cards.
+ * @property {string} [deck] - The deck the card belongs to.
+ */
 interface AnkiCard {
     id: string;
     front: string;
@@ -16,12 +32,25 @@ interface AnkiCard {
     deck?: string;
 }
 
+/**
+ * @interface AnkiFlashCardManagerProps
+ * @description Defines the props for the AnkiFlashCardManager component.
+ * @property {string} currentBook - The identifier for the current book.
+ * @property {string} currentChapter - The identifier for the current chapter, used for scoping the cards.
+ * @property {string} [className] - Optional CSS classes for the container.
+ */
 interface AnkiFlashCardManagerProps {
     currentBook: string;
     currentChapter: string;
     className?: string;
 }
 
+/**
+ * @description A self-contained UI and logic for an Anki-style flashcard system. It supports creating,
+ * managing, importing, and studying flashcards using the SM-2 spaced repetition algorithm to optimize learning.
+ * @param {AnkiFlashCardManagerProps} props - The props for the component.
+ * @returns {JSX.Element} The AnkiFlashCardManager component.
+ */
 const AnkiFlashCardManager: React.FC<AnkiFlashCardManagerProps> = ({
     currentBook,
     currentChapter,

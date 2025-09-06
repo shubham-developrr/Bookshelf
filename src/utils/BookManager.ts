@@ -1,11 +1,34 @@
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Enhanced Book Management System with UUID and Version Control
+ * @interface BookMetadata
+ * @description Defines the structure for a book's metadata, including versioning and marketplace info.
+ * @property {string} id - UUID - globally unique identifier for the book.
+ * @property {string} name - The name of the book.
+ * @property {string} [description] - A short description of the book.
+ * @property {string} [image] - URL or data URI for the book's cover image.
+ * @property {string} creatorName - The name of the book's creator.
+ * @property {string} university - The university associated with the book.
+ * @property {string} semester - The semester associated with the book.
+ * @property {string} subjectCode - The subject code for the book's course.
+ * @property {string} version - Semantic versioning string (e.g., "1.0.0").
+ * @property {string} [originalId] - For marketplace books, a reference to the original marketplace book ID.
+ * @property {boolean} isPublished - Whether the book is published to the marketplace.
+ * @property {string} [marketplaceId] - The ID of the book in the marketplace if published.
+ * @property {string} createdAt - ISO string of the creation date.
+ * @property {string} updatedAt - ISO string of the last update date.
+ * @property {string} [lastSyncAt] - ISO string of the last sync with a backend.
+ * @property {number} [downloadCount] - For marketplace books, the number of times it has been downloaded.
+ * @property {number} [rating] - For marketplace books, the average user rating.
+ * @property {string[]} [tags] - An array of tags for categorization.
+ * @property {number} [estimatedHours] - Estimated hours to complete the book.
+ * @property {'beginner' | 'intermediate' | 'advanced'} [difficulty] - The difficulty level of the book.
+ * @property {string} language - The language of the book content.
+ * @property {boolean} [updateAvailable] - Whether a newer version is available in the marketplace.
+ * @property {string} [latestVersion] - The latest version available in the marketplace.
  */
-
 export interface BookMetadata {
-  id: string; // UUID - globally unique
+  id: string;
   name: string;
   description?: string;
   image?: string;
@@ -13,61 +36,92 @@ export interface BookMetadata {
   university: string;
   semester: string;
   subjectCode: string;
-  version: string; // Semantic versioning (major.minor.patch)
-  originalId?: string; // For marketplace books - reference to marketplace book ID
-  isPublished: boolean; // Whether book is published to marketplace
-  marketplaceId?: string; // ID in marketplace if published
+  version: string;
+  originalId?: string;
+  isPublished: boolean;
+  marketplaceId?: string;
   createdAt: string;
   updatedAt: string;
-  lastSyncAt?: string; // Last sync with backend
-  downloadCount?: number; // For marketplace books
-  rating?: number; // For marketplace books
+  lastSyncAt?: string;
+  downloadCount?: number;
+  rating?: number;
   tags?: string[];
   estimatedHours?: number;
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
   language: string;
-  updateAvailable?: boolean; // Whether newer version is available
-  latestVersion?: string; // Latest version available in marketplace
+  updateAvailable?: boolean;
+  latestVersion?: string;
 }
 
+/**
+ * @interface BookVersion
+ * @description Represents a specific version of a book, typically for release history.
+ * @param {string} version - The semantic version number.
+ * @param {string} releaseNotes - Notes describing the changes in this version.
+ * @param {string} releasedAt - ISO string of the release date.
+ * @param {string} [downloadUrl] - URL to download this specific version.
+ * @param {number} [size] - The size of the book version file in bytes.
+ * @param {string} [checksum] - A checksum (e.g., SHA-256) for integrity verification.
+ */
 export interface BookVersion {
   version: string;
   releaseNotes: string;
   releasedAt: string;
   downloadUrl?: string;
-  size?: number; // in bytes
-  checksum?: string; // For integrity verification
+  size?: number;
+  checksum?: string;
 }
 
+/**
+ * @interface BookUpdateInfo
+ * @description Contains information about an available update for a book.
+ * @param {boolean} hasUpdate - Indicates if an update is available.
+ * @param {string} currentVersion - The user's current version of the book.
+ * @param {string} latestVersion - The latest version available.
+ * @param {string} [releaseNotes] - The release notes for the latest version.
+ * @param {number} [updateSize] - The size of the update in bytes.
+ * @param {boolean} isBreakingChange - Indicates if the update is a major version bump (breaking change).
+ */
 export interface BookUpdateInfo {
   hasUpdate: boolean;
   currentVersion: string;
   latestVersion: string;
   releaseNotes?: string;
   updateSize?: number;
-  isBreakingChange: boolean; // major version bump
+  isBreakingChange: boolean;
 }
 
+/**
+ * @class BookManager
+ * @description Provides a suite of static methods for managing user-created books,
+ * including CRUD operations, version control, and marketplace interactions,
+ * all using localStorage as the primary data store.
+ */
 export class BookManager {
   private static readonly STORAGE_KEY = 'createdBooks';
   private static readonly VERSIONS_KEY = 'bookVersions';
   
   /**
-   * Generate a new UUID for a book
+   * @description Generate a new UUID (v4) for a book.
+   * @returns {string} A new unique identifier.
    */
   static generateBookId(): string {
     return uuidv4();
   }
 
   /**
-   * Create initial semantic version
+   * @description Create an initial semantic version string.
+   * @returns {string} The initial version "1.0.0".
    */
   static generateInitialVersion(): string {
     return '1.0.0';
   }
 
   /**
-   * Increment version number
+   * @description Increments a semantic version string.
+   * @param {string} currentVersion - The current version (e.g., "1.2.3").
+   * @param {'major' | 'minor' | 'patch'} type - The type of version increment.
+   * @returns {string} The new, incremented version string.
    */
   static incrementVersion(currentVersion: string, type: 'major' | 'minor' | 'patch'): string {
     const [major, minor, patch] = currentVersion.split('.').map(Number);
@@ -85,7 +139,10 @@ export class BookManager {
   }
 
   /**
-   * Compare version numbers
+   * @description Compares two semantic version strings.
+   * @param {string} version1 - The first version string.
+   * @param {string} version2 - The second version string.
+   * @returns {number} 1 if version1 > version2, -1 if version1 < version2, 0 if equal.
    */
   static compareVersions(version1: string, version2: string): number {
     const v1Parts = version1.split('.').map(Number);
@@ -99,7 +156,9 @@ export class BookManager {
   }
 
   /**
-   * Create a new book with proper metadata
+   * @description Creates a new book metadata object and saves it to localStorage.
+   * @param {object} bookData - The initial data for the new book.
+   * @returns {BookMetadata} The newly created book metadata object.
    */
   static createBook(bookData: {
     name: string;
@@ -141,7 +200,9 @@ export class BookManager {
   }
 
   /**
-   * Save book to localStorage with quota error handling
+   * @description Saves a book to localStorage, handling potential quota errors by
+   * attempting to clean up old data or save a minimal version of the book.
+   * @param {BookMetadata} book - The book metadata to save.
    */
   static saveBook(book: BookMetadata): void {
     try {
@@ -166,7 +227,7 @@ export class BookManager {
           const existingIndex = books.findIndex(b => b.id === book.id);
           
           // Create a minimal version of the book for storage
-          const minimalBook = {
+          const minimalBook: Partial<BookMetadata> = {
             id: book.id,
             name: book.name,
             creatorName: book.creatorName,
@@ -181,9 +242,9 @@ export class BookManager {
           };
           
           if (existingIndex >= 0) {
-            books[existingIndex] = minimalBook;
+            books[existingIndex] = minimalBook as BookMetadata;
           } else {
-            books.push(minimalBook);
+            books.push(minimalBook as BookMetadata);
           }
           
           localStorage.setItem(this.STORAGE_KEY, JSON.stringify(books));
@@ -198,7 +259,8 @@ export class BookManager {
   }
 
   /**
-   * Clean up old data to free storage space
+   * @description Attempts to free up localStorage space by removing data
+   * associated with old or temporary keys.
    */
   static cleanupOldData(): void {
     try {
@@ -225,7 +287,8 @@ export class BookManager {
   }
 
   /**
-   * Get all books from localStorage
+   * @description Retrieves all books from localStorage.
+   * @returns {BookMetadata[]} An array of book metadata objects.
    */
   static getAllBooks(): BookMetadata[] {
     const stored = localStorage.getItem(this.STORAGE_KEY);
@@ -240,7 +303,9 @@ export class BookManager {
   }
 
   /**
-   * Get book by ID
+   * @description Retrieves a single book by its ID from localStorage.
+   * @param {string} id - The ID of the book to retrieve.
+   * @returns {BookMetadata | null} The book metadata object, or null if not found.
    */
   static getBookById(id: string): BookMetadata | null {
     const books = this.getAllBooks();
@@ -248,7 +313,10 @@ export class BookManager {
   }
 
   /**
-   * Update book metadata
+   * @description Updates a book's metadata in localStorage.
+   * @param {string} id - The ID of the book to update.
+   * @param {Partial<BookMetadata>} updates - An object with the properties to update.
+   * @returns {BookMetadata | null} The updated book metadata object, or null if not found.
    */
   static updateBook(id: string, updates: Partial<BookMetadata>): BookMetadata | null {
     const book = this.getBookById(id);
@@ -265,7 +333,9 @@ export class BookManager {
   }
 
   /**
-   * Delete book
+   * @description Deletes a book and its associated data from localStorage.
+   * @param {string} id - The ID of the book to delete.
+   * @returns {boolean} True if the book was deleted, false otherwise.
    */
   static deleteBook(id: string): boolean {
     const books = this.getAllBooks();
@@ -283,7 +353,8 @@ export class BookManager {
   }
 
   /**
-   * Clean up all data associated with a book
+   * @description Removes all data associated with a specific book ID from localStorage.
+   * @param {string} bookId - The ID of the book whose data should be cleaned up.
    */
   static cleanupBookData(bookId: string): void {
     const keysToRemove: string[] = [];
@@ -304,7 +375,10 @@ export class BookManager {
   }
 
   /**
-   * Publish book to marketplace
+   * @description Simulates publishing a book to a marketplace.
+   * @param {string} bookId - The ID of the book to publish.
+   * @param {string} releaseNotes - Notes for this release.
+   * @returns {Promise<{success: boolean; marketplaceId?: string; error?: string}>} A promise that resolves with the result.
    */
   static async publishToMarketplace(bookId: string, releaseNotes: string): Promise<{
     success: boolean;
@@ -332,7 +406,9 @@ export class BookManager {
   }
 
   /**
-   * Check for book updates
+   * @description Simulates checking for book updates from a marketplace.
+   * @param {string} bookId - The ID of the book to check.
+   * @returns {Promise<BookUpdateInfo>} A promise that resolves with the update information.
    */
   static async checkForUpdates(bookId: string): Promise<BookUpdateInfo> {
     // TODO: Implement actual update checking via backend API
@@ -358,7 +434,9 @@ export class BookManager {
   }
 
   /**
-   * Migrate legacy books to new format (with migration tracking)
+   * @description Migrates legacy book data in localStorage to the new format.
+   * Tracks migration status to prevent re-running.
+   * @returns {number} The number of books that were migrated.
    */
   static migrateLegacyBooks(): number {
     // Check if migration has already been completed
@@ -389,7 +467,7 @@ export class BookManager {
         }
         
         // Add missing fields
-        if (!book.isPublished) {
+        if (book.isPublished === undefined) {
           updatedBook.isPublished = false;
           needsMigration = true;
         }
@@ -444,7 +522,9 @@ export class BookManager {
   }
 
   /**
-   * Export book for marketplace
+   * @description Gathers all data for a book to prepare it for export.
+   * @param {string} bookId - The ID of the book to export.
+   * @returns {Promise<{success: boolean; exportData?: any; error?: string}>} A promise resolving with the exported data or an error.
    */
   static async exportBookForMarketplace(bookId: string): Promise<{
     success: boolean;
@@ -475,14 +555,14 @@ export class BookManager {
   }
 
   /**
-   * Reset migration flag (for development/debugging)
+   * @description Resets the migration flag in localStorage. For development/debugging purposes.
    */
   static resetMigrationFlag(): void {
     localStorage.removeItem('booksMigrated');
   }
 
   /**
-   * Clear all storage data (nuclear option for quota issues)
+   * @description Clears all book-related data from localStorage. Use with caution.
    */
   static clearAllData(): void {
     try {

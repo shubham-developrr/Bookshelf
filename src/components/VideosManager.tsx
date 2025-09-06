@@ -1,6 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { PlusIcon, TrashIcon, PlayIcon, ExternalLinkIcon } from './icons';
 
+/**
+ * @interface VideoItem
+ * @description Defines the structure of a video item object.
+ * @property {string} id - The unique ID of the video.
+ * @property {string} title - The title of the video.
+ * @property {string} youtubeUrl - The URL of the YouTube video.
+ * @property {string} [thumbnail] - The URL of the video thumbnail.
+ * @property {string} [duration] - The duration of the video.
+ * @property {Date} addedDate - The date the video was added.
+ * @property {number} [startTime] - The start time of the video in seconds.
+ * @property {number} [endTime] - The end time of the video in seconds.
+ */
 interface VideoItem {
     id: string;
     title: string;
@@ -12,6 +24,14 @@ interface VideoItem {
     endTime?: number; // in seconds
 }
 
+/**
+ * @interface VideosManagerProps
+ * @description Defines the props for the VideosManager component.
+ * @property {string} currentBook - The current book being viewed.
+ * @property {string} currentChapter - The current chapter being viewed.
+ * @property {string} [tabId] - A unique identifier for the tab to isolate storage.
+ * @property {string} [className] - Optional CSS class name for the component.
+ */
 interface VideosManagerProps {
     currentBook: string;
     currentChapter: string;
@@ -19,6 +39,11 @@ interface VideosManagerProps {
     className?: string;
 }
 
+/**
+ * @description A component for managing and viewing a collection of YouTube videos related to a book chapter.
+ * @param {VideosManagerProps} props - The props for the component.
+ * @returns {React.FC} The videos manager component.
+ */
 const VideosManager: React.FC<VideosManagerProps> = ({
     currentBook,
     currentChapter,

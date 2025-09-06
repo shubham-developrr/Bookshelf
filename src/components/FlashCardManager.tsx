@@ -4,6 +4,15 @@ import { processAIImport } from '../utils/aiImportService';
 import { OCRService } from '../utils/ocrService';
 import AILoadingAnimation from './AILoadingAnimation';
 
+/**
+ * @interface FlashCard
+ * @description Defines the structure of a flash card.
+ * @property {string} id - The unique identifier for the flash card.
+ * @property {string} question - The question on the front of the card.
+ * @property {string} answer - The answer on the back of the card.
+ * @property {Date} created - The date the card was created.
+ * @property {'easy' | 'medium' | 'hard'} difficulty - The difficulty level of the card.
+ */
 interface FlashCard {
     id: string;
     question: string;
@@ -12,6 +21,14 @@ interface FlashCard {
     difficulty: 'easy' | 'medium' | 'hard';
 }
 
+/**
+ * @interface FlashCardManagerProps
+ * @description Defines the props for the FlashCardManager component.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} currentChapter - The name of the current chapter.
+ * @property {string} [tabId] - An optional unique identifier for the tab to isolate storage.
+ * @property {string} [className] - An optional class name for the component.
+ */
 interface FlashCardManagerProps {
     currentBook: string;
     currentChapter: string;
@@ -19,6 +36,11 @@ interface FlashCardManagerProps {
     className?: string;
 }
 
+/**
+ * @description A component for managing and studying flash cards.
+ * @param {FlashCardManagerProps} props - The props for the component.
+ * @returns {JSX.Element} The flash card manager component.
+ */
 const FlashCardManager: React.FC<FlashCardManagerProps> = ({
     currentBook,
     currentChapter,
@@ -51,7 +73,10 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         }
     }, [storageKey]);
 
-    // Handle AI-powered smart import with OCR support
+    /**
+     * @description Handles the AI-powered import of flash cards from a file, with support for OCR.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleSmartImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -115,7 +140,12 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         }
     };
     
-    // Create FlashCard from smart processing
+    /**
+     * @description Creates a new flash card object from a question and answer.
+     * @param {string} question - The question for the flash card.
+     * @param {string} answer - The answer for the flash card.
+     * @returns {FlashCard | null} The new flash card object, or null if the question or answer is empty.
+     */
     const createSmartFlashCard = (question: string, answer: string): FlashCard | null => {
         if (!question.trim() || !answer.trim()) return null;
         
@@ -128,13 +158,19 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         };
     };
 
-    // Save flashcards to localStorage
+    /**
+     * @description Saves an array of flash cards to local storage.
+     * @param {FlashCard[]} cards - The array of flash cards to save.
+     */
     const saveFlashCards = (cards: FlashCard[]) => {
         localStorage.setItem(storageKey, JSON.stringify(cards));
         setFlashCards(cards);
     };
 
-    // Handle file import
+    /**
+     * @description Handles the import of flash cards from a text file.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event from the file input.
+     */
     const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -155,7 +191,10 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         event.target.value = '';
     };
 
-    // Process text import based on selected format
+    /**
+     * @description Processes a string of text to import flash cards based on the selected format.
+     * @param {string} text - The text to process.
+     */
     const processTextImport = async (text: string) => {
         const lines = text.trim().split('\n').filter(line => line.trim());
         const importedCards: FlashCard[] = [];
@@ -197,7 +236,9 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         }
     };
 
-    // Process manual text input
+    /**
+     * @description Processes a string of manually entered text to import flash cards.
+     */
     const handleManualImport = async () => {
         const textarea = document.querySelector('textarea[placeholder*="Question 1"]') as HTMLTextAreaElement;
         if (textarea && textarea.value.trim()) {
@@ -206,7 +247,9 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         }
     };
 
-    // Copy format to clipboard
+    /**
+     * @description Copies the selected import format to the clipboard.
+     */
     const copyFormatToClipboard = async () => {
         const formats = {
             tab: "Question[TAB]Answer",
@@ -223,12 +266,16 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         }
     };
 
-    // Show format example
+    /**
+     * @description Shows the format example modal.
+     */
     const showFormatExample = () => {
         setShowFormatModal(true);
     };
 
-    // Add new flashcard
+    /**
+     * @description Adds a new flash card to the deck.
+     */
     const handleAddCard = () => {
         if (newQuestion.trim() && newAnswer.trim()) {
             const newCard: FlashCard = {
@@ -246,7 +293,10 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         }
     };
 
-    // Delete flashcard
+    /**
+     * @description Deletes a flash card from the deck.
+     * @param {string} cardId - The ID of the card to delete.
+     */
     const handleDeleteCard = (cardId: string) => {
         const updatedCards = flashCards.filter(card => card.id !== cardId);
         saveFlashCards(updatedCards);
@@ -255,12 +305,17 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
         }
     };
 
-    // Navigate cards
+    /**
+     * @description Navigates to the next card in the deck.
+     */
     const nextCard = () => {
         setCurrentCardIndex((prev) => (prev + 1) % flashCards.length);
         setShowAnswer(false);
     };
 
+    /**
+     * @description Navigates to the previous card in the deck.
+     */
     const prevCard = () => {
         setCurrentCardIndex((prev) => (prev - 1 + flashCards.length) % flashCards.length);
         setShowAnswer(false);
@@ -268,7 +323,10 @@ const FlashCardManager: React.FC<FlashCardManagerProps> = ({
 
     const currentCard = flashCards[currentCardIndex];
 
-    // Format example modal
+    /**
+     * @description A modal component that displays an example of the selected import format.
+     * @returns {React.ReactElement | null} The format example modal component, or null if it is not open.
+     */
     const FormatExampleModal = () => {
         if (!showFormatModal) return null;
         

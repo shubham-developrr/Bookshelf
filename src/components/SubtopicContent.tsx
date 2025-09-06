@@ -2,6 +2,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Highlight } from '../types/types';
 
+/**
+ * @interface SubtopicContentProps
+ * @description Defines the props for the SubtopicContent component.
+ * @property {string} content - The text content of the subtopic.
+ * @property {Highlight[]} highlights - An array of highlight objects.
+ * @property {string} currentBook - The name of the current book.
+ * @property {function} addHighlight - Callback function to add a new highlight.
+ * @property {function} removeHighlight - Callback function to remove a highlight.
+ */
 interface SubtopicContentProps {
   content: string;
   highlights: Highlight[];
@@ -10,6 +19,11 @@ interface SubtopicContentProps {
   removeHighlight: (id: string) => void;
 }
 
+/**
+ * @description A component that displays the content of a subtopic, with support for text selection and highlighting.
+ * @param {SubtopicContentProps} props - The props for the component.
+ * @returns {JSX.Element} The subtopic content component.
+ */
 const SubtopicContent: React.FC<SubtopicContentProps> = ({ 
   content, 
   highlights, 
@@ -27,7 +41,9 @@ const SubtopicContent: React.FC<SubtopicContentProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const [selectedText, setSelectedText] = useState('');
 
-  // Handle touch events for mobile
+  /**
+   * @description Handles the start of a touch event, hiding the selection menu if it is visible.
+   */
   const handleTouchStart = () => {
     if (menuPosition.show) {
       window.getSelection()?.removeAllRanges();
@@ -37,6 +53,10 @@ const SubtopicContent: React.FC<SubtopicContentProps> = ({
     }
   };
 
+  /**
+   * @description Handles the end of a touch event, displaying the selection menu if text is selected.
+   * @param {React.TouchEvent} e - The touch event.
+   */
   const handleTouchEnd = (e: React.TouchEvent) => {
     setTimeout(() => {
       const selection = window.getSelection();
@@ -78,7 +98,10 @@ const SubtopicContent: React.FC<SubtopicContentProps> = ({
     }, 300);
   };
 
-  // Handle mouse events for desktop
+  /**
+   * @description Handles the mouse up event, displaying the selection menu if text is selected.
+   * @param {React.MouseEvent} e - The mouse event.
+   */
   const handleMouseUp = (e: React.MouseEvent) => {
     setTimeout(() => {
       const selection = window.getSelection();
@@ -120,7 +143,9 @@ const SubtopicContent: React.FC<SubtopicContentProps> = ({
     }, 100);
   };
 
-  // Hide menu when clicking outside
+  /**
+   * @description Hides the selection menu.
+   */
   const hideMenu = () => {
     setMenuPosition(prev => ({ ...prev, show: false }));
     setShowColorPicker(false);
@@ -128,7 +153,10 @@ const SubtopicContent: React.FC<SubtopicContentProps> = ({
     window.getSelection()?.removeAllRanges();
   };
 
-  // Apply highlight
+  /**
+   * @description Applies a highlight to the selected text.
+   * @param {string} color - The color of the highlight to apply.
+   */
   const applyHighlight = (color: string) => {
     if (!selectedText) {
       hideMenu();
@@ -151,7 +179,9 @@ const SubtopicContent: React.FC<SubtopicContentProps> = ({
     }
   };
 
-  // Add note
+  /**
+   * @description Adds a note to the selected text.
+   */
   const addNote = () => {
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed && noteText.trim()) {
@@ -254,7 +284,12 @@ const SubtopicContent: React.FC<SubtopicContentProps> = ({
   // Get highlights for this chapter
   const chapterHighlights = highlights.filter(h => h.chapterId === currentBook);
 
-  // Apply highlights to content
+  /**
+   * @description Applies highlights to the content.
+   * @param {string} content - The content to apply highlights to.
+   * @param {Highlight[]} highlights - An array of highlight objects.
+   * @returns {string} The content with highlights applied.
+   */
   const applyHighlightsToContent = (content: string, highlights: Highlight[]) => {
     if (highlights.length === 0) {
       return content;

@@ -1,6 +1,18 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 
-// User types
+/**
+ * @interface User
+ * @description Represents the structure of a user object in the application.
+ * @property {string} id - The user's unique identifier.
+ * @property {string} email - The user's email address.
+ * @property {string} username - The user's username.
+ * @property {string} fullName - The user's full name.
+ * @property {string} [avatarUrl] - URL to the user's avatar image.
+ * @property {'student' | 'educator' | 'admin'} role - The user's role.
+ * @property {UserPreferences} preferences - The user's application preferences.
+ * @property {string} createdAt - ISO string of when the user was created.
+ * @property {string} [lastLogin] - ISO string of the user's last login.
+ */
 export interface User {
   id: string;
   email: string;
@@ -13,6 +25,15 @@ export interface User {
   lastLogin?: string;
 }
 
+/**
+ * @interface UserPreferences
+ * @description Defines the structure for user-specific application preferences.
+ * @property {'light' | 'dark' | 'ocean-blue' | 'amoled'} theme - The selected theme.
+ * @property {'small' | 'medium' | 'large'} fontSize - The selected font size.
+ * @property {boolean} autoSaveHighlights - Whether highlights are saved automatically.
+ * @property {boolean} emailNotifications - Whether email notifications are enabled.
+ * @property {boolean} progressTracking - Whether progress tracking is enabled.
+ */
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'ocean-blue' | 'amoled';
   fontSize: 'small' | 'medium' | 'large';
@@ -21,6 +42,17 @@ export interface UserPreferences {
   progressTracking: boolean;
 }
 
+/**
+ * @interface UserProgress
+ * @description Represents a user's progress within a specific chapter of a book.
+ * @property {string} bookId - The ID of the book.
+ * @property {string} chapterId - The ID of the chapter.
+ * @property {number} progressPercentage - The user's progress percentage.
+ * @property {number} timeSpent - The time spent in minutes.
+ * @property {string} lastAccessed - ISO string of the last access date.
+ * @property {string} [completedAt] - ISO string of the completion date.
+ * @property {string} [notes] - User's notes for this chapter.
+ */
 export interface UserProgress {
   bookId: string;
   chapterId: string;
@@ -31,6 +63,19 @@ export interface UserProgress {
   notes?: string;
 }
 
+/**
+ * @interface UserHighlight
+ * @description Represents a user's highlight within a chapter.
+ * @property {string} id - The unique ID of the highlight.
+ * @property {string} bookId - The ID of the book.
+ * @property {string} chapterId - The ID of the chapter.
+ * @property {string} text - The highlighted text content.
+ * @property {'yellow' | 'green' | 'blue' | 'red'} color - The color of the highlight.
+ * @property {object} position - The start and end position of the highlight.
+ * @property {string} [note] - A note associated with the highlight.
+ * @property {string} createdAt - ISO string of the creation date.
+ * @property {string} updatedAt - ISO string of the last update date.
+ */
 export interface UserHighlight {
   id: string;
   bookId: string;
@@ -46,7 +91,16 @@ export interface UserHighlight {
   updatedAt: string;
 }
 
-// State management
+/**
+ * @interface UserState
+ * @description Defines the shape of the state managed by the userReducer.
+ * @property {User | null} user - The current user object, or null if not authenticated.
+ * @property {boolean} isAuthenticated - Whether the user is currently authenticated.
+ * @property {boolean} isLoading - Whether a user-related operation is in progress.
+ * @property {object} progress - A map of user's progress, nested by book and chapter ID.
+ * @property {UserHighlight[]} highlights - An array of the user's highlights.
+ * @property {string | null} error - An error message, if any.
+ */
 interface UserState {
   user: User | null;
   isAuthenticated: boolean;
@@ -56,6 +110,10 @@ interface UserState {
   error: string | null;
 }
 
+/**
+ * @type UserAction
+ * @description A discriminated union type representing all possible actions for the userReducer.
+ */
 type UserAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_USER'; payload: User | null }
@@ -77,6 +135,12 @@ const initialState: UserState = {
   error: null
 };
 
+/**
+ * @description The reducer function for managing the user state.
+ * @param {UserState} state - The current state.
+ * @param {UserAction} action - The dispatched action.
+ * @returns {UserState} The new state.
+ */
 function userReducer(state: UserState, action: UserAction): UserState {
   switch (action.type) {
     case 'SET_LOADING':
@@ -162,7 +226,12 @@ import { realtimeManager } from '../services/RealtimeManager';
 
 const userService = supabaseUserService;
 
-// Context
+/**
+ * @interface UserContextType
+ * @description Defines the shape of the context value, including the state and an actions object.
+ * @property {UserState} state - The current user state.
+ * @property {object} actions - An object containing all the actions to interact with the user state.
+ */
 interface UserContextType {
   state: UserState;
   actions: {
@@ -180,7 +249,11 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Provider component
+/**
+ * @description A provider that manages all user-related state and logic, including API calls and real-time updates.
+ * @param {{ children: ReactNode }} props - The component's props.
+ * @returns {React.FC} The UserProvider component.
+ */
 export function UserProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(userReducer, initialState);
 
@@ -189,7 +262,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     initializeUser();
   }, []);
 
-  // Sync data when user logs in
+  // Sync data when user logs in and set up real-time subscriptions
   useEffect(() => {
     if (state.isAuthenticated && state.user) {
       syncUserData();
@@ -354,7 +427,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Hook for using the user context
+/**
+ * @description The primary custom hook for accessing the full UserContext (both state and actions).
+ * It must be used within a UserProvider.
+ * @returns {UserContextType} The user context value.
+ */
 export function useUser() {
   const context = useContext(UserContext);
   if (context === undefined) {
@@ -363,7 +440,10 @@ export function useUser() {
   return context;
 }
 
-// Helper hooks for common operations
+/**
+ * @description A convenience hook for accessing authentication-related state and actions.
+ * @returns {object} An object containing user, isAuthenticated, isLoading, error, and auth actions.
+ */
 export function useAuth() {
   const { state, actions } = useUser();
   return {
@@ -377,6 +457,13 @@ export function useAuth() {
   };
 }
 
+/**
+ * @description A convenience hook for accessing user progress state and actions.
+ * Can be scoped to a specific book and/or chapter.
+ * @param {string} [bookId] - The ID of the book to get progress for.
+ * @param {string} [chapterId] - The ID of the chapter to get progress for.
+ * @returns {object} An object containing the progress data and the updateProgress action.
+ */
 export function useProgress(bookId?: string, chapterId?: string) {
   const { state, actions } = useUser();
   
@@ -392,6 +479,13 @@ export function useProgress(bookId?: string, chapterId?: string) {
   };
 }
 
+/**
+ * @description A convenience hook for accessing user highlight state and actions.
+ * Can be filtered by book and/or chapter.
+ * @param {string} [bookId] - The ID of the book to filter highlights by.
+ * @param {string} [chapterId] - The ID of the chapter to filter highlights by.
+ * @returns {object} An object containing the filtered highlights and highlight-related actions.
+ */
 export function useHighlights(bookId?: string, chapterId?: string) {
   const { state, actions } = useUser();
   

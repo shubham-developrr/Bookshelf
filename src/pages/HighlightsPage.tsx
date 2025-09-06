@@ -3,12 +3,24 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { BackIcon, AlertIcon } from '../components/icons';
 import { Highlight } from '../types/types';
 
+/**
+ * @interface HighlightsPageProps
+ * @description Defines the props for the HighlightsPage component.
+ * @property {Highlight[]} highlights - An array of highlight objects.
+ * @property {function} openAIGuru - Callback function to open the AI Guru modal.
+ * @property {function} removeHighlight - Callback function to remove a highlight.
+ */
 interface HighlightsPageProps {
     highlights: Highlight[];
     openAIGuru: (prompt?: string) => void;
     removeHighlight: (id: string) => void;
 }
 
+/**
+ * @description A page that displays all the highlights and notes for a specific chapter.
+ * @param {HighlightsPageProps} props - The props for the component.
+ * @returns {React.FC} The highlights page.
+ */
 const HighlightsPage: React.FC<HighlightsPageProps> = ({ highlights, openAIGuru, removeHighlight }) => {
     const { subjectName, chapterName } = useParams<{ subjectName: string; chapterName: string }>();
     const navigate = useNavigate();

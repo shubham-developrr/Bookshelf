@@ -6,6 +6,14 @@ import { syllabus, chapterSubtopics } from '../constants/constants';
 import { useTheme } from '../contexts/ThemeContext';
 import { MarketplaceBookExportService } from '../services/marketplaceExportService';
 
+/**
+ * @interface Chapter
+ * @description Defines the structure of a chapter object.
+ * @property {string} id - The unique ID of the chapter.
+ * @property {number} number - The chapter number.
+ * @property {string} name - The name of the chapter.
+ * @property {string[]} subtopics - An array of subtopic names.
+ */
 interface Chapter {
     id: string;
     number: number;
@@ -13,6 +21,10 @@ interface Chapter {
     subtopics: string[];
 }
 
+/**
+ * @description A page that displays the chapters of a specific subject or book.
+ * @returns {React.FC} The subject page.
+ */
 const SubjectPage: React.FC = () => {
     const { subjectName } = useParams<{ subjectName: string }>();
     const navigate = useNavigate();

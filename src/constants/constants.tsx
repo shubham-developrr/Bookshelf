@@ -1,5 +1,9 @@
 import React from 'react';
 
+/**
+ * @const READER_TEXT
+ * @description A constant containing a large block of HTML markup for a reader component.
+ */
 export const READER_TEXT = `
 <h2 class="text-xl font-semibold mb-4 theme-text">Chapter Overview</h2>
 <p class="mb-6" style="line-height: 1.8; font-size: 15px; text-align: justify; font-family: Georgia, serif;">Nature has endowed the human eye (retina) with the sensitivity to detect electromagnetic waves within a small range of the electromagnetic spectrum. Electromagnetic radiation belonging to this region of the spectrum (wavelength of about 400 nm to 750 nm) is called light. It is mainly through light and the sense of vision that we know and interpret the world around us. The study of optics has fascinated scientists for centuries, leading to breakthrough discoveries that have shaped our understanding of the physical world.</p>
@@ -26,11 +30,23 @@ export const READER_TEXT = `
 <p class="mb-6" style="line-height: 1.8; font-size: 15px; text-align: justify; font-family: Georgia, serif;">This chapter provides the essential foundation for understanding how light interacts with matter and how we can manipulate these interactions to create useful optical devices. The principles you learn here will be applied throughout your study of physics and will provide insights into phenomena ranging from rainbows and mirages to the operation of sophisticated scientific instruments.</p>
 `;
 
+/**
+ * @const syllabus
+ * @description An empty object that serves as a base for syllabus data.
+ */
 export const syllabus = {};
 
+/**
+ * @const chapterSubtopics
+ * @description An empty object that serves as a base for subtopic data.
+ */
 export const chapterSubtopics = {};
 
-// Dynamic function to get syllabus including imported books
+/**
+ * @description Retrieves the base syllabus and merges it with syllabus data
+ * from imported books stored in localStorage.
+ * @returns {object} The combined syllabus object.
+ */
 export const getSyllabus = () => {
   const baseSyllabus = { ...syllabus };
   
@@ -49,7 +65,11 @@ export const getSyllabus = () => {
   return baseSyllabus;
 };
 
-// Dynamic function to get chapter subtopics including imported books
+/**
+ * @description Retrieves the base subtopics and merges them with subtopic data
+ * from imported books stored in localStorage.
+ * @returns {object} The combined subtopics object.
+ */
 export const getChapterSubtopics = () => {
   const baseSubtopics = { ...chapterSubtopics };
   

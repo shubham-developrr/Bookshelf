@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import { PaperAirplaneIcon, CloseIcon, BookOpenIcon } from './icons';
 
+/**
+ * @interface PublishModalProps
+ * @description Defines the props for the PublishModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ * @property {Array<object>} completedBooks - An array of completed books available for publishing.
+ * @property {function} onPublish - Callback function to publish the selected books.
+ */
 interface PublishModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -15,16 +23,30 @@ interface PublishModalProps {
     onPublish: (bookIds: string[]) => void;
 }
 
-// Check mark icon
+/**
+ * @description A simple check mark icon component.
+ * @param {object} props - The component props.
+ * @param {string} [props.className="w-4 h-4"] - The CSS class name for the icon.
+ * @returns {React.ReactElement} The rendered check mark icon.
+ */
 const CheckIcon2 = ({ className = "w-4 h-4" }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
         <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
     </svg>
 );
 
+/**
+ * @description A modal component for publishing completed books to the bookstore.
+ * @param {PublishModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The publish modal component.
+ */
 const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, completedBooks, onPublish }) => {
     const [selectedBooks, setSelectedBooks] = useState<Set<string>>(new Set());
 
+    /**
+     * @description Toggles the selection of a book for publishing.
+     * @param {string} bookId - The ID of the book to toggle.
+     */
     const toggleBookSelection = (bookId: string) => {
         const newSelection = new Set(selectedBooks);
         if (newSelection.has(bookId)) {
@@ -35,6 +57,9 @@ const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, completedB
         setSelectedBooks(newSelection);
     };
 
+    /**
+     * @description Handles the publishing of the selected books.
+     */
     const handlePublish = () => {
         if (selectedBooks.size === 0) {
             alert('Please select at least one book to publish');

@@ -10,7 +10,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-// Create Supabase client with optimized configuration
+/**
+ * @const supabase
+ * @description The singleton instance of the Supabase client, configured with environment variables
+ * and optimized settings for authentication, real-time, and database interactions.
+ */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -28,10 +32,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Database type definitions for TypeScript
+/**
+ * @interface Database
+ * @description Provides TypeScript definitions for the Supabase database schema,
+ * enabling type-safe queries and IntelliSense for table structures.
+ */
 export interface Database {
   public: {
     Tables: {
+      /**
+       * @table profiles
+       * @description Stores user profile information, extending the built-in auth.users table.
+       */
       profiles: {
         Row: {
           id: string;
@@ -84,6 +96,10 @@ export interface Database {
           last_login?: string | null;
         };
       };
+      /**
+       * @table user_progress
+       * @description Tracks user progress within each book and chapter.
+       */
       user_progress: {
         Row: {
           id: string;
@@ -121,6 +137,10 @@ export interface Database {
           notes?: string | null;
         };
       };
+      /**
+       * @table user_highlights
+       * @description Stores user-created text highlights and associated notes.
+       */
       user_highlights: {
         Row: {
           id: string;
@@ -168,4 +188,8 @@ export interface Database {
   };
 }
 
+/**
+ * @type SupabaseClient
+ * @description A utility type that exports the type of the Supabase client instance.
+ */
 export type SupabaseClient = typeof supabase;

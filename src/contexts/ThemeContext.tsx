@@ -1,13 +1,30 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+/**
+ * @type ThemeMode
+ * @description Defines the available theme modes for the application.
+ */
 export type ThemeMode = 'light' | 'dark' | 'blue' | 'amoled' | 'custom';
 
+/**
+ * @interface CustomThemeColors
+ * @description Defines the structure for a user's custom theme colors.
+ * @property {string} primary - The primary background color.
+ * @property {string} secondary - The secondary surface color.
+ * @property {string} accent - The accent color.
+ */
 interface CustomThemeColors {
   primary: string;
   secondary: string; 
   accent: string;
 }
 
+/**
+ * @interface Theme
+ * @description Defines the complete structure of a theme, including its mode and a detailed color palette.
+ * @property {ThemeMode} mode - The current theme mode.
+ * @property {object} colors - The detailed color palette for the theme.
+ */
 interface Theme {
   mode: ThemeMode;
   colors: {
@@ -23,7 +40,11 @@ interface Theme {
   };
 }
 
-// Function to generate custom theme colors
+/**
+ * @description Generates a full Theme object from a user's custom color selections.
+ * @param {CustomThemeColors} customColors - The user-defined custom colors.
+ * @returns {Theme} The generated theme object.
+ */
 const generateCustomTheme = (customColors: CustomThemeColors): Theme => {
   return {
     mode: 'custom',
@@ -41,7 +62,11 @@ const generateCustomTheme = (customColors: CustomThemeColors): Theme => {
   };
 };
 
-// Helper function to determine if a color is light or dark
+/**
+ * @description Determines if a hex color is light or dark.
+ * @param {string} color - The hex color string.
+ * @returns {boolean} True if the color is light, false otherwise.
+ */
 const isLightColor = (color: string): boolean => {
   const hex = color.replace('#', '');
   const r = parseInt(hex.substr(0, 2), 16);
@@ -51,12 +76,21 @@ const isLightColor = (color: string): boolean => {
   return brightness > 128;
 };
 
-// Helper function to get contrasting text color
+/**
+ * @description Gets a contrasting text color (black or white) for a given background color.
+ * @param {string} bgColor - The background hex color string.
+ * @returns {string} The contrasting text color ('#1e293b' or '#f8fafc').
+ */
 const getContrastText = (bgColor: string): string => {
   return isLightColor(bgColor) ? '#1e293b' : '#f8fafc';
 };
 
-// Helper function to adjust opacity
+/**
+ * @description Adjusts the opacity of a hex color.
+ * @param {string} color - The hex color string.
+ * @param {number} opacity - The desired opacity (0-1).
+ * @returns {string} The color in rgba format.
+ */
 const adjustOpacity = (color: string, opacity: number): string => {
   if (color.startsWith('#')) {
     const hex = color.replace('#', '');
@@ -68,7 +102,12 @@ const adjustOpacity = (color: string, opacity: number): string => {
   return color;
 };
 
-// Helper function to darken a color
+/**
+ * @description Darkens a hex color by a specified amount.
+ * @param {string} color - The hex color string.
+ * @param {number} amount - The amount to darken (0-1).
+ * @returns {string} The new darkened hex color string.
+ */
 const darkenColor = (color: string, amount: number): string => {
   const hex = color.replace('#', '');
   const r = Math.max(0, parseInt(hex.substr(0, 2), 16) - Math.floor(255 * amount));
@@ -77,6 +116,10 @@ const darkenColor = (color: string, amount: number): string => {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 };
 
+/**
+ * @const themes
+ * @description An object containing the definitions for all the predefined themes.
+ */
 const themes: Record<Exclude<ThemeMode, 'custom'>, Theme> = {
   light: {
     mode: 'light',
@@ -136,6 +179,16 @@ const themes: Record<Exclude<ThemeMode, 'custom'>, Theme> = {
   },
 };
 
+/**
+ * @interface ThemeContextType
+ * @description Defines the shape of the context value provided by the ThemeProvider.
+ * @property {Theme} theme - The current theme object.
+ * @property {ThemeMode} themeMode - The current theme mode.
+ * @property {(mode: ThemeMode) => void} setThemeMode - Function to set the theme mode.
+ * @property {(colors: CustomThemeColors) => void} setCustomTheme - Function to set a custom theme.
+ * @property {CustomThemeColors | null} customColors - The current custom theme colors, if any.
+ * @property {ThemeMode[]} availableThemes - An array of all available theme modes.
+ */
 interface ThemeContextType {
   theme: Theme;
   themeMode: ThemeMode;
@@ -147,6 +200,12 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+/**
+ * @description A provider component that manages the theme state, applies theme styles as CSS variables,
+ * and makes the theme context available to its children.
+ * @param {{ children: React.ReactNode }} props - The component's props.
+ * @returns {React.FC} The ThemeProvider component.
+ */
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
   const [customColors, setCustomColors] = useState<CustomThemeColors | null>(null);
@@ -237,6 +296,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
 
+/**
+ * @description A custom hook for easily accessing the ThemeContext.
+ * It must be used within a ThemeProvider.
+ * @returns {ThemeContextType} The theme context value.
+ */
 export const useTheme = () => {
   const context = useContext(ThemeContext);
   if (context === undefined) {

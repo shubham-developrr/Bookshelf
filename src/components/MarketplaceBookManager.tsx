@@ -3,11 +3,29 @@ import { MarketplaceBookExportService } from '../services/marketplaceExportServi
 import { MarketplaceBookImportService } from '../services/marketplaceImportService';
 import { ExportIcon, ImportIcon, UploadIcon, DownloadIcon, CheckIcon, AlertIcon } from './icons';
 
+/**
+ * @interface MarketplaceManagerProps
+ * @description Defines the props for the MarketplaceBookManager component.
+ * @property {string} [className] - An optional class name for the component.
+ * @property {'export' | 'import'} [initialTab] - The initial tab to be displayed.
+ */
 interface MarketplaceManagerProps {
     className?: string;
     initialTab?: 'export' | 'import';
 }
 
+/**
+ * @interface ExportPreview
+ * @description Defines the structure of an export preview.
+ * @property {number} totalChapters - The total number of chapters in the book.
+ * @property {number} totalSubtopics - The total number of subtopics in the book.
+ * @property {number} totalTabs - The total number of tabs in the book.
+ * @property {number} totalAssets - The total number of assets in the book.
+ * @property {number} totalExamPapers - The total number of exam papers in the book.
+ * @property {number} totalHighlights - The total number of highlights in the book.
+ * @property {string} estimatedSize - The estimated size of the export file.
+ * @property {string[]} compatibility - An array of compatibility features.
+ */
 interface ExportPreview {
     totalChapters: number;
     totalSubtopics: number;
@@ -19,6 +37,18 @@ interface ExportPreview {
     compatibility: string[];
 }
 
+/**
+ * @interface ImportPreview
+ * @description Defines the structure of an import preview.
+ * @property {string} bookName - The name of the book to be imported.
+ * @property {string} description - The description of the book.
+ * @property {string[]} chapters - An array of chapter names.
+ * @property {number} totalTabs - The total number of tabs in the book.
+ * @property {number} totalAssets - The total number of assets in the book.
+ * @property {string} compatibility - The compatibility of the book.
+ * @property {string} estimatedSize - The estimated size of the import file.
+ * @property {string[]} warnings - An array of warnings related to the import.
+ */
 interface ImportPreview {
     bookName: string;
     description: string;
@@ -30,6 +60,14 @@ interface ImportPreview {
     warnings: string[];
 }
 
+/**
+ * @interface ExportStatus
+ * @description Defines the status of an export operation.
+ * @property {boolean} isExporting - Whether the export is in progress.
+ * @property {number} progress - The progress of the export, as a percentage.
+ * @property {string} message - A message describing the current status.
+ * @property {string} [error] - Any error message associated with a failed export.
+ */
 interface ExportStatus {
     isExporting: boolean;
     progress: number;
@@ -37,6 +75,14 @@ interface ExportStatus {
     error?: string;
 }
 
+/**
+ * @interface ImportStatus
+ * @description Defines the status of an import operation.
+ * @property {boolean} isImporting - Whether the import is in progress.
+ * @property {number} progress - The progress of the import, as a percentage.
+ * @property {string} message - A message describing the current status.
+ * @property {string} [error] - Any error message associated with a failed import.
+ */
 interface ImportStatus {
     isImporting: boolean;
     progress: number;
@@ -45,8 +91,9 @@ interface ImportStatus {
 }
 
 /**
- * MARKETPLACE BOOK MANAGER
- * Complete UI for marketplace export/import operations
+ * @description A component that provides a UI for managing the import and export of books to and from the marketplace.
+ * @param {MarketplaceManagerProps} props - The props for the component.
+ * @returns {JSX.Element} The marketplace book manager component.
  */
 const MarketplaceBookManager: React.FC<MarketplaceManagerProps> = ({ 
     className = '', 
@@ -74,7 +121,8 @@ const MarketplaceBookManager: React.FC<MarketplaceManagerProps> = ({
     const availableBooks = JSON.parse(localStorage.getItem('createdBooks') || '[]');
 
     /**
-     * EXPORT FUNCTIONALITY
+     * @description Handles the selection of a book for export, generating a preview of the export.
+     * @param {string} bookId - The ID of the selected book.
      */
     const handleBookSelection = useCallback(async (bookId: string) => {
         setSelectedBookId(bookId);
@@ -96,6 +144,9 @@ const MarketplaceBookManager: React.FC<MarketplaceManagerProps> = ({
         }
     }, [availableBooks]);
 
+    /**
+     * @description Handles the export of the selected book.
+     */
     const handleExport = useCallback(async () => {
         if (!selectedBookId) return;
 
@@ -143,7 +194,8 @@ const MarketplaceBookManager: React.FC<MarketplaceManagerProps> = ({
     }, [selectedBookId, availableBooks]);
 
     /**
-     * IMPORT FUNCTIONALITY
+     * @description Handles the selection of a file for import, generating a preview of the import.
+     * @param {File} file - The selected file.
      */
     const handleFileSelect = useCallback(async (file: File) => {
         if (!file || !file.name.endsWith('.zip')) {
@@ -160,6 +212,10 @@ const MarketplaceBookManager: React.FC<MarketplaceManagerProps> = ({
         }
     }, []);
 
+    /**
+     * @description Handles the import of the selected file.
+     * @param {File} file - The file to import.
+     */
     const handleImport = useCallback(async (file: File) => {
         setImportStatus({
             isImporting: true,
@@ -209,7 +265,10 @@ const MarketplaceBookManager: React.FC<MarketplaceManagerProps> = ({
         }
     }, []);
 
-    // File input handlers
+    /**
+     * @description Handles the change event for the file input.
+     * @param {React.ChangeEvent<HTMLInputElement>} event - The change event.
+     */
     const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -217,7 +276,10 @@ const MarketplaceBookManager: React.FC<MarketplaceManagerProps> = ({
         }
     };
 
-    // Drag and drop handlers
+    /**
+     * @description Handles drag events for the drag-and-drop area.
+     * @param {React.DragEvent} e - The drag event.
+     */
     const handleDrag = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -228,6 +290,10 @@ const MarketplaceBookManager: React.FC<MarketplaceManagerProps> = ({
         }
     }, []);
 
+    /**
+     * @description Handles the drop event for the drag-and-drop area.
+     * @param {React.DragEvent} e - The drop event.
+     */
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();

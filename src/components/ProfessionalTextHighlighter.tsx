@@ -1,6 +1,17 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Highlight } from '../types/types';
 
+/**
+ * @interface ProfessionalTextHighlighterProps
+ * @description Defines the props for the ProfessionalTextHighlighter component.
+ * @property {string} content - The text content to be displayed.
+ * @property {Highlight[]} highlights - An array of highlight objects.
+ * @property {string} currentBook - The name of the current book.
+ * @property {function} addHighlight - Callback function to add a new highlight.
+ * @property {function} removeHighlight - Callback function to remove a highlight.
+ * @property {function} [onExplainWithAI] - Callback function to explain text with AI.
+ * @property {string} [className] - An optional class name for the component.
+ */
 interface ProfessionalTextHighlighterProps {
   content: string;
   highlights: Highlight[];
@@ -11,6 +22,15 @@ interface ProfessionalTextHighlighterProps {
   className?: string;
 }
 
+/**
+ * @interface SelectionMenu
+ * @description Defines the state of the selection menu.
+ * @property {boolean} visible - Whether the menu is visible.
+ * @property {number} x - The x-coordinate of the menu.
+ * @property {number} y - The y-coordinate of the menu.
+ * @property {string} selectedText - The currently selected text.
+ * @property {Range | null} selectedRange - The range of the selection.
+ */
 interface SelectionMenu {
   visible: boolean;
   x: number;
@@ -19,6 +39,11 @@ interface SelectionMenu {
   selectedRange: Range | null;
 }
 
+/**
+ * @description A component that provides a professional text highlighting experience, similar to Medium or Kindle.
+ * @param {ProfessionalTextHighlighterProps} props - The props for the component.
+ * @returns {JSX.Element} The professional text highlighter component.
+ */
 const ProfessionalTextHighlighter: React.FC<ProfessionalTextHighlighterProps> = ({
   content,
   highlights,
@@ -37,7 +62,10 @@ const ProfessionalTextHighlighter: React.FC<ProfessionalTextHighlighterProps> = 
     selectedRange: null
   });
 
-  // Create processed HTML content with highlights
+  /**
+   * @description Creates the HTML content with highlights applied.
+   * @returns {string} The HTML content with highlights.
+   */
   const createHighlightedContent = useCallback(() => {
     if (!content) return '';
     
@@ -65,7 +93,9 @@ const ProfessionalTextHighlighter: React.FC<ProfessionalTextHighlighterProps> = 
     return processedContent;
   }, [content, highlights, currentBook]);
 
-  // Handle text selection
+  /**
+   * @description Handles text selection events, displaying the selection menu.
+   */
   const handleTextSelection = useCallback(() => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
@@ -170,7 +200,10 @@ const ProfessionalTextHighlighter: React.FC<ProfessionalTextHighlighterProps> = 
     };
   }, [handleTextSelection]);
 
-  // Apply highlight
+  /**
+   * @description Applies a highlight to the selected text.
+   * @param {string} color - The color of the highlight to apply.
+   */
   const applyHighlight = (color: string) => {
     if (!selectionMenu.selectedText) return;
 
@@ -188,7 +221,9 @@ const ProfessionalTextHighlighter: React.FC<ProfessionalTextHighlighterProps> = 
     setSelectionMenu(prev => ({ ...prev, visible: false }));
   };
 
-  // Handle AI explanation
+  /**
+   * @description Handles the AI explanation request for the selected text.
+   */
   const handleAIExplanation = () => {
     if (!selectionMenu.selectedText || !onExplainWithAI) return;
 

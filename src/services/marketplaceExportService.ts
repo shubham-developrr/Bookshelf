@@ -1,20 +1,17 @@
 import JSZip from 'jszip';
 
 /**
- * MARKETPLACE BOOK MODULE SYSTEM
- * Complete rewrite for marketplace-ready book modules
- * Features:
- * - Full data integrity (100% capture)
- * - Tab isolation support 
- * - Marketplace metadata
- * - Version control
- * - Digital signatures
- * - Dependency management
- * - Preview generation
- * - Compatibility layers
+ * @file A comprehensive service for exporting book data into a structured,
+ * marketplace-ready ZIP archive. This service handles data gathering from
+ * localStorage, asset processing, and packaging.
  */
 
-// Core Interfaces for Marketplace Book Modules
+// #region Core Interfaces for Marketplace Book Modules
+
+/**
+ * @interface MarketplaceBookModule
+ * @description The root interface for a complete, exportable book module.
+ */
 interface MarketplaceBookModule {
     metadata: BookModuleMetadata;
     content: BookModuleContent;
@@ -22,6 +19,10 @@ interface MarketplaceBookModule {
     manifest: BookModuleManifest;
 }
 
+/**
+ * @interface BookModuleMetadata
+ * @description Defines the high-level metadata for the book.
+ */
 interface BookModuleMetadata {
     id: string;
     name: string;
@@ -67,6 +68,10 @@ interface BookModuleMetadata {
     };
 }
 
+/**
+ * @interface BookModuleContent
+ * @description Defines the content structure of the book, including chapters and global settings.
+ */
 interface BookModuleContent {
     chapters: { [chapterName: string]: ChapterModuleData };
     globalSettings: {
@@ -77,6 +82,10 @@ interface BookModuleContent {
     };
 }
 
+/**
+ * @interface ChapterModuleData
+ * @description Defines the complete data structure for a single chapter.
+ */
 interface ChapterModuleData {
     metadata: {
         id: string;
@@ -94,6 +103,10 @@ interface ChapterModuleData {
     customContent: { [key: string]: any };
 }
 
+/**
+ * @interface SubtopicData
+ * @description Defines the structure for a single subtopic within a chapter.
+ */
 interface SubtopicData {
     id: string;
     title: string;
@@ -110,6 +123,10 @@ interface SubtopicData {
     };
 }
 
+/**
+ * @interface TabModuleData
+ * @description Defines the structure for a single dynamic tab's data.
+ */
 interface TabModuleData {
     id: string;
     templateType: string;
@@ -123,12 +140,20 @@ interface TabModuleData {
     };
 }
 
+/**
+ * @interface ExamModeData
+ * @description Defines the structure for all exam-related data in a chapter.
+ */
 interface ExamModeData {
     questionPapers: QuestionPaper[];
     evaluationReports: EvaluationReport[];
     settings: ExamSettings;
 }
 
+/**
+ * @interface QuestionPaper
+ * @description Defines the structure for a single question paper.
+ */
 interface QuestionPaper {
     id: string;
     name: string;
@@ -139,6 +164,10 @@ interface QuestionPaper {
     metadata: any;
 }
 
+/**
+ * @interface EvaluationReport
+ * @description Defines the structure for a single evaluation report.
+ */
 interface EvaluationReport {
     id: string;
     questionPaperId: string;
@@ -151,6 +180,10 @@ interface EvaluationReport {
     feedback: string;
 }
 
+/**
+ * @interface ExamQuestion
+ * @description Defines the structure for a single question within an exam.
+ */
 interface ExamQuestion {
     id: string;
     type: 'mcq' | 'short' | 'long' | 'true-false';
@@ -163,6 +196,10 @@ interface ExamQuestion {
     topic: string;
 }
 
+/**
+ * @interface UserAnswer
+ * @description Defines the structure for a user's answer to an exam question.
+ */
 interface UserAnswer {
     questionId: string;
     answer: string | string[];
@@ -171,6 +208,10 @@ interface UserAnswer {
     timeSpent: number;
 }
 
+/**
+ * @interface ExamSettings
+ * @description Defines the settings for an exam.
+ */
 interface ExamSettings {
     allowReview: boolean;
     showResults: boolean;
@@ -178,6 +219,10 @@ interface ExamSettings {
     strictMode: boolean;
 }
 
+/**
+ * @interface HighlightData
+ * @description Defines the structure for a single highlight.
+ */
 interface HighlightData {
     id: string;
     text: string;
@@ -192,6 +237,10 @@ interface HighlightData {
     subtopicId?: string;
 }
 
+/**
+ * @interface UserNoteData
+ * @description Defines the structure for a user's note or annotation.
+ */
 interface UserNoteData {
     id: string;
     content: string;
@@ -202,6 +251,10 @@ interface UserNoteData {
     lastModified: string;
 }
 
+/**
+ * @interface VideoData
+ * @description Defines the structure for a video asset.
+ */
 interface VideoData {
     id: string;
     title: string;
@@ -213,6 +266,10 @@ interface VideoData {
     metadata: any;
 }
 
+/**
+ * @interface AttachmentData
+ * @description Defines the structure for a file attachment.
+ */
 interface AttachmentData {
     id: string;
     name: string;
@@ -223,6 +280,10 @@ interface AttachmentData {
     metadata: any;
 }
 
+/**
+ * @interface BookModuleAssets
+ * @description Defines the structure for storing base64 encoded assets.
+ */
 interface BookModuleAssets {
     images: { [id: string]: string }; // Base64 encoded images
     documents: { [id: string]: string }; // Base64 encoded documents
@@ -230,6 +291,10 @@ interface BookModuleAssets {
     thumbnails: { [id: string]: string }; // Generated thumbnails
 }
 
+/**
+ * @interface BookModuleManifest
+ * @description Defines the structure for the manifest file, containing metadata about the export itself.
+ */
 interface BookModuleManifest {
     formatVersion: string;
     generatedBy: {
@@ -256,17 +321,22 @@ interface BookModuleManifest {
         highlights: number;
     };
 }
+// #endregion
 
 /**
- * MARKETPLACE BOOK EXPORT SERVICE
- * Creates marketplace-ready book modules with complete data integrity
+ * @class MarketplaceBookExportService
+ * @description A service to gather all data associated with a book from localStorage, structure it
+ * according to a detailed schema, and package it into a distributable ZIP file.
  */
 export class MarketplaceBookExportService {
     private static readonly FORMAT_VERSION = '2.0.0';
     private static readonly PLATFORM_VERSION = '1.0.0';
 
     /**
-     * Export a book as a marketplace-ready module
+     * @description The main public method that orchestrates the entire export process.
+     * @param {string} bookName - The name of the book to export.
+     * @param {string} bookId - The ID of the book to export.
+     * @param {Partial<BookModuleMetadata>} [marketplaceMetadata] - Optional metadata to override the defaults.
      */
     static async exportBookModule(
         bookName: string, 
@@ -299,7 +369,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Gather complete book data with 100% accuracy
+     * @description The core data aggregation method that gathers all book-related data.
+     * @private
      */
     private static async gatherCompleteBookData(
         bookName: string, 
@@ -423,7 +494,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Gather complete chapter data including all tab instances
+     * @description Gathers all data for a single chapter.
+     * @private
      */
     private static async gatherCompleteChapterData(
         bookName: string, 
@@ -468,7 +540,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get all tab instances including isolated tabs from our new system
+     * @description Scans localStorage to find and structure all tab data for a chapter.
+     * @private
      */
     private static getAllTabInstances(bookName: string, chapterKey: string): { [tabId: string]: TabModuleData } {
         const tabs: { [tabId: string]: TabModuleData } = {};
@@ -571,7 +644,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get storage key pattern by template type
+     * @description A helper to get localStorage key patterns for different template types.
+     * @private
      */
     private static getStorageKeyByTemplate(templateType: string, bookName: string, chapterKey: string): string {
         const keyMap: { [key: string]: string } = {
@@ -586,7 +660,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get display name for template type
+     * @description A helper to get a user-friendly display name for a template type.
+     * @private
      */
     private static getTemplateDisplayName(templateType: string): string {
         const nameMap: { [key: string]: string } = {
@@ -601,7 +676,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get chapter subtopics
+     * @description Retrieves subtopic data for a chapter.
+     * @private
      */
     private static getChapterSubtopics(bookId: string, chapterName: string): SubtopicData[] {
         const subtopicsKey = `subtopics_${bookId}_${chapterName.replace(/\s+/g, '_')}`;
@@ -634,7 +710,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get exam mode data
+     * @description Retrieves exam mode data for a chapter.
+     * @private
      */
     private static getExamModeData(bookName: string, chapterName: string): ExamModeData | undefined {
         const examKey = `exam_${bookName}_${chapterName.replace(/\s+/g, '_')}`;
@@ -661,7 +738,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get highlights data
+     * @description Retrieves highlights data for a chapter.
+     * @private
      */
     private static getHighlights(bookName: string, chapterName: string): HighlightData[] {
         const highlightsKey = `highlights_${bookName}_${chapterName.replace(/\s+/g, '_')}`;
@@ -679,7 +757,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get user notes data
+     * @description Retrieves user notes for a chapter.
+     * @private
      */
     private static getUserNotes(bookName: string, chapterName: string): UserNoteData[] {
         const notesKey = `userNotes_${bookName}_${chapterName.replace(/\s+/g, '_')}`;
@@ -697,7 +776,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get custom content
+     * @description Retrieves any other custom content for a chapter.
+     * @private
      */
     private static getCustomContent(bookName: string, chapterKey: string): { [key: string]: any } {
         const customContent: { [key: string]: any } = {};
@@ -726,7 +806,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Process and optimize assets
+     * @description Processes and optimizes image assets for the export.
+     * @private
      */
     private static async processAssets(bookModule: MarketplaceBookModule): Promise<void> {
         console.log('🖼️ Processing assets...');
@@ -753,7 +834,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Generate thumbnail for image
+     * @description Generates a smaller thumbnail for a given image URL.
+     * @private
      */
     private static async generateThumbnail(imageUrl: string): Promise<string | null> {
         try {
@@ -778,7 +860,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Generate integrity data
+     * @description Calculates and populates integrity data (checksum, counts) for the manifest.
+     * @private
      */
     private static generateIntegrityData(bookModule: MarketplaceBookModule): void {
         let itemCount = 0;
@@ -824,7 +907,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Generate simple checksum
+     * @description Generates a simple checksum from a string.
+     * @private
      */
     private static generateChecksum(data: string): string {
         let hash = 0;
@@ -837,7 +921,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Format file size
+     * @description Formats a number of bytes into a human-readable string.
+     * @private
      */
     private static formatFileSize(bytes: number): string {
         if (bytes === 0) return '0 Bytes';
@@ -848,7 +933,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Create marketplace ZIP package
+     * @description Creates the final ZIP package with a structured folder layout.
+     * @private
      */
     private static async createMarketplacePackage(bookModule: MarketplaceBookModule): Promise<Blob> {
         console.log('📦 Creating marketplace package...');
@@ -931,7 +1017,8 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Download marketplace module
+     * @description Triggers a browser download for the created marketplace module ZIP file.
+     * @private
      */
     private static downloadMarketplaceModule(blob: Blob, bookName: string): void {
         const url = URL.createObjectURL(blob);
@@ -947,7 +1034,10 @@ export class MarketplaceBookExportService {
     }
 
     /**
-     * Get export preview/summary
+     * @description Provides a summary of what an export would contain without creating the ZIP file.
+     * @param {string} bookName - The name of the book.
+     * @param {string} bookId - The ID of the book.
+     * @returns {Promise<object>} A promise that resolves with the export preview statistics.
      */
     static async getExportPreview(bookName: string, bookId: string): Promise<{
         totalChapters: number;

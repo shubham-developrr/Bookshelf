@@ -1,11 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { geminiAPIService } from '../services/GeminiAPIService';
 
+/**
+ * @interface PremiumAIModalProps
+ * @description Defines the props for the PremiumAIModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ */
 interface PremiumAIModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+/**
+ * @description A modal component for managing premium AI settings, including API key configuration.
+ * @param {PremiumAIModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The premium AI modal component.
+ */
 const PremiumAIModal: React.FC<PremiumAIModalProps> = ({ isOpen, onClose }) => {
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +33,9 @@ const PremiumAIModal: React.FC<PremiumAIModalProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
+  /**
+   * @description Handles the saving and validation of the user's API key.
+   */
   const handleSaveApiKey = async () => {
     if (!apiKey.trim()) {
       setErrorMessage('Please enter an API key');
@@ -53,6 +67,9 @@ const PremiumAIModal: React.FC<PremiumAIModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  /**
+   * @description Handles the removal of the user's API key.
+   */
   const handleRemoveApiKey = () => {
     geminiAPIService.clearApiKey();
     setCurrentStatus(geminiAPIService.getStatus());

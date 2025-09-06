@@ -7,6 +7,15 @@ import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { PencilIcon, EyeIcon, BookOpenIcon, PlusIcon, TrashIcon } from './icons';
 import 'katex/dist/katex.min.css';
 
+/**
+ * @interface Note
+ * @description Defines the structure of a note object.
+ * @property {string} id - The unique identifier for the note.
+ * @property {string} topic - The topic of the note.
+ * @property {string} content - The content of the note in Markdown format.
+ * @property {Date} createdAt - The date the note was created.
+ * @property {Date} updatedAt - The date the note was last updated.
+ */
 interface Note {
     id: string;
     topic: string;
@@ -15,6 +24,14 @@ interface Note {
     updatedAt: Date;
 }
 
+/**
+ * @interface NotesManagerProps
+ * @description Defines the props for the NotesManager component.
+ * @property {string} currentBook - The name of the current book.
+ * @property {string} currentChapter - The name of the current chapter.
+ * @property {string} [tabId] - An optional unique identifier for the tab to isolate storage.
+ * @property {string} [className] - An optional class name for the component.
+ */
 interface NotesManagerProps {
     currentBook: string;
     currentChapter: string;
@@ -22,6 +39,11 @@ interface NotesManagerProps {
     className?: string;
 }
 
+/**
+ * @description A component for managing and editing notes in Markdown format.
+ * @param {NotesManagerProps} props - The props for the component.
+ * @returns {JSX.Element} The notes manager component.
+ */
 const NotesManager: React.FC<NotesManagerProps> = ({
     currentBook,
     currentChapter,
@@ -51,13 +73,18 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         }
     }, [storageKey]);
 
-    // Save notes to localStorage
+    /**
+     * @description Saves an array of notes to local storage.
+     * @param {Note[]} updatedNotes - The array of notes to save.
+     */
     const saveNotes = (updatedNotes: Note[]) => {
         localStorage.setItem(storageKey, JSON.stringify(updatedNotes));
         setNotes(updatedNotes);
     };
 
-    // Add new note
+    /**
+     * @description Adds a new note.
+     */
     const handleAddNote = () => {
         if (!newTopic.trim()) return;
 
@@ -77,7 +104,10 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         setIsAddingNote(false);
     };
 
-    // Delete note
+    /**
+     * @description Deletes a note.
+     * @param {string} noteId - The ID of the note to delete.
+     */
     const handleDeleteNote = (noteId: string) => {
         if (window.confirm('Are you sure you want to delete this note?')) {
             const updatedNotes = notes.filter(note => note.id !== noteId);
@@ -89,7 +119,11 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         }
     };
 
-    // Update note content
+    /**
+     * @description Updates the content of a note.
+     * @param {string} noteId - The ID of the note to update.
+     * @param {string} newContent - The new content for the note.
+     */
     const handleUpdateNote = (noteId: string, newContent: string) => {
         const updatedNotes = notes.map(note =>
             note.id === noteId

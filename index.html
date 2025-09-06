@@ -1,10 +1,18 @@
+<!--
+ * @file This is the main HTML file for the application. It sets up the basic structure of the page,
+ * includes necessary scripts and stylesheets, and provides the root element for the React application.
+-->
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Meta tags for character set and viewport -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Title of the application -->
     <title>Interactive Study Bookshelf</title>
+    <!-- Tailwind CSS script for utility-first styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS configuration -->
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -32,10 +40,13 @@
   }
 }
 </script>
+<!-- Link to the main stylesheet -->
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
+    <!-- The root element where the React application will be mounted -->
     <div id="root"></div>
+    <!-- The main script for the React application -->
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>

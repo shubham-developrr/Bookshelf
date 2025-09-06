@@ -2,10 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { CloseIcon, FileTextIcon, ClockIcon, CheckCircleIcon, AlertCircleIcon, TrashIcon } from './icons';
 
+/**
+ * @interface EvaluationReport
+ * @description Defines the structure of an evaluation report.
+ * @property {string} id - The unique identifier for the report.
+ * @property {string} paperTitle - The title of the exam paper.
+ * @property {string} subjectName - The name of the subject.
+ * @property {string} chapterName - The name of the chapter.
+ * @property {Date} submittedAt - The date and time the exam was submitted.
+ * @property {'processing' | 'completed' | 'failed'} status - The status of the evaluation.
+ * @property {number} totalMarks - The total possible marks for the exam.
+ * @property {number} obtainedMarks - The marks obtained by the user.
+ * @property {number} percentage - The user's score as a percentage.
+ * @property {Array<object>} questionResults - An array of results for each question.
+ * @property {number} [processingProgress] - The progress of the evaluation, as a percentage.
+ * @property {string} [error] - Any error message associated with a failed evaluation.
+ */
 export interface EvaluationReport {
     id: string;
     paperTitle: string;
-    subjectName: string;
+    subjectName:string;
     chapterName: string;
     submittedAt: Date;
     status: 'processing' | 'completed' | 'failed';
@@ -29,6 +45,15 @@ export interface EvaluationReport {
     error?: string;
 }
 
+/**
+ * @interface EvaluationReportsModalProps
+ * @description Defines the props for the EvaluationReportsModal component.
+ * @property {boolean} isOpen - Whether the modal is open.
+ * @property {function} onClose - Callback function to close the modal.
+ * @property {EvaluationReport[]} reports - An array of evaluation reports to display.
+ * @property {function} onDeleteReport - Callback function to delete a report.
+ * @property {function} onViewReport - Callback function to view the details of a report.
+ */
 interface EvaluationReportsModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -37,6 +62,11 @@ interface EvaluationReportsModalProps {
     onViewReport: (report: EvaluationReport) => void;
 }
 
+/**
+ * @description A modal component for displaying a list of previous evaluation reports.
+ * @param {EvaluationReportsModalProps} props - The props for the component.
+ * @returns {JSX.Element | null} The evaluation reports modal component.
+ */
 const EvaluationReportsModal: React.FC<EvaluationReportsModalProps> = ({
     isOpen,
     onClose,
@@ -48,6 +78,11 @@ const EvaluationReportsModal: React.FC<EvaluationReportsModalProps> = ({
     const [sortBy, setSortBy] = useState<'date' | 'score' | 'title'>('date');
     const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'processing' | 'failed'>('all');
 
+    /**
+     * @description Returns an icon component based on the evaluation status.
+     * @param {string} status - The status of the evaluation.
+     * @returns {React.ReactElement} The icon component.
+     */
     const getStatusIcon = (status: string) => {
         switch (status) {
             case 'completed':
@@ -61,6 +96,11 @@ const EvaluationReportsModal: React.FC<EvaluationReportsModalProps> = ({
         }
     };
 
+    /**
+     * @description Returns a display-friendly string for the evaluation status.
+     * @param {string} status - The status of the evaluation.
+     * @returns {string} The display text for the status.
+     */
     const getStatusText = (status: string) => {
         switch (status) {
             case 'completed':
